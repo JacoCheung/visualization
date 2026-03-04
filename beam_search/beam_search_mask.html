@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beam Search — Token Layout &amp; Attention Masks</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#333;overflow:hidden}
+#header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+#header h1{font-size:17px;font-weight:600}
+#header .sub{font-size:12px;color:rgba(255,255,255,.5);font-weight:400}
+.controls{display:flex;gap:6px}
+.controls button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s}
+.controls button:hover{background:rgba(255,255,255,.25)}
+#main{display:flex;height:calc(100vh - 48px)}
+#chart-container{flex:1;overflow:hidden;position:relative;background:#fafbfc}
+.left-col{position:relative;width:300px;min-width:300px;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;order:-1}
+#detail-panel{position:absolute;inset:0;background:#fff;padding:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .2s ease,padding .2s ease;z-index:2}
+#detail-panel.open{padding:20px;opacity:1;pointer-events:auto;overflow-y:auto}
+#detail-panel h2{font-size:14px;margin-bottom:10px;color:#1a1a2e;display:flex;justify-content:space-between;align-items:center}
+.close-panel{background:none;border:none;font-size:18px;color:#999;cursor:pointer;padding:0 2px;line-height:1}
+.close-panel:hover{color:#333}
+.detail-item{margin-bottom:14px}
+.detail-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:3px}
+.detail-value{font-size:12.5px;line-height:1.55;white-space:pre-wrap}
+.tooltip{position:absolute;pointer-events:none;background:rgba(22,33,62,.94);color:#fff;padding:10px 14px;border-radius:8px;font-size:11.5px;line-height:1.55;max-width:320px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:100;opacity:0;transition:opacity .12s}
+.tooltip.visible{opacity:1}
+#legend{position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,.92);border:1px solid #e0e0e0;border-radius:8px;padding:8px 14px;display:flex;flex-wrap:wrap;gap:10px 16px;font-size:10.5px;color:#666;backdrop-filter:blur(4px);max-width:calc(100% - 20px)}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-swatch{width:14px;height:14px;border-radius:2px;flex-shrink:0}
+#zoom-ind{position:absolute;bottom:10px;right:10px;background:rgba(255,255,255,.88);border:1px solid #ddd;border-radius:5px;padding:3px 10px;font-size:10px;color:#888}
+.help-hint{position:absolute;top:8px;right:8px;font-size:10px;color:#aaa}
+#docs-section{flex:1;overflow-y:auto;padding:20px 18px 40px;background:#fff}
+.guide-section{margin-bottom:16px}
+.guide-section h3{font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e0e0e0}
+.guide-section p,.guide-section li{font-size:11.5px;line-height:1.6;color:#444}
+.guide-section ul{padding-left:16px;margin:4px 0 0}
+.guide-section li{margin-bottom:3px}
+.guide-section .tag-a{display:inline-block;background:#FADBD8;color:#C0392B;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
+.guide-section .tag-b{display:inline-block;background:#D4E6F1;color:#2471A3;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
+.guide-section .kw{font-weight:700;color:#1a1a2e}
+.guide-section .compare-tbl{width:100%;font-size:10.5px;border-collapse:collapse;margin-top:6px}
+.guide-section .compare-tbl th,.guide-section .compare-tbl td{padding:4px 5px;border:1px solid #e0e0e0;text-align:left}
+.guide-section .compare-tbl th{background:#f4f5f8;font-weight:700;color:#555}
+.docs-title{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a1a2e}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Beam Search Visualization <span class="sub">(beam width = 2)</span></h1>
+  <div class="controls">
+    <button onclick="zoomBy(1.3)">+ Zoom</button>
+    <button onclick="zoomBy(0.7)">− Zoom</button>
+    <button onclick="resetZoom()">Reset</button>
+    <button onclick="fitToView()">Fit</button>
+    <button onclick="expandAll()">▼ Expand All</button>
+    <button onclick="collapseAll()">▲ Collapse All</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="chart-container">
+    <div class="tooltip" id="tooltip"></div>
+    <div id="legend"></div>
+    <div id="zoom-ind">100%</div>
+    <div class="help-hint">scroll = pan · ⌘+scroll = zoom · drag = pan · click row = toggle mask</div>
+  </div>
+  <div class="left-col">
+    <div id="docs-section">
+  <div class="docs-title">Beam Search 可视化文档</div>
+
+  <div class="guide-section">
+    <h3>1. Beam Search 概述</h3>
+    <p><span class="kw">Beam Search</span> 是大语言模型推理阶段常用的解码策略。与贪心搜索每步只保留 1 个最优 token 不同，beam search 每步保留 <span class="kw">beam width</span>（本图 = 2）条得分最高的候选路径，在更大的搜索空间中寻找全局更优的输出序列。</p>
+    <ul>
+      <li>每个 decode step，模型对所有活跃 beam 生成下一个 token 的概率分布</li>
+      <li>将所有 beam × vocab 的得分排序，选取全局 top-K 路径继续</li>
+      <li>这意味着两条 beam 可能选择同一个父节点（共享祖先）或各自独立扩展</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>2. 两种 Token 排列方法</h3>
+    <p>当多条 beam 并行解码时，GPU 上需要将所有 token 组织成一个序列送入 attention 计算。如何排列这些 token，直接决定了 attention mask 的形状和 KV cache 的管理方式。</p>
+    <p><span class="tag-a">Method A</span> <span class="kw">Incremental Append（按生成顺序追加）</span></p>
+    <ul>
+      <li>所有 beam 的 token 按解码时间顺序交替追加到序列末尾</li>
+      <li>序列：[context, s0t0, s0t1, s1t0, s1t1, …]</li>
+      <li>优点：追加即可，无需搬移；缺点：不同 beam 的 token 交织在一起</li>
+    </ul>
+    <p style="margin-top:8px"><span class="tag-b">Method B</span> <span class="kw">Beam-Grouped（按 beam 分组）</span></p>
+    <ul>
+      <li>将属于同一 beam 的 token 聚合为连续块</li>
+      <li>序列：[context, beam0_tokens…, beam1_tokens…]</li>
+      <li>每步需根据 beam 的祖先路径重新组织各 beam 的 token 顺序</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>3. Attention Mask 的作用</h3>
+    <p>并行解码多条 beam 时，必须通过 <span class="kw">attention mask</span> 隔离不同 beam 的 token，否则 beam 之间会发生信息泄漏，破坏搜索的独立性。</p>
+    <p><span class="tag-a">Method A</span> 的 mask 特点：</p>
+    <ul>
+      <li>Context 部分（共享）可被所有 token attend</li>
+      <li>被剪枝的路径产生 <span class="kw">dead token</span>（灰色），其行列全部 masked</li>
+      <li>Mask 矩阵呈不规则的斑块状，GPU 计算效率较低</li>
+    </ul>
+    <p style="margin-top:6px"><span class="tag-b">Method B</span> 的 mask 特点：</p>
+    <ul>
+      <li>无 dead token — 每条 beam 只保留自己的活跃路径</li>
+      <li>Mask 呈规整的块对角结构：context 块 + beam0 块 + beam1 块</li>
+      <li>结构规整利于 GPU 并行（可用 block-sparse attention 等加速）</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>4. 共享祖先与 Beam 剪枝</h3>
+    <p>Beam search 的 top-K 选择是全局的，两条 beam 可能在同一步选择了同一个父 token，此时产生<span class="kw">共享祖先</span>。</p>
+    <ul>
+      <li><span class="tag-a">Method A</span>：共享祖先 token 的 beam membership 变为 shared（灰色），两条 beam 均可 attend；被抛弃路径上的 token 变为 dead</li>
+      <li><span class="tag-b">Method B</span>：共享祖先在两个 beam 组中各保留一份副本（加粗标记），物理上存两份，但逻辑上代表同一 token</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>5. KV Cache 管理</h3>
+    <p>KV cache 存储了历史 token 的 key/value 张量，是推理的核心开销之一。两种方法对 KV cache 的管理有本质差异：</p>
+    <p><span class="tag-a">Method A</span>：</p>
+    <ul>
+      <li>KV cache 是一整条追加序列，不同 beam 的 KV 交织存储</li>
+      <li>通过 attention mask 隔离不同 beam 的 KV</li>
+      <li>Beam 切换祖先时，旧路径的 token 变 dead，其 <span class="kw">KV 仍占用 cache 空间但不再被引用</span>（内存浪费）</li>
+      <li>随着步数增加，dead token 的 KV 越积越多，cache 利用率逐步下降</li>
+    </ul>
+    <p style="margin-top:6px"><span class="tag-b">Method B</span>：</p>
+    <ul>
+      <li>KV cache 按 beam 分段管理，每条 beam 拥有独立的连续 KV 区间</li>
+      <li>无 dead token，cache 中不存在无用 KV，利用率始终 100%</li>
+      <li>但 beam 切换祖先时，需要将父 beam 的 <span class="kw">KV 前缀拷贝</span>到子 beam 的 cache 区间（拷贝开销）</li>
+      <li>实际系统（如 vLLM PagedAttention）通过页表映射避免物理拷贝，仅拷贝页表指针</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>6. 性能对比与 Tradeoff</h3>
+    <table class="compare-tbl">
+      <tr><th></th><th>Method A 追加式</th><th>Method B 分组式</th></tr>
+      <tr><td>Token 排列</td><td>按生成时间交替追加</td><td>按 beam 分组聚合</td></tr>
+      <tr><td>KV Cache</td><td>单条序列，有 dead KV 浪费</td><td>按 beam 分段，无浪费</td></tr>
+      <tr><td>Beam 切换</td><td>无需拷贝，标记 dead 即可</td><td>需拷贝/映射父 beam KV</td></tr>
+      <tr><td>Mask 形状</td><td>不规则斑块状</td><td>规整块对角结构</td></tr>
+      <tr><td>GPU 效率</td><td>mask 不规则，计算效率低</td><td>块结构利于并行加速</td></tr>
+      <tr><td>实现复杂度</td><td>简单</td><td>需要 KV 重组/页表管理</td></tr>
+      <tr><td>适用场景</td><td>beam width 小、序列短</td><td>长序列、大 beam width</td></tr>
+    </table>
+    <p style="margin-top:8px">实际推理系统（vLLM、TensorRT-LLM、SGLang 等）普遍采用 <span class="kw">Method B 变体 + PagedAttention</span>，通过页表共享和 copy-on-write 机制，在避免物理拷贝的同时实现高效的 beam 管理。</p>
+  </div>
+    </div>
+    <div id="detail-panel">
+      <h2><span>Details</span><button class="close-panel" onclick="closePanel()">✕</button></h2>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   CONSTANTS
+   ================================================================ */
+const CL = 5, STEPS = 5;
+const CONN = [[0,1],[0,0],[0,1],[0,0]];
+
+const TS = 38, TG = 2, TP = TS + TG;
+const MC = 26;
+const ROW_H = TS + 4;
+const STEP_GAP = 24;
+const MASK_TOP = 14, MASK_COL_LBL = 38, MASK_ROW_LBL = 42, MASK_BOT = 10;
+const METHOD_GAP = 60, LEFT_M = 140, TOP_M = 60;
+const MAX_N = CL + 2 * STEPS;
+
+const COL = {
+  ctx:'#E8E8E8', confirmed:'#FFF',
+  candFill:'#FFE0B2', candStroke:'#FF8C00',
+  b0:'#FADBD8', b1:'#D4E6F1',
+  ab0:'#E74C3C', ab1:'#3498DB', ashared:'#000',
+  mCtx:'#BBBBBB', mB0:'#F1948A', mB1:'#85C1E9',
+  mDead:'#C8C8C8', mMasked:'#FFF3E0',
+  deadTxt:'#CCC', aliveTxt:'#444',
+};
+
+/* ================================================================
+   DATA MODEL
+   ================================================================ */
+function beamTokens(step, beam) {
+  const r = []; let idx = beam, k = step;
+  r.push([step, idx]);
+  while (k > 1) { const t = CONN[k-2][idx]; r.push([k-1,t]); idx = t; k--; }
+  return r;
+}
+
+function computeBeamHistories() {
+  const res = [];
+  let h = [[[1,0]],[[1,1]]]; res.push(h);
+  for (let i = 0; i < 4; i++) {
+    const c = CONN[i], prev = res[i];
+    res.push([[...prev[c[0]],[i+2,0]], [...prev[c[1]],[i+2,1]]]);
+  }
+  return res;
+}
+const BH = computeBeamHistories();
+
+function tokEq(a, b) { return a[0]===b[0] && a[1]===b[1]; }
+
+function methodAData(step) {
+  const tokens = [], beams = [], dividers = [];
+  for (let i = 0; i < CL; i++) { tokens.push({label:'c'+i, type:'context'}); beams.push(2); }
+  if (step === 0) return {tokens, beams, dividers};
+  const b0 = beamTokens(step,0), b1 = beamTokens(step,1);
+  for (let s = 1; s <= step; s++) {
+    for (let j = 0; j < 2; j++) {
+      const tok = [s,j], label = 's'+(s-1)+'t'+j;
+      const in0 = b0.some(t=>tokEq(t,tok)), in1 = b1.some(t=>tokEq(t,tok));
+      let bm; if (in0&&in1) bm=2; else if (in0) bm=0; else if (in1) bm=1; else bm=-1;
+      beams.push(bm);
+      const isCand = s===step;
+      tokens.push({label, type: isCand?'candidate': bm===-1?'dead': bm===2?'shared':'confirmed', beam:bm, genStep:s, tokIdx:j});
+    }
+  }
+  for (let s = 1; s <= step; s++) dividers.push(CL + 2*s);
+  return {tokens, beams, dividers};
+}
+
+function methodBData(step) {
+  const tokens = [], beams = [], dividers = [];
+  for (let i = 0; i < CL; i++) { tokens.push({label:'c'+i, type:'context'}); beams.push(2); }
+  if (step === 0) return {tokens, beams, dividers};
+  const hist = BH[step-1];
+  [0,1].forEach(beam => {
+    const toks = hist[beam], other = hist[1-beam];
+    toks.forEach((tok, i) => {
+      const label = 's'+(tok[0]-1)+'t'+tok[1];
+      const isCand = i === toks.length-1;
+      const isShared = i < other.length && tokEq(other[i], tok);
+      tokens.push({label, type: isCand?'candidate': beam===0?'beam0':'beam1', beam, shared:isShared});
+      beams.push(beam);
+    });
+  });
+  dividers.push(CL, CL + hist[0].length);
+  return {tokens, beams, dividers};
+}
+
+function canAttend(i, j, beams) {
+  if (j > i) return false;
+  const bi = beams[i], bj = beams[j];
+  if (bi===-1 || bj===-1) return false;
+  if (bi===2 || bj===2) return true;
+  return bi === bj;
+}
+
+function maskCellColor(bi) {
+  return bi===2?COL.mCtx : bi===0?COL.mB0 : bi===1?COL.mB1 : COL.mDead;
+}
+
+function traceBeam(step, beam) {
+  const r = []; let idx = beam, k = step;
+  while (k > 1) { const t = CONN[k-2][idx]; r.push({step:k, src:idx, tgt:t}); idx = t; k--; }
+  return r;
+}
+
+const allDataA = [], allDataB = [];
+for (let s = 0; s <= STEPS; s++) { allDataA.push(methodAData(s)); allDataB.push(methodBData(s)); }
+
+/* ================================================================
+   LAYOUT STATE
+   ================================================================ */
+const expanded = new Set();
+
+function maskExtra(step) {
+  const n = CL + 2 * step;
+  return MASK_TOP + MASK_COL_LBL + n * MC + MASK_BOT;
+}
+
+function stepY(step, method) {
+  let y = 0;
+  for (let s = 0; s < step; s++) {
+    y += ROW_H;
+    if (s >= 1 && expanded.has(method + s)) y += maskExtra(s);
+    y += STEP_GAP;
+  }
+  return y;
+}
+
+/* ================================================================
+   SVG + ZOOM
+   ================================================================ */
+const svg = d3.select('#chart-container').append('svg').attr('width','100%').attr('height','100%');
+const defs = svg.append('defs');
+[['ab0',COL.ab0],['ab1',COL.ab1],['ash',COL.ashared]].forEach(([id,c]) => {
+  defs.append('marker').attr('id',id).attr('viewBox','0 0 8 6').attr('refX',7).attr('refY',3)
+    .attr('markerWidth',7).attr('markerHeight',5).attr('orient','auto')
+    .append('path').attr('d','M0,0L8,3L0,6Z').attr('fill',c);
+});
+
+const gRoot = svg.append('g');
+const zoomBeh = d3.zoom().scaleExtent([.15,5])
+  .filter(e => {
+    if (e.type === 'wheel') return e.metaKey || e.ctrlKey;
+    return !e.button;
+  })
+  .on('zoom', e => { gRoot.attr('transform', e.transform); d3.select('#zoom-ind').text(Math.round(e.transform.k*100)+'%'); });
+svg.call(zoomBeh);
+
+svg.on('wheel', function(e) {
+  if (e.metaKey || e.ctrlKey) return;
+  e.preventDefault();
+  const t = d3.zoomTransform(this);
+  const newT = d3.zoomIdentity.translate(t.x, t.y - e.deltaY).scale(t.k);
+  svg.call(zoomBeh.transform, newT);
+}, {passive: false});
+
+/* method origins */
+const METHOD_B_X = LEFT_M + MAX_N * TP + METHOD_GAP;
+
+/* ================================================================
+   RENDER TOKENS
+   ================================================================ */
+function tokenFill(tok) {
+  if (tok.type==='context') return COL.ctx;
+  if (tok.type==='candidate') return COL.candFill;
+  if (tok.type==='dead') return '#C8C8C8';
+  if (tok.type==='beam0') return COL.b0;
+  if (tok.type==='beam1') return COL.b1;
+  if (tok.type==='shared') return '#FFF';
+  return COL.confirmed;
+}
+
+function tokenStroke(tok) {
+  if (tok.type==='candidate') return COL.candStroke;
+  if (tok.type==='dead') return '#999';
+  return '#BBB';
+}
+
+function drawTokenStrip(parent, data, ox, oy, step, method) {
+  const grp = parent.append('g').attr('class','token-strip');
+  data.tokens.forEach((tok, i) => {
+    const x = ox + i * TP, y = oy;
+    const bm = data.beams[i];
+    const tg = grp.append('g').attr('cursor','pointer')
+      .on('mousemove', moveTip).on('mouseleave', ev => { hideTip(); if (method==='A') clearBeamHL(grp); })
+      .on('click', () => showDetail(tok, step, method));
+
+    tg.on('mouseenter', ev => {
+      showTip(ev, tok.label, tokenDesc(tok, step, method));
+      if (method === 'A' && tok.type !== 'context') highlightBeam(grp, bm);
+    });
+
+    const rect = tg.append('rect').attr('x',x).attr('y',y).attr('width',TS).attr('height',TS).attr('rx',4)
+      .attr('fill', tokenFill(tok))
+      .attr('stroke', tokenStroke(tok))
+      .attr('stroke-width', tok.type==='candidate'?1.5:1)
+      .attr('stroke-dasharray', tok.type==='candidate'?'4,2':'none');
+    rect.attr('data-beam', bm).attr('data-method', method);
+
+    const fs = tok.label.length > 4 ? 7 : 8;
+    const fw = (tok.type==='candidate' || tok.shared) ? 700 : 400;
+    const fc = tok.type==='candidate'?COL.candStroke : tok.type==='dead'?'#CCC' : '#555';
+    tg.append('text').attr('x',x+TS/2).attr('y',y+TS/2+1)
+      .attr('text-anchor','middle').attr('dominant-baseline','central')
+      .attr('font-size',fs).attr('font-weight',fw).attr('fill',fc).text(tok.label);
+  });
+
+  data.dividers.forEach(pos => {
+    const x = ox + pos * TP - TG/2;
+    grp.append('line').attr('x1',x).attr('x2',x).attr('y1',oy-3).attr('y2',oy+TS+3)
+      .attr('stroke','#333').attr('stroke-width',2).attr('stroke-linecap','round');
+  });
+
+  return grp;
+}
+
+function highlightBeam(stripGrp, beam) {
+  stripGrp.selectAll('rect[data-beam]').each(function() {
+    const el = d3.select(this);
+    const b = +el.attr('data-beam');
+    if (b === beam || b === 2 || beam === 2) {
+      el.attr('filter','drop-shadow(0 0 3px rgba(0,0,0,.35))');
+    } else {
+      el.attr('opacity', 0.25);
+    }
+  });
+}
+
+function clearBeamHL(stripGrp) {
+  stripGrp.selectAll('rect[data-beam]').attr('opacity',1).attr('filter',null);
+}
+
+/* ================================================================
+   RENDER ARROWS (Method A only)
+   ================================================================ */
+function drawArrows(parent, ox, oy, step) {
+  if (step < 2) return;
+  const c0 = traceBeam(step,0), c1 = traceBeam(step,1);
+  const drawn = new Set();
+
+  function drawOne(arr, color, markerEnd) {
+    const key = arr.step+','+arr.src+','+arr.tgt;
+    if (drawn.has(key)) return;
+    drawn.add(key);
+    const sx = ox + (CL + 2*(arr.step-1) + arr.src) * TP + TS/2;
+    const tx = ox + (CL + 2*(arr.step-2) + arr.tgt) * TP + TS/2;
+    const dist = Math.abs(sx - tx);
+    const arch = 14 + dist * 0.08 + arr.src * 4;
+    const cy = oy - arch;
+    parent.append('path')
+      .attr('d', `M${sx},${oy} C${sx},${cy} ${tx},${cy} ${tx},${oy}`)
+      .attr('fill','none').attr('stroke',color).attr('stroke-width',1.2)
+      .attr('marker-end', `url(#${markerEnd})`);
+  }
+
+  c0.forEach(a => {
+    const shared = c1.some(b => b.step===a.step && b.src===a.src && b.tgt===a.tgt);
+    drawOne(a, shared?COL.ashared:COL.ab0, shared?'ash':'ab0');
+  });
+  c1.forEach(a => {
+    const inC0 = c0.some(b => b.step===a.step && b.src===a.src && b.tgt===a.tgt);
+    if (!inC0) drawOne(a, COL.ab1, 'ab1');
+  });
+}
+
+/* ================================================================
+   RENDER MASK
+   ================================================================ */
+function drawMask(parent, data, ox, oy, step, method) {
+  const n = data.tokens.length;
+  const gm = parent.append('g').attr('class','mask-group').attr('opacity',0);
+
+  const labelText = 'Attention Mask';
+  gm.append('text').attr('x', ox + MASK_ROW_LBL + n*MC/2).attr('y', oy + 12)
+    .attr('text-anchor','middle').attr('font-size',10).attr('font-weight',600).attr('fill','#666').text(labelText);
+
+  const gridX = ox + MASK_ROW_LBL, gridY = oy + MASK_COL_LBL;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const cx = gridX + j * MC, cy = gridY + i * MC;
+      const bi = data.beams[i];
+      let fill, stroke;
+      if (canAttend(i, j, data.beams)) {
+        fill = maskCellColor(bi); stroke = '#DDD';
+      } else if (bi === -1) {
+        fill = COL.mDead; stroke = '#E8E8E8';
+      } else {
+        fill = COL.mMasked; stroke = '#E8E8E8';
+      }
+      gm.append('rect').attr('x',cx).attr('y',cy).attr('width',MC).attr('height',MC)
+        .attr('fill',fill).attr('stroke',stroke).attr('stroke-width',.5)
+        .attr('cursor','pointer')
+        .on('mouseenter', ev => {
+          const qi = data.tokens[i].label, kj = data.tokens[j].label;
+          const att = canAttend(i,j,data.beams);
+          showTip(ev, (att?'✓':'✗')+' '+qi+' → '+kj, maskCellDesc(i,j,data));
+        })
+        .on('mousemove', moveTip).on('mouseleave', hideTip)
+        .on('click', () => showMaskDetail(i, j, data, step, method));
+    }
+  }
+
+  gm.append('rect').attr('x',gridX).attr('y',gridY)
+    .attr('width',n*MC).attr('height',n*MC)
+    .attr('fill','none').attr('stroke','#333').attr('stroke-width',1);
+
+  data.dividers.forEach(d => {
+    gm.append('line').attr('x1',gridX+d*MC).attr('x2',gridX+d*MC).attr('y1',gridY).attr('y2',gridY+n*MC)
+      .attr('stroke','#333').attr('stroke-width',1);
+    gm.append('line').attr('x1',gridX).attr('x2',gridX+n*MC).attr('y1',gridY+d*MC).attr('y2',gridY+d*MC)
+      .attr('stroke','#333').attr('stroke-width',1);
+  });
+
+  for (let i = 0; i < n; i++) {
+    const c = data.beams[i]===-1?COL.deadTxt:COL.aliveTxt;
+    gm.append('text').attr('x',gridX-4).attr('y',gridY+i*MC+MC/2+1)
+      .attr('text-anchor','end').attr('dominant-baseline','central')
+      .attr('font-size',7).attr('fill',c).text(data.tokens[i].label);
+  }
+  for (let j = 0; j < n; j++) {
+    const c = data.beams[j]===-1?COL.deadTxt:COL.aliveTxt;
+    gm.append('text')
+      .attr('transform',`translate(${gridX+j*MC+MC/2},${gridY-4}) rotate(-55)`)
+      .attr('text-anchor','start').attr('font-size',7).attr('fill',c).text(data.tokens[j].label);
+  }
+
+  gm.append('text').attr('x',gridX+n*MC/2).attr('y',gridY-MASK_COL_LBL+8)
+    .attr('text-anchor','middle').attr('font-size',7).attr('fill','#AAA').text('Key →');
+  gm.append('text')
+    .attr('transform',`translate(${gridX-MASK_ROW_LBL+8},${gridY+n*MC/2}) rotate(-90)`)
+    .attr('text-anchor','middle').attr('font-size',7).attr('fill','#AAA').text('Query →');
+
+  return gm;
+}
+
+/* ================================================================
+   BUILD STEP GROUPS
+   ================================================================ */
+const stepGroups = {};
+
+function buildMethod(method) {
+  const baseX = method === 'A' ? LEFT_M : METHOD_B_X;
+  const allData = method === 'A' ? allDataA : allDataB;
+  const mTitle = method === 'A' ? 'Method A: Incremental Append' : 'Method B: Beam-Grouped';
+
+  gRoot.append('text').attr('x', baseX + MAX_N*TP/2).attr('y', TOP_M - 20)
+    .attr('text-anchor','middle').attr('font-size',13).attr('font-weight',700).attr('fill','#1a1a2e')
+    .attr('class','method-title-'+method).text(mTitle);
+
+  for (let step = 0; step <= STEPS; step++) {
+    const data = allData[step];
+    const y = stepY(step, method);
+    const grp = gRoot.append('g').attr('id','step-'+method+'-'+step)
+      .attr('transform', `translate(0,${TOP_M + y})`);
+    stepGroups[method+step] = grp;
+
+    if (method === 'A') {
+      const stepLabel = step === 0 ? 'Initial Context' : 'Decode Step ' + step;
+      grp.append('text').attr('x', LEFT_M - 12).attr('y', TS/2 + 1)
+        .attr('text-anchor','end').attr('dominant-baseline','central')
+        .attr('font-size',11).attr('font-weight',500).attr('fill','#666').text(stepLabel);
+    }
+
+    drawTokenStrip(grp, data, baseX, 0, step, method);
+    if (method === 'A') drawArrows(grp, baseX, 0, step);
+
+    if (step >= 1) {
+      const hint = grp.append('g').attr('class','expand-hint').attr('cursor','pointer')
+        .on('click', () => toggleMask(step));
+      const hw = data.tokens.length * TP;
+      hint.append('rect').attr('x',baseX).attr('y',TS+1).attr('width',hw).attr('height',16)
+        .attr('fill','#3498DB').attr('fill-opacity',.04).attr('rx',3);
+      hint.append('text').attr('x',baseX+hw/2).attr('y',TS+11)
+        .attr('text-anchor','middle').attr('font-size',8).attr('fill','#3498DB').attr('opacity',.6)
+        .attr('class','hint-text').text('▼ click to show attention mask');
+
+      const maskY = ROW_H + MASK_TOP;
+      drawMask(grp, data, baseX, maskY, step, method);
+    }
+  }
+}
+
+buildMethod('A');
+buildMethod('B');
+
+/* ================================================================
+   TOGGLE MASK
+   ================================================================ */
+function toggleMask(step) {
+  const keyA = 'A'+step, keyB = 'B'+step;
+  if (expanded.has(keyA)) { expanded.delete(keyA); expanded.delete(keyB); }
+  else { expanded.add(keyA); expanded.add(keyB); }
+  updateLayout();
+}
+
+function updateLayout() {
+  ['A','B'].forEach(method => {
+    for (let step = 0; step <= STEPS; step++) {
+      const y = stepY(step, method);
+      d3.select('#step-'+method+'-'+step)
+        .transition().duration(300).attr('transform',`translate(0,${TOP_M + y})`);
+
+      if (step >= 1) {
+        const isExp = expanded.has(method + step);
+        const grp = stepGroups[method+step];
+        grp.select('.mask-group').transition().duration(250).attr('opacity', isExp?1:0);
+        grp.select('.hint-text').text(isExp ? '▲ click to hide attention mask' : '▼ click to show attention mask');
+      }
+    }
+  });
+}
+
+/* ================================================================
+   TOOLTIP
+   ================================================================ */
+const tooltip = d3.select('#tooltip');
+function showTip(ev, title, desc) {
+  tooltip.classed('visible',true).html('<div style="font-weight:700;font-size:13px;margin-bottom:4px">'+title+'</div><div style="color:#c8d0e0;white-space:pre-wrap">'+desc+'</div>');
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const r = document.getElementById('chart-container').getBoundingClientRect();
+  let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
+  if (x + 320 > r.width) x = ev.clientX - r.left - 330;
+  if (y + 180 > r.height) y = ev.clientY - r.top - 190;
+  tooltip.style('left',x+'px').style('top',y+'px');
+}
+function hideTip() { tooltip.classed('visible',false); }
+
+/* ================================================================
+   DESCRIPTIONS
+   ================================================================ */
+const beamName = b => b===2?'Shared':b===0?'Beam 0':b===1?'Beam 1':'Dead';
+
+function tokenDesc(tok, step, method) {
+  if (tok.type==='context') return 'Shared context token.\nAll beams can attend to this token.';
+  if (tok.type==='candidate') return 'Candidate token being decoded at Step '+step+'.\nBeam membership will be determined by beam search selection.';
+  if (tok.type==='dead') return 'Dead token — pruned by beam search.\nNo longer in any active beam\'s path.\nIsolated in the attention mask.';
+  if (tok.type==='shared') return 'Shared ancestor token.\nAppears in both beams\' active paths.\nAll beams can attend to this token.';
+  if (tok.shared) return 'Shared ancestor token ('+beamName(tok.beam)+' group).\nAppears in both beams\' histories.\nAll tokens from either beam can attend to it.';
+  if (tok.type==='beam0') return 'Active token in Beam 0\'s sequence.\nOnly Beam 0 tokens can attend to this.';
+  if (tok.type==='beam1') return 'Active token in Beam 1\'s sequence.\nOnly Beam 1 tokens can attend to this.';
+  return 'Confirmed token in '+beamName(tok.beam)+'\'s active path.';
+}
+
+function maskCellDesc(i, j, data) {
+  const qi = data.tokens[i], kj = data.tokens[j];
+  const bi = data.beams[i], bj = data.beams[j];
+  if (j > i) return 'Causal masking: '+kj.label+' is at a later position than '+qi.label+'.';
+  if (bi===-1) return qi.label+' is dead — no attention is computed for this row.';
+  if (bj===-1) return kj.label+' is dead — cannot be attended to.';
+  if (canAttend(i,j,data.beams)) {
+    if (bi===2 && bj===2) return qi.label+' attends to '+kj.label+': both are shared context.';
+    if (bi===2) return qi.label+' (shared) attends to '+kj.label+' ('+beamName(bj)+').';
+    if (bj===2) return qi.label+' ('+beamName(bi)+') attends to '+kj.label+' (shared context).';
+    return qi.label+' attends to '+kj.label+': both in '+beamName(bi)+'.';
+  }
+  return qi.label+' ('+beamName(bi)+') CANNOT attend to '+kj.label+' ('+beamName(bj)+').\nBeam isolation: different beams are masked.';
+}
+
+/* ================================================================
+   DETAIL PANEL
+   ================================================================ */
+function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
+window.closePanel = function() { document.getElementById('detail-panel').classList.remove('open'); };
+
+function showDetail(tok, step, method) {
+  openPanel();
+  const p = d3.select('#detail-content').html('');
+  const add = (label, val) => {
+    const d = p.append('div').attr('class','detail-item');
+    d.append('div').attr('class','detail-label').text(label);
+    d.append('div').attr('class','detail-value').text(val);
+  };
+  add('Token', tok.label);
+  add('Type', tok.type.charAt(0).toUpperCase()+tok.type.slice(1));
+  add('Method', method==='A'?'A: Incremental Append':'B: Beam-Grouped');
+  add('Step', step===0?'Initial Context':'Decode Step '+step);
+  if (tok.beam !== undefined) add('Beam Membership', beamName(tok.beam));
+  add('Description', tokenDesc(tok, step, method));
+
+  if (step >= 2 && method === 'A') {
+    const c0 = traceBeam(step,0), c1 = traceBeam(step,1);
+    let arrows = '';
+    c0.forEach(a => {
+      const shared = c1.some(b=>b.step===a.step&&b.src===a.src&&b.tgt===a.tgt);
+      arrows += 's'+(a.step-1)+'t'+a.src+' → s'+(a.step-2)+'t'+a.tgt+' ('+( shared?'Shared':' Beam 0')+')\n';
+    });
+    c1.forEach(a => {
+      if (!c0.some(b=>b.step===a.step&&b.src===a.src&&b.tgt===a.tgt))
+        arrows += 's'+(a.step-1)+'t'+a.src+' → s'+(a.step-2)+'t'+a.tgt+' (Beam 1)\n';
+    });
+    if (arrows) add('Beam Connections', arrows.trim());
+  }
+}
+
+function showMaskDetail(i, j, data, step, method) {
+  openPanel();
+  const p = d3.select('#detail-content').html('');
+  const add = (label, val) => {
+    const d = p.append('div').attr('class','detail-item');
+    d.append('div').attr('class','detail-label').text(label);
+    d.append('div').attr('class','detail-value').text(val);
+  };
+  const qi = data.tokens[i], kj = data.tokens[j];
+  const att = canAttend(i,j,data.beams);
+  add('Mask Cell', qi.label+' [row '+i+'] → '+kj.label+' [col '+j+']');
+  add('Can Attend', att?'Yes ✓':'No ✗');
+  add('Query Beam', beamName(data.beams[i]));
+  add('Key Beam', beamName(data.beams[j]));
+  add('Method', method==='A'?'A: Incremental Append':'B: Beam-Grouped');
+  add('Step', 'Decode Step '+step);
+  add('Reason', maskCellDesc(i, j, data));
+}
+
+/* ================================================================
+   LEGEND
+   ================================================================ */
+const legendData = [
+  {label:'Context', fill:COL.ctx, stroke:'#BBB', desc:'初始上下文 token 及共享祖先。所有 beam 共享，均可 attend。在 mask 中显示为深灰色区域。'},
+  {label:'Confirmed', fill:COL.confirmed, stroke:'#BBB', desc:'已确认的活跃 token，属于某条 beam 的当前路径。'},
+  {label:'Candidate', fill:COL.candFill, stroke:COL.candStroke, dash:true, desc:'当前 step 正在解码的候选 token（橙色虚线边框）。'},
+  {label:'Beam 0', fill:COL.b0, stroke:'#BBB', desc:'属于 Beam 0 的 token。在序列条中为粉红色方块，在 mask 中对应可 attend 区域为红色系。'},
+  {label:'Beam 1', fill:COL.b1, stroke:'#BBB', desc:'属于 Beam 1 的 token。在序列条中为蓝色方块，在 mask 中对应可 attend 区域为蓝色系。'},
+  {label:'Dead', fill:'#C8C8C8', stroke:'#999', desc:'被 beam search 剪枝的 token，不再属于任何活跃路径。在 mask 中对应行/列全部不参与 attention 计算。其 KV cache 仍占空间但不再被引用。'},
+  {label:'Blocked', fill:COL.mMasked, stroke:'#E0C8A0', desc:'Mask 中被遮蔽的区域（浅琥珀色），因 beam 隔离或因果遮蔽而无法 attend。'},
+];
+const leg = d3.select('#legend');
+legendData.forEach(d => {
+  const item = leg.append('div').attr('class','legend-item').attr('cursor','pointer')
+    .on('mouseenter', ev => showTip(ev, d.label, d.desc))
+    .on('mousemove', moveTip).on('mouseleave', hideTip);
+  const sw = item.append('div').attr('class','legend-swatch')
+    .style('background',d.fill).style('border','1px solid '+d.stroke);
+  if (d.dash) sw.style('border-style','dashed');
+  item.append('span').text(d.label);
+});
+
+/* ================================================================
+   ZOOM CONTROLS
+   ================================================================ */
+window.zoomBy = k => svg.transition().duration(250).call(zoomBeh.scaleBy, k);
+window.resetZoom = () => svg.transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity);
+window.fitToView = () => {
+  const r = document.getElementById('chart-container').getBoundingClientRect();
+  const bb = gRoot.node().getBBox();
+  const s = Math.min(r.width/(bb.width+60), r.height/(bb.height+60))*.92;
+  const tx = (r.width - bb.width*s)/2 - bb.x*s;
+  const ty = (r.height - bb.height*s)/2 - bb.y*s;
+  svg.transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity.translate(tx,ty).scale(s));
+};
+window.expandAll = () => { for(let s=1;s<=STEPS;s++){expanded.add('A'+s);expanded.add('B'+s);} updateLayout(); };
+window.collapseAll = () => { expanded.clear(); updateLayout(); };
+setTimeout(fitToView, 150);
+window.addEventListener('resize', () => setTimeout(fitToView, 80));
+</script>
+</body>
+</html>

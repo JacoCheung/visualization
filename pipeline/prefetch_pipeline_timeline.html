@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Timeline — 3 Iterations Unrolled</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#333;overflow:hidden}
+#header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+#header h1{font-size:17px;font-weight:600}
+.controls{display:flex;gap:6px}
+.controls button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s}
+.controls button:hover{background:rgba(255,255,255,.25)}
+#main{display:flex;height:calc(100vh - 48px)}
+#chart-container{flex:1;overflow:hidden;position:relative;background:#fafbfc}
+#detail-panel{width:330px;background:#fff;border-left:1px solid #e0e0e0;padding:20px;overflow-y:auto}
+#detail-panel h2{font-size:14px;margin-bottom:10px;color:#1a1a2e}
+.detail-item{margin-bottom:14px}
+.detail-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:3px}
+.detail-value{font-size:12.5px;line-height:1.55}
+.code-ref{background:#f4f4f6;padding:8px 10px;border-radius:6px;font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:11px;margin-top:4px;white-space:pre-wrap;line-height:1.5}
+.sync-card{margin-bottom:6px;padding:6px 8px;background:#f8f8fa;border-radius:4px;font-size:11.5px;line-height:1.5}
+.tooltip{position:absolute;pointer-events:none;background:rgba(22,33,62,.94);color:#fff;padding:10px 14px;border-radius:8px;font-size:11.5px;line-height:1.55;max-width:320px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:100;opacity:0;transition:opacity .12s}
+.tooltip.visible{opacity:1}
+.tt-title{font-weight:700;font-size:13px;margin-bottom:3px}
+.tt-stream{color:#8899bb;font-size:10px}
+.tt-desc{margin-top:6px;color:#c8d0e0}
+#legend{position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,.92);border:1px solid #e0e0e0;border-radius:8px;padding:8px 16px;display:flex;gap:18px;font-size:10.5px;color:#666;backdrop-filter:blur(4px)}
+.legend-item{display:flex;align-items:center;gap:5px}
+#zoom-ind{position:absolute;bottom:10px;right:10px;background:rgba(255,255,255,.88);border:1px solid #ddd;border-radius:5px;padding:3px 10px;font-size:10px;color:#888}
+.help-hint{position:absolute;top:8px;right:8px;font-size:10px;color:#aaa}
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>progress() — 3-Iteration Pipeline Timeline</h1>
+  <div class="controls">
+    <button onclick="zoomBy(1.4)">+ Zoom In</button>
+    <button onclick="zoomBy(0.7)">− Zoom Out</button>
+    <button onclick="resetZoom()">Reset</button>
+    <button onclick="fitToView()">Fit</button>
+  </div>
+</div>
+<div id="main">
+  <div id="chart-container">
+    <div class="tooltip" id="tooltip"></div>
+    <div id="legend">
+      <div class="legend-item"><svg width="28" height="6"><line x1="0" y1="3" x2="28" y2="3" stroke="#C00000" stroke-width="1.5" stroke-dasharray="5,3"/></svg><span>GPU wait_stream</span></div>
+      <div class="legend-item"><svg width="28" height="6"><line x1="0" y1="3" x2="28" y2="3" stroke="#C55A11" stroke-width="1.5" stroke-dasharray="5,3"/></svg><span>CPU sync / Future</span></div>
+      <div class="legend-item"><svg width="8" height="16"><line x1="4" y1="1" x2="4" y2="15" stroke="#C00000" stroke-width="3" stroke-linecap="round"/></svg><span>wait_stream barrier</span></div>
+      <div class="legend-item"><svg width="28" height="6"><line x1="0" y1="3" x2="28" y2="3" stroke="#ccc" stroke-width="1.5" stroke-dasharray="3,4"/></svg><span>stream idle</span></div>
+      <div class="legend-item"><svg width="28" height="6"><line x1="0" y1="3" x2="28" y2="3" stroke="#FF0000" stroke-width="1.8" opacity=".75"/></svg><span>same batch flow</span></div>
+      <div class="legend-item"><svg width="14" height="14"><rect width="14" height="14" rx="2" fill="#2B579A" fill-opacity=".06" stroke="#2B579A" stroke-opacity=".18"/></svg><span>iteration region</span></div>
+    </div>
+    <div id="zoom-ind">100%</div>
+    <div class="help-hint">scroll = zoom · drag = pan · click = details</div>
+  </div>
+  <div id="detail-panel">
+    <h2>Operation Details</h2>
+    <p id="detail-placeholder" style="color:#aaa;font-size:12px;margin-top:8px">Click any operation box or barrier to inspect.</p>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   STREAMS
+   ================================================================ */
+const STREAMS = [
+  { id:'default',  name:'default_stream',   thread:'main thread', color:'#2B579A' },
+  { id:'memcpy',   name:'_memcpy_stream',   thread:'main thread', color:'#217346' },
+  { id:'cpu_bg',   name:'CPU bg thread',    thread:'KK executor', color:'#C55A11' },
+  { id:'prefetch', name:'_prefetch_stream',  thread:'main thread', color:'#2E75B6' },
+  { id:'datadist', name:'_data_dist_stream', thread:'main thread', color:'#7030A0' },
+];
+
+/* ================================================================
+   DATA GENERATION — 3 iterations
+   ================================================================ */
+const CYCLE = 82, NUM_ITERS = 3, MAX_T = NUM_ITERS * CYCLE;
+const bn = n => n === 0 ? 'N' : 'N+' + n;
+
+const CODE = {
+  prev_pf:  'train_pipeline.py:918-919\n_wait_for_batch(cast(In, self._batch_i), self._prefetch_stream)\n\nutils.py:790\ntorch.get_device_module(device).current_stream().wait_stream(stream)  # GPU-level, non-blocking',
+  prev_dd:  'train_pipeline.py:931-932\nself._wait_sparse_data_dist()\n\ntrain_pipeline.py:499-501\nfor names, awaitable in self._context.fused_splits_awaitables:\n    for name, request in zip(names, awaitable.wait()):  # CPU blocks here',
+  h2d:      'train_pipeline.py:922-928\nwith self._stream_context(self._memcpy_stream):\n    raw_batch = _to_device(raw_batch, self._device, non_blocking=True)',
+  ag_wkld:  'train_pipeline.py:936-941\nwith self._stream_context(self._memcpy_stream):\n    shuffle_handle = self._batch_shuffler.start_shuffle_async(\n        raw_batch, parallel_state.get_data_parallel_group())',
+  fwd:      'train_pipeline.py:944-946\nlosses, output = self._model_fwd(self._batch_i)',
+  kk:       'batch_shuffler.py: start_shuffle_async()\nself._kk_executor.submit(kk_partition, ...)',
+  finish:   'train_pipeline.py:949-964\nwith self._stream_context(self._memcpy_stream):\n    self._batch_ip2 = self._batch_shuffler.finish_shuffle(\n        raw_batch, shuffle_handle, pg_group)',
+  loss_ar:  'train_pipeline.py:987-989\ntorch.distributed.all_reduce(\n    reporting_loss, group=parallel_state.get_data_parallel_group())',
+  pf:       'train_pipeline.py:990-991\nself._prefetch(self._batch_ip1)',
+  bwd:      'train_pipeline.py:997-1014\ntorch.cuda.current_stream().wait_stream(self._prefetch_stream)\nlocal_loss_average.backward()\nself._optimizer.step()',
+  inp_dist: 'train_pipeline.py:1016-1017\nself._start_sparse_data_dist(self._batch_ip2)',
+};
+
+const DESC = {
+  prev_pf: b => '【GPU wait，不阻塞 CPU】\n\n等待上一轮的 (10) prefetch（batch['+b+'] embedding lookup）完成。\n\n机制：current_stream().wait_stream(_prefetch_stream)——这是 GPU 级别的 wait_stream，CPU 调用后立即返回。GPU default_stream 上后续操作（(6) forward）会自动等 _prefetch_stream 完成后才执行。\n\n等待的 batch：batch['+b+']（_batch_i，即将 forward 的 batch）。',
+  prev_dd: b => '【CPU 阻塞等待】\n\n等待上一轮的 (13) input_dist（batch['+b+'] sparse data distribution / AllToAll）完成。\n\n机制：调用 awaitable.wait()——这是 CPU 级别的阻塞。CPU 主线程会卡住，直到 _data_dist_stream 上的 AllToAll 完成并返回结果 tensor。在此期间，(4)(6) 等后续步骤的 GPU 指令都无法被提交。\n\n等待的 batch：batch['+b+']（_batch_ip1，本轮将在 (10) 做 prefetch 的 batch）。\n\n为什么必须 CPU 阻塞：需要拿到 input_dist 的结果 tensor 才能继续；同时确保 _data_dist_stream 上的 NCCL 空闲，防止 (4) 的 AllGather 与之冲突。',
+  h2d:     b => 'Host→Device 拷贝 batch['+b+'] 到 GPU，在 _memcpy_stream 上执行。仅 memcpy，无 NCCL 通信。CPU 调用是 non-blocking，立即返回。',
+  ag_wkld: b => '在 _memcpy_stream 上 AllGather workload sizes（每个 rank 的 batch 工作量）for batch['+b+']。使用 DP group 的 NCCL communicator。完成后将 KK partitioning 任务提交到 CPU 后台线程。',
+  fwd:     b => 'batch['+b+'] 的 forward pass，在 default_stream 上执行。这是主要的 GPU 计算。与 CPU 后台线程上的 (5) KK partitioning 并行执行——这种重叠正是 2-phase async shuffle 设计的核心收益。',
+  kk:      b => 'Karmarkar-Karp 负载均衡算法（batch['+b+']），在 CPU 后台线程（ThreadPoolExecutor）上执行。由 (4) 结束时提交，与 (6) forward 并行运行。结果通过 Future.result() 在 (7) 中被消费。',
+  finish:  b => '在 _memcpy_stream 上完成 shuffle（batch['+b+']）。首先 CPU 阻塞等待 KK Future.result()，然后 GPU 执行：AllGather batch data（NCCL DP）+ index_select 按 KK 分配重排 → 生成 _batch_ip2。',
+  loss_ar: b => '在 default_stream 上 AllReduce loss（batch['+b+']），使用 DP group NCCL communicator。(8) 屏障确保此操作在 _memcpy_stream 上的 AllGather×2 之后执行，防止跨 rank NCCL 调用顺序不一致 → 死锁。',
+  pf:      b => '在 _prefetch_stream 上为 batch['+b+'] 做 embedding prefetch（table lookup + cache）。与 (9) loss AllReduce 并行执行（使用不同 NCCL comm 或不同 stream）。',
+  bwd:     b => 'batch['+b+'] 的 backward pass + optimizer step，在 default_stream 上执行。之前有 (11) wait_stream(_prefetch_stream) 屏障确保 prefetch 完成——防止 backward 读写 GPU cache 时与 prefetch flush to host 产生 race condition。',
+  inp_dist:b => '在 _data_dist_stream 上为 batch['+b+'] 发起 sparse data distribution（AllToAll）。内部先 _data_dist_stream.wait_stream(_memcpy_stream) 确保 shuffled batch 数据可见。',
+};
+
+const ITER_BG = ['rgba(43,87,154,0.05)','rgba(33,115,70,0.05)','rgba(192,90,17,0.05)'];
+const ITER_BORDER = ['#2B579A','#217346','#C55A11'];
+
+const OPS = [], BARRIERS = [], ARROWS = [];
+
+for (let i = 0; i < NUM_ITERS; i++) {
+  const off = i * CYCLE, pfx = 'i' + i + '_';
+  const bF = bn(i), bP = bn(i + 1), bH = bn(i + 2);
+
+  OPS.push(
+    { id:pfx+'prev_pf', num:'1', name:'['+bF+'] pf done', si:3, t0:off, t1:off+6, done:true, iter:i,
+      desc:DESC.prev_pf(bF), code:CODE.prev_pf },
+    { id:pfx+'prev_dd', num:'3', name:'['+bP+'] dist done', si:4, t0:off, t1:off+6, done:true, iter:i,
+      desc:DESC.prev_dd(bP), code:CODE.prev_dd }
+  );
+
+  OPS.push(
+    { id:pfx+'h2d', num:'2', name:'H2D ['+bH+']', si:1, t0:off+7, t1:off+14, iter:i,
+      desc:DESC.h2d(bH), code:CODE.h2d },
+    { id:pfx+'ag_wkld', num:'4', name:'AG wkld ['+bH+']', si:1, t0:off+16, t1:off+24, iter:i,
+      desc:DESC.ag_wkld(bH), code:CODE.ag_wkld },
+    { id:pfx+'fwd', num:'6', name:'forward ['+bF+']', si:0, t0:off+22, t1:off+42, iter:i,
+      desc:DESC.fwd(bF), code:CODE.fwd },
+    { id:pfx+'kk', num:'5', name:'KK ['+bH+']', si:2, t0:off+24, t1:off+38, iter:i,
+      desc:DESC.kk(bH), code:CODE.kk },
+    { id:pfx+'finish', num:'7', name:'AG+idx ['+bH+']', si:1, t0:off+38, t1:off+50, iter:i,
+      desc:DESC.finish(bH), code:CODE.finish },
+    { id:pfx+'loss_ar', num:'9', name:'loss AR ['+bF+']', si:0, t0:off+52, t1:off+60, clr:'#ED7D31', iter:i,
+      desc:DESC.loss_ar(bF), code:CODE.loss_ar },
+    { id:pfx+'pf', num:'10', name:'prefetch ['+bP+']', si:3, t0:off+53, t1:off+62, iter:i,
+      desc:DESC.pf(bP), code:CODE.pf },
+    { id:pfx+'bwd', num:'12', name:'bwd+opt ['+bF+']', si:0, t0:off+65, t1:off+82, clr:'#4a3580', iter:i,
+      desc:DESC.bwd(bF), code:CODE.bwd },
+    { id:pfx+'inp_dist', num:'13', name:'dist ['+bH+']', si:4, t0:off+70, t1:off+82, iter:i,
+      desc:DESC.inp_dist(bH), code:CODE.inp_dist }
+  );
+
+  BARRIERS.push(
+    { id:pfx+'b7', num:'8', x:off+50, si:0, iter:i,
+      desc:'default_stream.wait_stream(_memcpy_stream)\n\nNCCL ordering guard：_memcpy_stream 上的 AllGather×2 必须在 default_stream 的 AllReduce 之前完成。否则不同 rank 可能以不同顺序到达同一 DP communicator 的 NCCL 调用 → 死锁。\n\n例：\n  Rank 0 (KK 慢, fwd 快): AllReduce 先到 NCCL\n  Rank 1 (KK 快, fwd 慢): AllGather 先到 NCCL\n  → 同一 communicator 上跨 rank 顺序不一致 → 死锁',
+      code:'train_pipeline.py:977-980\ntorch.get_device_module(self._device)\n  .current_stream().wait_stream(self._memcpy_stream)' },
+    { id:pfx+'bw', num:'11', x:off+63, si:0, iter:i,
+      desc:'default_stream.wait_stream(_prefetch_stream)\n\nCache race guard：prefetch 向 GPU cache 写入 embedding 并可能 flush 到 host memory。backward 读写同一 cache。如果并发执行，cache 可能处于 dangling 状态（key 既不在 cache 也不在 host）。',
+      code:'train_pipeline.py:997\ntorch.cuda.current_stream().wait_stream(self._prefetch_stream)' }
+  );
+
+  /* intra-iteration arrows: done blocks → actual ops */
+  ARROWS.push(
+    { id:pfx+'s1', from:pfx+'prev_pf', fa:'top', to:pfx+'fwd', ta:'bl',
+      label:'GPU wait: pf', clr:'#2E75B6',
+      desc:'(1) _prefetch_stream → default_stream（GPU wait_stream，不阻塞 CPU）：batch['+bF+'] prefetch 完成后 forward 才能执行。' },
+    { id:pfx+'s3', from:pfx+'prev_dd', fa:'top', to:pfx+'h2d', ta:'bl',
+      label:'CPU block: dist', clr:'#7030A0',
+      desc:'(3) _data_dist_stream → CPU（awaitable.wait，阻塞 CPU）：batch['+bP+'] input_dist 完成后 CPU 才能继续提交后续 GPU 指令。' }
+  );
+  ARROWS.push(
+    { id:pfx+'s4', from:pfx+'ag_wkld', fa:'bottom', to:pfx+'kk', ta:'tl',
+      label:'submit KK', clr:'#217346',
+      desc:'AG workloads 完成后，KK partitioning 任务提交到 ThreadPoolExecutor。' },
+    { id:pfx+'sf', from:pfx+'kk', fa:'tr', to:pfx+'finish', ta:'bottom',
+      label:'Future.result()', clr:'#C55A11',
+      desc:'CPU 阻塞等待 KK Future 完成，然后在 _memcpy_stream 上发起 AllGather batch + index_select。' },
+    { id:pfx+'s7', from:pfx+'finish', fa:'tr', toB:pfx+'b7',
+      label:'(8) wait(_memcpy)', clr:'#C00000',
+      desc:'(8) NCCL ordering guard：强制 AllGather×2 在 AllReduce 之前完成。' },
+    { id:pfx+'s10', from:pfx+'pf', fa:'tr', toB:pfx+'bw',
+      label:'(11) wait(_pf)', clr:'#C00000',
+      desc:'(11) Cache race guard：prefetch 完成后才能 backward。' },
+    { id:pfx+'s11', from:pfx+'finish', fa:'br', to:pfx+'inp_dist', ta:'tl',
+      label:'dist.wait(_memcpy)', clr:'#7030A0',
+      desc:'(13) 内部 wait：_data_dist_stream.wait_stream(_memcpy_stream)，确保 shuffled batch 数据可见后才发起 input_dist。' }
+  );
+}
+
+/* cross-iteration sync arrows: prev iter's result → next iter's done block */
+for (let i = 0; i < NUM_ITERS - 1; i++) {
+  const pfx = 'i' + i + '_', npfx = 'i' + (i + 1) + '_';
+  ARROWS.push(
+    { id:'x_pf_'+i, from:pfx+'pf', fa:'tr', to:npfx+'prev_pf', ta:'tl',
+      label:'(10)→(1) pf ['+bn(i+1)+']', clr:'#2E75B6',
+      desc:'Iter '+bn(i)+' 的 (10) prefetch 结果 → iter '+bn(i+1)+' 的 (1) wait_for_batch' },
+    { id:'x_dd_'+i, from:pfx+'inp_dist', fa:'tr', to:npfx+'prev_dd', ta:'tl',
+      label:'(13)→(3) dist ['+bn(i+2)+']', clr:'#7030A0',
+      desc:'Iter '+bn(i)+' 的 (13) input_dist 结果 → iter '+bn(i+1)+' 的 (3) wait_sparse_data_dist' }
+  );
+}
+
+/* auto-compute idle segments (gap > 10 time units) */
+const IDLES = [];
+const byStream = {};
+OPS.forEach(op => (byStream[op.si] = byStream[op.si] || []).push(op));
+for (const si in byStream) {
+  const segs = byStream[si].sort((a, b) => a.t0 - b.t0);
+  if (segs[0].t0 > 10) IDLES.push({ si:+si, t0:0, t1:segs[0].t0 });
+  for (let j = 0; j < segs.length - 1; j++) {
+    const g0 = segs[j].t1, g1 = segs[j + 1].t0;
+    if (g1 - g0 > 10) {
+      const idle = { si:+si, t0:g0, t1:g1 };
+      for (let it = 0; it < NUM_ITERS; it++) {
+        if (+si === 1 && g0 === it * CYCLE + 24 && g1 === it * CYCLE + 38)
+          idle.label = 'GPU idle (CPU: issue (6), then (5) KK)';
+      }
+      IDLES.push(idle);
+    }
+  }
+}
+
+/* ================================================================
+   BATCH LIFECYCLE CHAINS — connect same-batch ops with red arrows
+   ================================================================ */
+const BATCH_CLR = '#E8363B';
+const BATCH_CHAINS = [];
+for (let b = 0; b < NUM_ITERS + 2; b++) {
+  const chain = [];
+  const i1 = b - 2, i2 = b - 1, i3 = b;
+  if (i1 >= 0 && i1 < NUM_ITERS) {
+    const p = 'i' + i1 + '_';
+    chain.push(p+'h2d', p+'ag_wkld', p+'kk', p+'finish', p+'inp_dist');
+  }
+  if (i2 >= 0 && i2 < NUM_ITERS) {
+    const p = 'i' + i2 + '_';
+    chain.push(p+'prev_dd', p+'pf');
+  }
+  if (i3 >= 0 && i3 < NUM_ITERS) {
+    const p = 'i' + i3 + '_';
+    chain.push(p+'prev_pf', p+'fwd', p+'loss_ar', p+'bwd');
+  }
+  if (chain.length > 1) BATCH_CHAINS.push({ batch: bn(b), chain });
+}
+
+/* ================================================================
+   LAYOUT
+   ================================================================ */
+const LH = 72, LG = 24, LT = LH + LG, TS = 11;
+const M = { t: 70, r: 40, b: 170, l: 220 };
+const W = M.l + (MAX_T + 4) * TS + M.r;
+const H = M.t + STREAMS.length * LT + M.b;
+
+const tX = t => M.l + t * TS;
+const lY = i => M.t + i * LT;
+const lMY = i => lY(i) + LH / 2;
+
+/* ================================================================
+   SVG + ZOOM
+   ================================================================ */
+const svg = d3.select('#chart-container').append('svg')
+  .attr('width', '100%').attr('height', '100%');
+
+const ACOLORS = ['#C00000', '#7030A0', '#217346', '#C55A11', '#2E75B6', '#888888'];
+const defs = svg.append('defs');
+ACOLORS.forEach(c => {
+  defs.append('marker').attr('id', 'a' + c.slice(1))
+    .attr('viewBox', '0 0 10 6').attr('refX', 9).attr('refY', 3)
+    .attr('markerWidth', 8).attr('markerHeight', 6).attr('orient', 'auto')
+    .append('path').attr('d', 'M0,0L10,3L0,6Z').attr('fill', c);
+});
+defs.append('marker').attr('id', 'abatch')
+  .attr('viewBox', '0 0 10 6').attr('refX', 9).attr('refY', 3)
+  .attr('markerWidth', 7).attr('markerHeight', 5).attr('orient', 'auto')
+  .append('path').attr('d', 'M0,0L10,3L0,6Z').attr('fill', '#FF0000');
+
+const g = svg.append('g');
+const zoomBehavior = d3.zoom().scaleExtent([.15, 6])
+  .on('zoom', e => { g.attr('transform', e.transform); d3.select('#zoom-ind').text(Math.round(e.transform.k * 100) + '%'); });
+svg.call(zoomBehavior);
+
+/* ================================================================
+   ITERATION REGIONS
+   ================================================================ */
+for (let i = 0; i < NUM_ITERS; i++) {
+  const x0 = tX(i * CYCLE), x1 = tX((i + 1) * CYCLE);
+  const y0 = M.t - 8, y1 = M.t + STREAMS.length * LT - LG + 4;
+  g.append('rect').attr('x', x0 - 4).attr('y', y0)
+    .attr('width', x1 - x0 + 8).attr('height', y1 - y0)
+    .attr('rx', 6).attr('fill', ITER_BG[i]).attr('stroke', ITER_BORDER[i]).attr('stroke-opacity', .12);
+  g.append('text').attr('x', (x0 + x1) / 2).attr('y', M.t - 16)
+    .attr('text-anchor', 'middle').attr('font-size', '12px').attr('font-weight', '700')
+    .attr('fill', ITER_BORDER[i]).attr('fill-opacity', .7).text('Iter ' + bn(i));
+  if (i < NUM_ITERS - 1) {
+    g.append('line').attr('x1', x1).attr('x2', x1).attr('y1', y0).attr('y2', y1)
+      .attr('stroke', '#bbb').attr('stroke-width', 1).attr('stroke-dasharray', '6,4');
+  }
+}
+
+/* ================================================================
+   LANES
+   ================================================================ */
+STREAMS.forEach((s, i) => {
+  const y = lY(i);
+  g.append('rect').attr('x', M.l - 10).attr('y', y)
+    .attr('width', tX(MAX_T + 2) - M.l + 10).attr('height', LH).attr('rx', 4)
+    .attr('fill', s.color).attr('fill-opacity', .03);
+  [y, y + LH].forEach(yy => g.append('line')
+    .attr('x1', M.l - 10).attr('x2', tX(MAX_T + 2))
+    .attr('y1', yy).attr('y2', yy)
+    .attr('stroke', s.color).attr('stroke-opacity', .06));
+  g.append('text').attr('x', M.l - 16).attr('y', lMY(i) - 6)
+    .attr('text-anchor', 'end').attr('font-size', '12px').attr('font-weight', '600').attr('fill', s.color).text(s.name);
+  g.append('text').attr('x', M.l - 16).attr('y', lMY(i) + 8)
+    .attr('text-anchor', 'end').attr('font-size', '9px').attr('fill', '#999').attr('font-style', 'italic').text('[' + s.thread + ']');
+});
+
+/* time arrow */
+g.append('line').attr('x1', M.l - 10).attr('x2', tX(MAX_T + 2)).attr('y1', M.t - 35).attr('y2', M.t - 35)
+  .attr('stroke', '#bbb').attr('stroke-width', 1.8).attr('marker-end', 'url(#a888888)');
+g.append('text').attr('x', tX(MAX_T + 2) + 8).attr('y', M.t - 31)
+  .attr('font-size', '12px').attr('font-weight', '600').attr('fill', '#aaa').text('Time →');
+g.append('text').attr('x', M.l - 10).attr('y', M.t - 50)
+  .attr('font-size', '15px').attr('font-weight', '700').attr('fill', '#1a1a2e').text('progress() — 3-Iteration Pipeline Timeline');
+
+/* ================================================================
+   IDLE SEGMENTS
+   ================================================================ */
+IDLES.forEach(s => {
+  const y = lMY(s.si);
+  g.append('line').attr('x1', tX(s.t0)).attr('x2', tX(s.t1)).attr('y1', y).attr('y2', y)
+    .attr('stroke', '#ccc').attr('stroke-width', 1.2).attr('stroke-dasharray', '3,4');
+  if (s.label) g.append('text').attr('x', tX((s.t0 + s.t1) / 2)).attr('y', y - 8)
+    .attr('text-anchor', 'middle').attr('font-size', '8px').attr('fill', '#bbb').text(s.label);
+});
+
+/* ================================================================
+   OPERATION BOXES
+   ================================================================ */
+const tooltip = d3.select('#tooltip');
+const rects = {};
+
+OPS.forEach(op => {
+  const s = STREAMS[op.si], x1 = tX(op.t0), x2 = tX(op.t1), y = lY(op.si) + 8, h = LH - 16, w = x2 - x1;
+  const c = op.clr || s.color;
+  rects[op.id] = { x1, x2, y, h, w, mx: (x1 + x2) / 2, my: y + h / 2, si: op.si };
+
+  const grp = g.append('g').attr('cursor', 'pointer')
+    .on('mouseenter', function (ev) {
+      d3.select(this).select('rect').attr('stroke-width', 2.8).attr('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,.18))');
+      hlArrows(op.id, true); showTip(ev, op, s);
+    })
+    .on('mousemove', moveTip)
+    .on('mouseleave', function () {
+      d3.select(this).select('rect').attr('stroke-width', op.done ? 1 : 1.5).attr('filter', 'none');
+      hlArrows(op.id, false); hideTip();
+    })
+    .on('click', () => showDetail(op, s));
+
+  grp.append('rect').attr('x', x1).attr('y', y).attr('width', w).attr('height', h).attr('rx', 5)
+    .attr('fill', c).attr('fill-opacity', op.done ? .04 : .07)
+    .attr('stroke', c).attr('stroke-width', op.done ? 1 : 1.5)
+    .attr('stroke-dasharray', op.done ? '4,3' : 'none');
+
+  if (op.num) {
+    const isWide = op.num.length > 1;
+    const br = isWide ? 14 : 12, bfs = isWide ? '10px' : '12px';
+    grp.append('circle').attr('cx', x1 + 15).attr('cy', y + 15).attr('r', br).attr('fill', c).attr('fill-opacity', .85);
+    grp.append('text').attr('x', x1 + 15).attr('y', y + 15.5)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+      .attr('font-size', bfs).attr('font-weight', '700').attr('fill', '#fff').text(op.num);
+  }
+  const fs = w < 80 ? '8px' : w < 120 ? '9px' : w < 160 ? '10px' : '11px';
+  grp.append('text').attr('x', x1 + w / 2).attr('y', y + h / 2 + (op.num ? 4 : 0))
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('font-size', fs).attr('font-weight', '600').attr('fill', c).text(op.name);
+});
+
+/* ================================================================
+   BARRIERS
+   ================================================================ */
+BARRIERS.forEach(b => {
+  const x = tX(b.x), y = lY(b.si);
+  rects[b.id] = { x1: x, x2: x, y, h: LH, mx: x, my: y + LH / 2, si: b.si };
+
+  const grp = g.append('g').attr('cursor', 'pointer')
+    .on('mouseenter', function (ev) {
+      d3.select(this).select('line').attr('stroke-width', 5);
+      hlArrows(b.id, true);
+      showTip(ev, { num: b.num, name: 'wait_stream barrier', desc: b.desc, code: b.code }, STREAMS[b.si]);
+    })
+    .on('mousemove', moveTip)
+    .on('mouseleave', function () {
+      d3.select(this).select('line').attr('stroke-width', 3);
+      hlArrows(b.id, false); hideTip();
+    })
+    .on('click', () => showDetail({ id: b.id, num: b.num, name: 'wait_stream barrier', desc: b.desc, code: b.code, si: b.si, iter: b.iter }, STREAMS[b.si]));
+
+  grp.append('line').attr('x1', x).attr('x2', x).attr('y1', y + 4).attr('y2', y + LH - 4)
+    .attr('stroke', '#C00000').attr('stroke-width', 3).attr('stroke-linecap', 'round');
+  grp.append('text').attr('x', x).attr('y', y - 4).attr('text-anchor', 'middle')
+    .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#C00000').text(b.num);
+});
+
+/* ================================================================
+   SYNC ARROWS
+   ================================================================ */
+const anchors = {
+  top:    r => ({ x: r.mx, y: r.y - 2 }),
+  tl:     r => ({ x: r.x1 + 8, y: r.y - 2 }),
+  tr:     r => ({ x: r.x2 - 8, y: r.y - 2 }),
+  bottom: r => ({ x: r.mx, y: r.y + r.h + 2 }),
+  bl:     r => ({ x: r.x1 + 8, y: r.y + r.h + 2 }),
+  br:     r => ({ x: r.x2 - 8, y: r.y + r.h + 2 }),
+};
+const arrowEls = {};
+
+ARROWS.forEach(a => {
+  const fr = anchors[a.fa](rects[a.from]);
+  let to;
+  if (a.toB) { const br = rects[a.toB]; to = { x: br.mx, y: br.y + br.h - 4 }; }
+  else to = anchors[a.ta](rects[a.to]);
+
+  const dx = to.x - fr.x, dy = to.y - fr.y;
+  const isCross = a.id.startsWith('x_');
+  const cx1 = isCross ? 0.15 : 0.3, cy1 = isCross ? 0.1 : 0.15;
+  const cx2 = isCross ? 0.85 : 0.7, cy2 = isCross ? 0.9 : 0.85;
+  const d = 'M' + fr.x + ',' + fr.y + ' C' + (fr.x + dx * cx1) + ',' + (fr.y + dy * cy1) + ' ' + (fr.x + dx * cx2) + ',' + (fr.y + dy * cy2) + ' ' + to.x + ',' + to.y;
+
+  const path = g.append('path').attr('d', d).attr('fill', 'none')
+    .attr('stroke', a.clr).attr('stroke-width', isCross ? 2 : 1.5)
+    .attr('stroke-dasharray', isCross ? '8,4' : '5,3')
+    .attr('marker-end', 'url(#a' + a.clr.slice(1) + ')').attr('opacity', isCross ? .5 : .65);
+
+  const lx = fr.x + dx * .5, ly = fr.y + dy * .5;
+  g.append('rect').attr('x', lx - a.label.length * 2.5).attr('y', ly - 16)
+    .attr('width', a.label.length * 5).attr('height', 12).attr('rx', 2)
+    .attr('fill', '#fff').attr('fill-opacity', .88);
+  g.append('text').attr('x', lx).attr('y', ly - 8)
+    .attr('text-anchor', 'middle').attr('font-size', '7.5px').attr('font-weight', '500').attr('fill', a.clr).text(a.label);
+
+  arrowEls[a.id] = { path, from: a.from, to: a.to || a.toB };
+});
+
+/* ================================================================
+   BATCH LIFECYCLE CHAINS (red connecting lines)
+   — skip pairs already connected by sync arrows
+   ================================================================ */
+const linked = new Set();
+ARROWS.forEach(a => {
+  if (a.to) linked.add(a.from + '|' + a.to);
+  if (a.toB) linked.add(a.from + '|' + a.toB);
+});
+
+BATCH_CHAINS.forEach(bc => {
+  for (let j = 0; j < bc.chain.length - 1; j++) {
+    const srcId = bc.chain[j], dstId = bc.chain[j + 1];
+    if (linked.has(srcId + '|' + dstId)) continue;
+    const from = rects[srcId], to = rects[dstId];
+    if (!from || !to) continue;
+    const fx = from.x2, fy = from.y + from.h / 2;
+    const tx = to.x1,   ty = to.y + to.h / 2;
+    if (from.si === to.si) {
+      g.append('line')
+        .attr('x1', fx).attr('y1', fy).attr('x2', tx).attr('y2', ty)
+        .attr('stroke', '#FF0000').attr('stroke-width', 1.8)
+        .attr('opacity', .75).attr('marker-end', 'url(#abatch)');
+    } else {
+      const dx = tx - fx, dy = ty - fy;
+      g.append('path')
+        .attr('d', `M${fx},${fy} C${fx+dx*.3},${fy+dy*.1} ${fx+dx*.7},${fy+dy*.9} ${tx},${ty}`)
+        .attr('stroke', '#FF0000').attr('stroke-width', 1.8)
+        .attr('fill', 'none').attr('opacity', .75)
+        .attr('marker-end', 'url(#abatch)');
+    }
+  }
+  const first = rects[bc.chain[0]];
+  if (first) {
+    g.append('text').attr('x', first.x1 - 2).attr('y', first.y + first.h / 2 + 4)
+      .attr('text-anchor', 'end').attr('font-size', '8px').attr('font-weight', '700')
+      .attr('fill', '#FF0000').text('batch[' + bc.batch + ']');
+  }
+});
+
+/* ================================================================
+   ANNOTATION — CPU code sequence & batch lifecycle
+   ================================================================ */
+const annY = M.t + STREAMS.length * LT + 12;
+const annW = tX(MAX_T + 2) - M.l + 10;
+
+/* background block */
+g.append('rect').attr('x', M.l - 10).attr('y', annY - 16)
+  .attr('width', annW).attr('height', 148).attr('rx', 8)
+  .attr('fill', '#f0f2f8').attr('stroke', '#d0d4e0').attr('stroke-width', 1);
+
+/* title */
+g.append('text').attr('x', M.l + 4).attr('y', annY + 2)
+  .attr('font-size', '13px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+  .text('序号含义：CPU 主线程代码执行顺序（progress() 函数内）');
+g.append('text').attr('x', M.l + 4).attr('y', annY + 22)
+  .attr('font-size', '12px').attr('fill', '#444')
+  .text('CPU code sequence per iteration:  1 → 2 → 3 → 4 → 5(bg) → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13');
+
+/* batch lifecycle title */
+g.append('text').attr('x', M.l + 4).attr('y', annY + 48)
+  .attr('font-size', '13px').attr('font-weight', '700').attr('fill', '#C00000')
+  .text('每个 batch 的完整生命周期（跨 3 次迭代）：');
+
+/* batch lifecycle — line 1: Iter N */
+g.append('text').attr('x', M.l + 14).attr('y', annY + 68)
+  .attr('font-size', '12px').attr('font-weight', '600').attr('fill', '#C00000')
+  .text('Iter N  (as batch[N+2]) :   2 → 4 → 5 → 7 → 13');
+
+/* batch lifecycle — line 2: Iter N+1  (new line at 13 → 3) */
+g.append('text').attr('x', M.l + 14).attr('y', annY + 88)
+  .attr('font-size', '12px').attr('font-weight', '600').attr('fill', '#C00000')
+  .text('Iter N+1 (as batch[N+1]) :   3 → 10');
+
+/* batch lifecycle — line 3: Iter N+2  (new line at 10 → 1) */
+g.append('text').attr('x', M.l + 14).attr('y', annY + 108)
+  .attr('font-size', '12px').attr('font-weight', '600').attr('fill', '#C00000')
+  .text('Iter N+2 (as batch[N]) :   1 → 6 → 8 → 9 → 11 → 12');
+
+/* cross-iteration arrows hint */
+g.append('text').attr('x', M.l + 14).attr('y', annY + 128)
+  .attr('font-size', '11px').attr('fill', '#888')
+  .text('↑ 迭代之间通过 13→3 和 10→1 衔接');
+
+/* ================================================================
+   INTERACTIONS
+   ================================================================ */
+function showTip(ev, op, st) {
+  tooltip.classed('visible', true).html(
+    '<div class="tt-title">' + (op.num ? op.num + ' ' : '') + op.name + '</div>' +
+    '<div class="tt-stream">' + st.name + ' [' + st.thread + ']</div>' +
+    (op.iter !== undefined ? '<div class="tt-stream">Iter ' + bn(op.iter) + '</div>' : '') +
+    '<div class="tt-desc">' + (op.desc || '') + '</div>');
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const r = document.getElementById('chart-container').getBoundingClientRect();
+  let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
+  if (x + 320 > r.width) x = ev.clientX - r.left - 330;
+  if (y + 180 > r.height) y = ev.clientY - r.top - 190;
+  tooltip.style('left', x + 'px').style('top', y + 'px');
+}
+function hideTip() { tooltip.classed('visible', false); }
+
+function hlArrows(opId, on) {
+  Object.values(arrowEls).forEach(a => {
+    if (a.from === opId || a.to === opId)
+      a.path.attr('stroke-width', on ? 3.5 : (a.from.startsWith('x_') ? 2 : 1.5)).attr('opacity', on ? 1 : .65);
+  });
+}
+
+function showDetail(op, st) {
+  d3.select('#detail-placeholder').style('display', 'none');
+  const p = d3.select('#detail-content').html('');
+  const add = (label, val, isCode) => {
+    const d = p.append('div').attr('class', 'detail-item');
+    d.append('div').attr('class', 'detail-label').text(label);
+    if (isCode) d.append('div').attr('class', 'code-ref').text(val);
+    else d.append('div').attr('class', 'detail-value').text(val);
+  };
+  add('Operation', (op.num ? op.num + ' ' : '') + op.name);
+  add('Stream', st.name);
+  add('Thread', st.thread);
+  if (op.iter !== undefined) add('Iteration', 'Iter ' + bn(op.iter));
+  if (op.desc) add('Description', op.desc);
+  if (op.code) add('Code Reference', op.code, true);
+
+  const related = ARROWS.filter(a => a.from === (op.id || '') || a.to === (op.id || '') || a.toB === (op.id || ''));
+  if (related.length) {
+    const d = p.append('div').attr('class', 'detail-item');
+    d.append('div').attr('class', 'detail-label').text('Related Sync Dependencies');
+    related.forEach(a => {
+      d.append('div').attr('class', 'sync-card')
+        .style('border-left', '3px solid ' + a.clr)
+        .html('<strong>' + a.label + '</strong><br><span style="color:#666">' + a.desc + '</span>');
+    });
+  }
+}
+
+/* ================================================================
+   ZOOM CONTROLS
+   ================================================================ */
+window.zoomBy = k => svg.transition().duration(250).call(zoomBehavior.scaleBy, k);
+window.resetZoom = () => svg.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity);
+window.fitToView = () => {
+  const r = document.getElementById('chart-container').getBoundingClientRect();
+  const s = Math.min(r.width / W, r.height / H) * .92;
+  const tx = (r.width - W * s) / 2, ty = (r.height - H * s) / 2;
+  svg.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(s));
+};
+setTimeout(fitToView, 120);
+window.addEventListener('resize', () => setTimeout(fitToView, 50));
+</script>
+</body>
+</html>

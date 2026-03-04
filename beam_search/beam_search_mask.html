@@ -325,6 +325,12 @@ svg.on('wheel', function(e) {
 /* method origins */
 const METHOD_B_X = LEFT_M + MAX_N * TP + METHOD_GAP;
 
+function resetMaskCells(mg) {
+  if (mg.empty()) return;
+  mg.selectAll('rect[data-row]').attr('opacity',1).attr('filter',null).attr('stroke-width',.5)
+    .each(function(){ const el=d3.select(this); el.attr('stroke',el.attr('data-orig-stroke')); });
+}
+
 let hlLocked = false;
 function unlockHL() {
   hlLocked = false;
@@ -332,11 +338,7 @@ function unlockHL() {
   for (let s = 1; s <= STEPS; s++) {
     ['A','B'].forEach(m => {
       const grp = stepGroups[m+s]; if (!grp) return;
-      const mg = grp.select('.mask-group');
-      if (!mg.empty()) {
-        mg.selectAll('rect[data-row]').attr('opacity',1).attr('filter',null).attr('stroke-width',.5)
-          .each(function(){ const el=d3.select(this); el.attr('stroke',el.attr('data-orig-stroke')); });
-      }
+      resetMaskCells(grp.select('.mask-group'));
       grp.selectAll('.mask-arrow-tmp').remove();
       grp.selectAll('path[data-arr-key]').attr('opacity',1);
     });
@@ -351,10 +353,10 @@ svg.on('click', function() { if (hlLocked) unlockHL(); });
 function tokenFill(tok) {
   if (tok.type==='context') return COL.ctx;
   if (tok.type==='candidate') return COL.candFill;
-  if (tok.type==='dead') return '#C8C8C8';
+  if (tok.type==='dead') return COL.mDead;
   if (tok.type==='beam0') return COL.b0;
   if (tok.type==='beam1') return COL.b1;
-  if (tok.type==='shared') return '#FFF';
+  if (tok.type==='shared') return COL.confirmed;
   return COL.confirmed;
 }
 
@@ -373,25 +375,14 @@ function drawTokenStrip(parent, data, ox, oy, step, method) {
       .on('mousemove', moveTip)
       .on('mouseleave', ev => { hideTip(); if (!hlLocked) { clearLegendHL(); method==='A' ? clearPathHL() : clearBeamHLB(); } })
       .on('click', ev => {
-        ev.stopPropagation();
-        unlockHL();
-        hlLegend(tokLegendKey(tok));
-        if (tok.type !== 'context') {
-          if (method === 'A') highlightPath(bm, step, tok.type === 'dead');
-          else highlightBeamB(bm, step);
-        }
-        hlLocked = true;
-        showDetail(tok, step, method);
+        ev.stopPropagation(); unlockHL();
+        applyTokenHL(tok, bm, step, method);
+        hlLocked = true; showDetail(tok, step, method);
       });
 
     tg.on('mouseenter', ev => {
       showTip(ev, tok.label, tokenDesc(tok, step, method));
-      if (hlLocked) return;
-      hlLegend(tokLegendKey(tok));
-      if (tok.type !== 'context') {
-        if (method === 'A') highlightPath(bm, step, tok.type === 'dead');
-        else highlightBeamB(bm, step);
-      }
+      if (!hlLocked) applyTokenHL(tok, bm, step, method);
     });
 
     const rect = tg.append('rect').attr('x',x).attr('y',y).attr('width',TS).attr('height',TS).attr('rx',4)
@@ -417,6 +408,14 @@ function drawTokenStrip(parent, data, ox, oy, step, method) {
   });
 
   return grp;
+}
+
+function applyTokenHL(tok, bm, step, method) {
+  hlLegend(tokLegendKey(tok));
+  if (tok.type !== 'context') {
+    if (method === 'A') highlightPath(bm, step, tok.type === 'dead');
+    else highlightBeamB(bm, step);
+  }
 }
 
 function tokLegendKey(tok) {
@@ -518,8 +517,7 @@ function clearPathHL() {
     const g = stepGroups['A'+s]; if (!g) continue;
     g.selectAll('rect[data-tok-key]').attr('opacity',1).attr('filter',null);
     g.selectAll('path[data-arr-key]').attr('opacity',1).attr('stroke-width',1.2);
-    const mg = g.select('.mask-group');
-    if (!mg.empty()) mg.selectAll('rect[data-row]').attr('opacity',1);
+    resetMaskCells(g.select('.mask-group'));
   }
 }
 
@@ -560,12 +558,45 @@ function clearBeamHLB() {
   for (let s = 0; s <= STEPS; s++) {
     const g = stepGroups['B'+s]; if (!g) continue;
     g.selectAll('rect[data-beam]').attr('opacity',1).attr('filter',null);
-    const mg = g.select('.mask-group');
-    if (!mg.empty()) mg.selectAll('rect[data-row]').attr('opacity',1);
+    resetMaskCells(g.select('.mask-group'));
   }
 }
 
-function highlightMaskCell(maskGrp, row, col, n, step, method) {
+function drawTmpArrow(grp, row, col, baseX, blocked) {
+  const color = blocked ? '#C33' : '#222';
+  const dash = blocked ? '5,3' : 'none';
+  const sx = baseX + row * TP + TS/2, tx = baseX + col * TP + TS/2;
+  if (row !== col) {
+    const dist = Math.abs(sx - tx), cy = -(14 + dist * 0.15);
+    grp.append('path').attr('class','mask-arrow-tmp')
+      .attr('d', `M${sx},0 C${sx},${cy} ${tx},${cy} ${tx},0`)
+      .attr('fill','none').attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', dash);
+    grp.append('path').attr('class','mask-arrow-tmp')
+      .attr('d', `M${tx-4},${-5} L${tx},0 L${tx+4},${-5}`)
+      .attr('fill', color).attr('stroke','none');
+    if (blocked) {
+      grp.append('text').attr('class','mask-arrow-tmp')
+        .attr('x', (sx+tx)/2).attr('y', cy/2+1)
+        .attr('text-anchor','middle').attr('dominant-baseline','central')
+        .attr('font-size', 14).text('❌');
+    }
+  } else {
+    grp.append('path').attr('class','mask-arrow-tmp')
+      .attr('d', `M${sx-6},${-2} A6,6 0 1,1 ${sx+6},${-2}`)
+      .attr('fill','none').attr('stroke', color).attr('stroke-width', 2).attr('stroke-dasharray', dash);
+    grp.append('path').attr('class','mask-arrow-tmp')
+      .attr('d', `M${sx+2},${-5} L${sx+6},${-2} L${sx+10},${-5}`)
+      .attr('fill', color).attr('stroke','none');
+    if (blocked) {
+      grp.append('text').attr('class','mask-arrow-tmp')
+        .attr('x', sx).attr('y', -14)
+        .attr('text-anchor','middle').attr('dominant-baseline','central')
+        .attr('font-size', 14).text('❌');
+    }
+  }
+}
+
+function highlightMaskCell(maskGrp, row, col, step, method, beams) {
   maskGrp.selectAll('rect[data-row]').each(function() {
     const el = d3.select(this);
     const r = +el.attr('data-row'), c = +el.attr('data-col');
@@ -582,39 +613,16 @@ function highlightMaskCell(maskGrp, row, col, n, step, method) {
   if (!grp) return;
   grp.select('.token-strip').selectAll('rect[data-beam]').each(function(d, idx) {
     const el = d3.select(this);
-    if (idx === row || idx === col) {
-      el.attr('filter','drop-shadow(0 0 3px rgba(0,0,0,.35))');
-    } else {
-      el.attr('opacity', 0.25);
-    }
+    if (idx === row || idx === col) el.attr('filter','drop-shadow(0 0 3px rgba(0,0,0,.35))');
+    else el.attr('opacity', 0.25);
   });
   grp.selectAll('path[data-arr-key]').attr('opacity', 0);
-  const arrColor = '#222';
-  const baseX = method === 'A' ? LEFT_M : METHOD_B_X;
-  const sx = baseX + row * TP + TS/2, tx = baseX + col * TP + TS/2;
-  if (row !== col) {
-    const dist = Math.abs(sx - tx);
-    const arch = 14 + dist * 0.15;
-    const cy = -arch;
-    grp.append('path').attr('class','mask-arrow-tmp')
-      .attr('d', `M${sx},0 C${sx},${cy} ${tx},${cy} ${tx},0`)
-      .attr('fill','none').attr('stroke', arrColor).attr('stroke-width', 2);
-    grp.append('path').attr('class','mask-arrow-tmp')
-      .attr('d', `M${tx-4},${-5} L${tx},0 L${tx+4},${-5}`)
-      .attr('fill', arrColor).attr('stroke','none');
-  } else {
-    grp.append('path').attr('class','mask-arrow-tmp')
-      .attr('d', `M${sx-6},${-2} A6,6 0 1,1 ${sx+6},${-2}`)
-      .attr('fill','none').attr('stroke', arrColor).attr('stroke-width', 2);
-    grp.append('path').attr('class','mask-arrow-tmp')
-      .attr('d', `M${sx+2},${-5} L${sx+6},${-2} L${sx+10},${-5}`)
-      .attr('fill', arrColor).attr('stroke','none');
-  }
+  const blocked = beams ? !canAttend(row, col, beams) : false;
+  drawTmpArrow(grp, row, col, method === 'A' ? LEFT_M : METHOD_B_X, blocked);
 }
 
 function clearMaskCellHL(maskGrp, step, method) {
-  maskGrp.selectAll('rect[data-row]').attr('opacity',1).attr('filter',null).attr('stroke-width',.5)
-    .each(function() { const el = d3.select(this); el.attr('stroke', el.attr('data-orig-stroke')); });
+  resetMaskCells(maskGrp);
   const grp = stepGroups[method + step];
   if (grp) {
     grp.select('.token-strip').selectAll('rect[data-beam]').attr('opacity',1).attr('filter',null);
@@ -631,7 +639,7 @@ function drawArrows(parent, ox, oy, step) {
   const c0 = traceBeam(step,0), c1 = traceBeam(step,1);
   const drawn = new Set();
 
-  function drawOne(arr, color, markerEnd, beam) {
+  function drawOne(arr, color, markerEnd) {
     const key = arr.step+','+arr.src+','+arr.tgt;
     if (drawn.has(key)) return;
     drawn.add(key);
@@ -644,17 +652,16 @@ function drawArrows(parent, ox, oy, step) {
       .attr('d', `M${sx},${oy} C${sx},${cy} ${tx},${cy} ${tx},${oy}`)
       .attr('fill','none').attr('stroke',color).attr('stroke-width',1.2)
       .attr('marker-end', `url(#${markerEnd})`)
-      .attr('data-arrow-beam', beam)
-      .attr('data-arr-key', arr.step+','+arr.src+','+arr.tgt);
+      .attr('data-arr-key', key);
   }
 
   c0.forEach(a => {
     const shared = c1.some(b => b.step===a.step && b.src===a.src && b.tgt===a.tgt);
-    drawOne(a, shared?COL.ashared:COL.ab0, shared?'ash':'ab0', shared?2:0);
+    drawOne(a, shared?COL.ashared:COL.ab0, shared?'ash':'ab0');
   });
   c1.forEach(a => {
     const inC0 = c0.some(b => b.step===a.step && b.src===a.src && b.tgt===a.tgt);
-    if (!inC0) drawOne(a, COL.ab1, 'ab1', 1);
+    if (!inC0) drawOne(a, COL.ab1, 'ab1');
   });
 }
 
@@ -688,22 +695,16 @@ function drawMask(parent, data, ox, oy, step, method) {
         .attr('data-row',i).attr('data-col',j).attr('data-orig-stroke',stroke)
         .attr('cursor','pointer')
         .on('mouseenter', ev => {
-          const qi = data.tokens[i].label, kj = data.tokens[j].label;
           const att = canAttend(i,j,data.beams);
-          showTip(ev, (att?'✓':'✗')+' '+qi+' → '+kj, maskCellDesc(i,j,data));
-          if (hlLocked) return;
-          highlightMaskCell(gm, i, j, n, step, method);
-          hlLegend(maskCellLegendKey(i, j, data));
+          showTip(ev, (att?'✓':'✗')+' '+data.tokens[i].label+' → '+data.tokens[j].label, maskCellDesc(i,j,data));
+          if (!hlLocked) { highlightMaskCell(gm, i, j, step, method, data.beams); hlLegend(maskCellLegendKey(i,j,data)); }
         })
         .on('mousemove', moveTip)
         .on('mouseleave', ev => { hideTip(); if (!hlLocked) { clearMaskCellHL(gm, step, method); clearLegendHL(); } })
         .on('click', ev => {
-          ev.stopPropagation();
-          unlockHL();
-          highlightMaskCell(gm, i, j, n, step, method);
-          hlLegend(maskCellLegendKey(i, j, data));
-          hlLocked = true;
-          showMaskDetail(i, j, data, step, method);
+          ev.stopPropagation(); unlockHL();
+          highlightMaskCell(gm, i, j, step, method, data.beams); hlLegend(maskCellLegendKey(i,j,data));
+          hlLocked = true; showMaskDetail(i, j, data, step, method);
         });
     }
   }
@@ -872,7 +873,7 @@ function maskCellDesc(i, j, data) {
 function openPanel() { document.getElementById('detail-panel').classList.add('open'); }
 window.closePanel = function() { document.getElementById('detail-panel').classList.remove('open'); };
 
-function showDetail(tok, step, method) {
+function beginDetail() {
   openPanel();
   const p = d3.select('#detail-content').html('');
   const add = (label, val) => {
@@ -880,9 +881,15 @@ function showDetail(tok, step, method) {
     d.append('div').attr('class','detail-label').text(label);
     d.append('div').attr('class','detail-value').text(val);
   };
+  return add;
+}
+const methodLabel = m => m==='A'?'A: Incremental Append':'B: Beam-Grouped';
+
+function showDetail(tok, step, method) {
+  const add = beginDetail();
   add('Token', tok.label);
   add('Type', tok.type.charAt(0).toUpperCase()+tok.type.slice(1));
-  add('Method', method==='A'?'A: Incremental Append':'B: Beam-Grouped');
+  add('Method', methodLabel(method));
   add('Step', step===0?'Initial Context':'Decode Step '+step);
   if (tok.beam !== undefined) add('Beam Membership', beamName(tok.beam));
   add('Description', tokenDesc(tok, step, method));
@@ -903,20 +910,13 @@ function showDetail(tok, step, method) {
 }
 
 function showMaskDetail(i, j, data, step, method) {
-  openPanel();
-  const p = d3.select('#detail-content').html('');
-  const add = (label, val) => {
-    const d = p.append('div').attr('class','detail-item');
-    d.append('div').attr('class','detail-label').text(label);
-    d.append('div').attr('class','detail-value').text(val);
-  };
+  const add = beginDetail();
   const qi = data.tokens[i], kj = data.tokens[j];
-  const att = canAttend(i,j,data.beams);
   add('Mask Cell', qi.label+' [row '+i+'] → '+kj.label+' [col '+j+']');
-  add('Can Attend', att?'Yes ✓':'No ✗');
+  add('Can Attend', canAttend(i,j,data.beams)?'Yes ✓':'No ✗');
   add('Query Beam', beamName(data.beams[i]));
   add('Key Beam', beamName(data.beams[j]));
-  add('Method', method==='A'?'A: Incremental Append':'B: Beam-Grouped');
+  add('Method', methodLabel(method));
   add('Step', 'Decode Step '+step);
   add('Reason', maskCellDesc(i, j, data));
 }
@@ -930,7 +930,7 @@ const legendData = [
   {label:'Candidate', fill:COL.candFill, stroke:COL.candStroke, dash:true, desc:'当前 step 正在解码的候选 token（橙色虚线边框）。'},
   {label:'Beam 0', fill:COL.b0, stroke:'#BBB', desc:'属于 Beam 0 的 token。在序列条中为粉红色方块，在 mask 中对应可 attend 区域为红色系。'},
   {label:'Beam 1', fill:COL.b1, stroke:'#BBB', desc:'属于 Beam 1 的 token。在序列条中为蓝色方块，在 mask 中对应可 attend 区域为蓝色系。'},
-  {label:'Dead', fill:'#C8C8C8', stroke:'#999', desc:'被 beam search 剪枝的 token，不再属于任何活跃路径。在 mask 中对应行/列全部不参与 attention 计算。其 KV cache 仍占空间但不再被引用。'},
+  {label:'Dead', fill:COL.mDead, stroke:'#999', desc:'被 beam search 剪枝的 token，不再属于任何活跃路径。在 mask 中对应行/列全部不参与 attention 计算。其 KV cache 仍占空间但不再被引用。'},
   {label:'Blocked', fill:COL.mMasked, stroke:'#E0C8A0', desc:'Mask 中被遮蔽的区域（浅琥珀色），因 beam 隔离或因果遮蔽而无法 attend。'},
 ];
 const leg = d3.select('#legend');

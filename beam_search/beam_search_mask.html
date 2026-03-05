@@ -41,6 +41,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .guide-section li{margin-bottom:3px}
 .guide-section .tag-a{display:inline-block;background:#FADBD8;color:#C0392B;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
 .guide-section .tag-b{display:inline-block;background:#D4E6F1;color:#2471A3;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
+.guide-section .tag-c{display:inline-block;background:#D5F5E3;color:#1E8449;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
 .guide-section .kw{font-weight:700;color:#1a1a2e}
 .guide-section .compare-tbl{width:100%;font-size:10.5px;border-collapse:collapse;margin-top:6px}
 .guide-section .compare-tbl th,.guide-section .compare-tbl td{padding:4px 5px;border:1px solid #e0e0e0;text-align:left}
@@ -84,8 +85,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   </div>
 
   <div class="guide-section">
-    <h3>2. 两种 Token 排列方法</h3>
-    <p>当多条 beam 并行解码时，GPU 上需要将所有 token 组织成一个序列送入 attention 计算。如何排列这些 token，直接决定了 attention mask 的形状和 KV cache 的管理方式。</p>
+    <h3>2. 三种 Token 排列方法</h3>
+    <p>当多条 beam 并行解码时，GPU 上需要将所有 token 组织成序列送入 attention 计算。如何排列这些 token，直接决定了 attention mask 的形状和 KV cache 的管理方式。</p>
     <p><span class="tag-a">Method A</span> <span class="kw">Incremental Append（按生成顺序追加）</span></p>
     <ul>
       <li>所有 beam 的 token 按累积概率降序交替追加到序列末尾</li>
@@ -97,6 +98,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <li>将属于同一 beam 的 token 聚合为连续块</li>
       <li>序列：[context, beam0_tokens…, beam1_tokens…]</li>
       <li>每步需根据 beam 的祖先路径重新组织各 beam 的 token 顺序</li>
+    </ul>
+    <p style="margin-top:8px"><span class="tag-c">Method 0</span> <span class="kw">Independent Sequences（独立序列 / Naive 方法）</span></p>
+    <ul>
+      <li>每条 beam 持有完整的独立序列（context 被复制到每条 beam），batch_size 从 1 变为 B</li>
+      <li>Beam 0: [context, s0t0, s1t0, …]；Beam 1: [context, s0t1, s1t1, …]</li>
+      <li>每条序列等价于 Method B 中对应 beam 的 token 序列加上相同的 context 前缀</li>
+      <li>优点：mask 始终是标准 causal（下三角），无需自定义 mask；缺点：context 的 KV 被复制 B 份，显存开销大</li>
     </ul>
   </div>
 
@@ -115,6 +123,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <li>Mask 呈规整的块对角结构：context 块 + beam0 块 + beam1 块</li>
       <li>结构规整利于 GPU 并行（可用 block-sparse attention 等加速）</li>
     </ul>
+    <p style="margin-top:6px"><span class="tag-c">Method 0</span> 的 mask 特点：</p>
+    <ul>
+      <li>每条 beam 拥有独立的 mask 矩阵（B 个 2D tensor）</li>
+      <li>每个 mask 都是标准的 <span class="kw">causal mask</span>（纯下三角矩阵），无任何自定义逻辑</li>
+      <li>最简单的 mask 形式，无需额外实现 beam 隔离</li>
+    </ul>
   </div>
 
   <div class="guide-section">
@@ -123,6 +137,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <ul>
       <li><span class="tag-a">Method A</span>：共享祖先 token 的 beam membership 变为 shared（灰色），两条 beam 均可 attend；被抛弃路径上的 token 变为 dead</li>
       <li><span class="tag-b">Method B</span>：共享祖先在两个 beam 组中各保留一份副本（加粗标记），物理上存两份，但逻辑上代表同一 token</li>
+      <li><span class="tag-c">Method 0</span>：与 Method B 类似，共享祖先在每条 beam 的独立序列中各存一份。beam 切换祖先时需将父 beam 的整条序列（含 context）拷贝到子 beam</li>
     </ul>
   </div>
 
@@ -143,21 +158,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <li>但 beam 切换祖先时，需要将父 beam 的 <span class="kw">KV 前缀拷贝</span>到子 beam 的 cache 区间（拷贝开销）</li>
       <li>实际系统（如 vLLM PagedAttention）通过页表映射避免物理拷贝，仅拷贝页表指针</li>
     </ul>
+    <p style="margin-top:6px"><span class="tag-c">Method 0</span>：</p>
+    <ul>
+      <li>每条 beam 独立持有完整的 KV cache（含 context 部分的副本）</li>
+      <li>Context 的 KV 被复制了 B 份，<span class="kw">显存开销最大</span>（= B × 完整序列长度）</li>
+      <li>Beam 切换祖先时同样需要拷贝，且拷贝量更大（包含 context 的 KV）</li>
+      <li>优点：无需自定义 attention kernel，标准 causal attention 即可直接使用</li>
+    </ul>
   </div>
 
   <div class="guide-section">
     <h3>6. 性能对比与 Tradeoff</h3>
     <table class="compare-tbl">
-      <tr><th></th><th>Method A 追加式</th><th>Method B 分组式</th></tr>
-      <tr><td>Token 排列</td><td>按生成时间交替追加</td><td>按 beam 分组聚合</td></tr>
-      <tr><td>KV Cache</td><td>单条序列，有 dead KV 浪费</td><td>按 beam 分段，无浪费</td></tr>
-      <tr><td>Beam 切换</td><td>无需拷贝，标记 dead 即可</td><td>需拷贝/映射父 beam KV</td></tr>
-      <tr><td>Mask 形状</td><td>不规则斑块状</td><td>规整块对角结构</td></tr>
-      <tr><td>GPU 效率</td><td>mask 不规则，计算效率低</td><td>块结构利于并行加速</td></tr>
-      <tr><td>实现复杂度</td><td>简单</td><td>需要 KV 重组/页表管理</td></tr>
-      <tr><td>适用场景</td><td>beam width 小、序列短</td><td>长序列、大 beam width</td></tr>
+      <tr><th></th><th>Method A 追加式</th><th>Method B 分组式</th><th>Method 0 独立序列</th></tr>
+      <tr><td>Token 排列</td><td>按生成时间交替追加</td><td>按 beam 分组聚合</td><td>B 条独立完整序列</td></tr>
+      <tr><td>KV Cache</td><td>单条序列，有 dead KV 浪费</td><td>按 beam 分段，无浪费</td><td>B 份完整序列（含 context 副本），显存最大</td></tr>
+      <tr><td>Beam 切换</td><td>无需拷贝，标记 dead 即可</td><td>需拷贝/映射父 beam KV</td><td>需拷贝完整序列（含 context）</td></tr>
+      <tr><td>Mask 形状</td><td>不规则斑块状</td><td>规整块对角结构</td><td>B 个标准 causal 下三角</td></tr>
+      <tr><td>GPU 效率</td><td>mask 不规则，计算效率低</td><td>块结构利于并行加速</td><td>标准 attention，无额外开销</td></tr>
+      <tr><td>实现复杂度</td><td>简单</td><td>需要 KV 重组/页表管理</td><td>最简单，标准推理即可</td></tr>
+      <tr><td>显存利用率</td><td>中（有 dead KV）</td><td>高（无浪费）</td><td>低（context KV × B）</td></tr>
+      <tr><td>适用场景</td><td>beam width 小、序列短</td><td>长序列、大 beam width</td><td>原型验证、小 beam width</td></tr>
     </table>
-    <p style="margin-top:8px">实际推理系统（vLLM、TensorRT-LLM、SGLang 等）普遍采用 <span class="kw">Method B 变体 + PagedAttention</span>，通过页表共享和 copy-on-write 机制，在避免物理拷贝的同时实现高效的 beam 管理。</p>
+    <p style="margin-top:8px">实际推理系统（vLLM、TensorRT-LLM、SGLang 等）普遍采用 <span class="kw">Method B 变体 + PagedAttention</span>，通过页表共享和 copy-on-write 机制实现高效管理。Method 0 虽然实现最简单，但因 context KV 冗余复制导致显存开销过大，仅适用于小规模场景或原型验证。</p>
   </div>
     </div>
     <div id="detail-panel">
@@ -271,24 +294,50 @@ function traceBeam(step, beam) {
   return r;
 }
 
-const allDataA = [], allDataB = [];
-for (let s = 0; s <= STEPS; s++) { allDataA.push(methodAData(s)); allDataB.push(methodBData(s)); }
+function methodCData(step, beam) {
+  const tokens = [], beams = [], dividers = [];
+  for (let i = 0; i < CL; i++) { tokens.push({label:'c'+i, type:'context'}); beams.push(2); }
+  if (step === 0) return {tokens, beams, dividers};
+  const hist = BH[step-1][beam];
+  hist.forEach((tok, i) => {
+    const label = 's'+(tok[0]-1)+'t'+tok[1];
+    const isCand = i === hist.length - 1;
+    tokens.push({label, type: isCand?'candidate': beam===0?'beam0':'beam1', beam, genStep:tok[0], tokIdx:tok[1]});
+    beams.push(beam);
+  });
+  dividers.push(CL);
+  return {tokens, beams, dividers};
+}
+
+const allDataA = [], allDataB = [], allDataC = [];
+for (let s = 0; s <= STEPS; s++) {
+  allDataA.push(methodAData(s));
+  allDataB.push(methodBData(s));
+  allDataC.push([methodCData(s, 0), methodCData(s, 1)]);
+}
 
 /* ================================================================
    LAYOUT STATE
    ================================================================ */
 const expanded = new Set();
+const MAX_N_C = CL + STEPS;
 
-function maskExtra(step) {
-  const n = CL + 2 * step;
-  return MASK_TOP + MASK_COL_LBL + n * MC + MASK_BOT;
-}
+function maskExtraN(n) { return MASK_TOP + MASK_COL_LBL + n * MC + MASK_BOT; }
 
 function stepY(step, method) {
+  if (method === 'M0') {
+    let y = 0;
+    for (let s = 0; s < step; s++) {
+      y += (s === 0 ? ROW_H : M0_ROW_H);
+      if (s >= 1 && expanded.has('M0' + s)) y += maskExtraN(CL + s);
+      y += STEP_GAP;
+    }
+    return y;
+  }
   let y = 0;
   for (let s = 0; s < step; s++) {
     y += ROW_H;
-    if (s >= 1 && expanded.has(method + s)) y += maskExtra(s);
+    if (s >= 1 && expanded.has(method + s)) y += maskExtraN(CL + 2*s);
     y += STEP_GAP;
   }
   return y;
@@ -324,6 +373,19 @@ svg.on('wheel', function(e) {
 
 /* method origins */
 const METHOD_B_X = LEFT_M + MAX_N * TP + METHOD_GAP;
+const C_SUB_GAP = 10;
+const METHOD_C0_X = (LEFT_M + METHOD_B_X + MAX_N * TP) / 2 - MAX_N_C * TP / 2;
+const ROW_GAP = 60;
+const M0_ROW_H = 2 * TS + C_SUB_GAP + 4;
+const M0_MASK_GAP = 10;
+const M0_MASK_COL_GAP = 20;
+
+function abTopY() {
+  let y = stepY(STEPS, 'M0');
+  y += (STEPS === 0 ? ROW_H : M0_ROW_H);
+  if (STEPS >= 1 && expanded.has('M0' + STEPS)) y += maskExtraN(CL + STEPS);
+  return TOP_M + y + ROW_GAP;
+}
 
 function resetMaskCells(mg) {
   if (mg.empty()) return;
@@ -334,9 +396,9 @@ function resetMaskCells(mg) {
 let hlLocked = false;
 function unlockHL() {
   hlLocked = false;
-  clearPathHL(); clearBeamHLB(); clearLegendHL();
+  clearPathHL(); clearBeamHLB(); clearBeamHLC(); clearLegendHL();
   for (let s = 1; s <= STEPS; s++) {
-    ['A','B'].forEach(m => {
+    ['A','B','C0','C1'].forEach(m => {
       const grp = stepGroups[m+s]; if (!grp) return;
       resetMaskCells(grp.select('.mask-group'));
       grp.selectAll('.mask-arrow-tmp').remove();
@@ -373,7 +435,7 @@ function drawTokenStrip(parent, data, ox, oy, step, method) {
     const bm = data.beams[i];
     const tg = grp.append('g').attr('cursor','pointer')
       .on('mousemove', moveTip)
-      .on('mouseleave', ev => { hideTip(); if (!hlLocked) { clearLegendHL(); method==='A' ? clearPathHL() : clearBeamHLB(); } })
+      .on('mouseleave', ev => { hideTip(); if (!hlLocked) { clearLegendHL(); clearHL(method); } })
       .on('click', ev => {
         ev.stopPropagation(); unlockHL();
         applyTokenHL(tok, bm, step, method);
@@ -410,11 +472,18 @@ function drawTokenStrip(parent, data, ox, oy, step, method) {
   return grp;
 }
 
+function clearHL(method) {
+  if (method === 'A') clearPathHL();
+  else if (method === 'B') clearBeamHLB();
+  else clearBeamHLC();
+}
+
 function applyTokenHL(tok, bm, step, method) {
   hlLegend(tokLegendKey(tok));
   if (tok.type !== 'context') {
     if (method === 'A') highlightPath(bm, step, tok.type === 'dead');
-    else highlightBeamB(bm, step);
+    else if (method === 'B') highlightBeamB(bm, step);
+    else highlightBeamC(method, step);
   }
 }
 
@@ -562,6 +631,42 @@ function clearBeamHLB() {
   }
 }
 
+function highlightBeamC(method, hoverStep) {
+  ['C0','C1'].forEach(m => {
+    const isSelf = m === method;
+    for (let s = 0; s <= STEPS; s++) {
+      const grp = stepGroups[m+s]; if (!grp) continue;
+      if (s > hoverStep || !isSelf) {
+        grp.selectAll('rect[data-beam]').attr('opacity', 0.25).attr('filter', null);
+        const mg = grp.select('.mask-group');
+        if (!mg.empty() && +mg.attr('opacity') !== 0) mg.selectAll('rect[data-row]').attr('opacity', 0.25);
+        continue;
+      }
+      grp.selectAll('rect[data-beam]').each(function() {
+        d3.select(this).attr('filter','drop-shadow(0 0 3px rgba(0,0,0,.35))');
+      });
+      if (s >= 1) {
+        const mg = grp.select('.mask-group');
+        if (!mg.empty() && +mg.attr('opacity') !== 0) {
+          mg.selectAll('rect[data-row]').each(function() {
+            d3.select(this).attr('filter','drop-shadow(0 0 2px rgba(0,0,0,.15))');
+          });
+        }
+      }
+    }
+  });
+}
+
+function clearBeamHLC() {
+  ['C0','C1'].forEach(m => {
+    for (let s = 0; s <= STEPS; s++) {
+      const g = stepGroups[m+s]; if (!g) continue;
+      g.selectAll('rect[data-beam]').attr('opacity',1).attr('filter',null);
+      resetMaskCells(g.select('.mask-group'));
+    }
+  });
+}
+
 function drawTmpArrow(grp, row, col, baseX, blocked) {
   const color = blocked ? '#C33' : '#222';
   const dash = blocked ? '5,3' : 'none';
@@ -618,7 +723,8 @@ function highlightMaskCell(maskGrp, row, col, step, method, beams) {
   });
   grp.selectAll('path[data-arr-key]').attr('opacity', 0);
   const blocked = beams ? !canAttend(row, col, beams) : false;
-  drawTmpArrow(grp, row, col, method === 'A' ? LEFT_M : METHOD_B_X, blocked);
+  const bx = method==='A' ? LEFT_M : method==='B' ? METHOD_B_X : METHOD_C0_X;
+  drawTmpArrow(grp, row, col, bx, blocked);
 }
 
 function clearMaskCellHL(maskGrp, step, method) {
@@ -751,8 +857,9 @@ function buildMethod(method) {
   const baseX = method === 'A' ? LEFT_M : METHOD_B_X;
   const allData = method === 'A' ? allDataA : allDataB;
   const mTitle = method === 'A' ? 'Method A: Incremental Append' : 'Method B: Beam-Grouped';
+  const aby = abTopY();
 
-  gRoot.append('text').attr('x', baseX + MAX_N*TP/2).attr('y', TOP_M - 20)
+  gRoot.append('text').attr('x', baseX + MAX_N*TP/2).attr('y', aby - 20)
     .attr('text-anchor','middle').attr('font-size',13).attr('font-weight',700).attr('fill','#1a1a2e')
     .attr('class','method-title-'+method).text(mTitle);
 
@@ -760,7 +867,7 @@ function buildMethod(method) {
     const data = allData[step];
     const y = stepY(step, method);
     const grp = gRoot.append('g').attr('id','step-'+method+'-'+step)
-      .attr('transform', `translate(0,${TOP_M + y})`);
+      .attr('transform', `translate(0,${aby + y})`);
     stepGroups[method+step] = grp;
 
     if (method === 'A') {
@@ -789,29 +896,107 @@ function buildMethod(method) {
   }
 }
 
+/* Method 0: two beams stacked as two rows, centered above A and B */
+(function buildMethod0() {
+  const baseX = METHOD_C0_X;
+
+  gRoot.append('text').attr('class','m0-title')
+    .attr('x', baseX + MAX_N_C*TP/2).attr('y', TOP_M - 20)
+    .attr('text-anchor','middle').attr('font-size',13).attr('font-weight',700).attr('fill','#1a1a2e')
+    .text('Method 0: Independent Sequences (batch = beam width)');
+
+  for (let step = 0; step <= STEPS; step++) {
+    const y = stepY(step, 'M0');
+    const parent = gRoot.append('g').attr('id','step-M0-'+step)
+      .attr('transform', `translate(0,${TOP_M + y})`);
+
+    if (step === 0) {
+      const data = allDataC[0][0];
+      const sub = parent.append('g');
+      stepGroups['C0'+0] = sub;
+      stepGroups['C1'+0] = sub;
+      parent.append('text').attr('x', baseX - 12).attr('y', TS/2+1)
+        .attr('text-anchor','end').attr('dominant-baseline','central')
+        .attr('font-size',11).attr('font-weight',500).attr('fill','#666').text('Initial Context');
+      drawTokenStrip(sub, data, baseX, 0, 0, 'C0');
+    } else {
+      parent.append('text').attr('x', baseX - 12).attr('y', TS + C_SUB_GAP/2)
+        .attr('text-anchor','end').attr('dominant-baseline','central')
+        .attr('font-size',11).attr('font-weight',500).attr('fill','#666').text('Decode Step '+step);
+
+      [0,1].forEach(beam => {
+        const m = 'C'+beam;
+        const subY = beam * (TS + C_SUB_GAP);
+        const sub = parent.append('g').attr('transform', `translate(0,${subY})`);
+        stepGroups[m+step] = sub;
+
+        sub.append('text').attr('x', baseX - 4).attr('y', TS/2+1)
+          .attr('text-anchor','end').attr('dominant-baseline','central')
+          .attr('font-size',8).attr('font-weight',600)
+          .attr('fill', beam===0?COL.ab0:COL.ab1).text('B'+beam);
+
+        const data = allDataC[step][beam];
+        drawTokenStrip(sub, data, baseX, 0, step, m);
+
+        const n = data.tokens.length;
+        const maskY = beam === 0 ? M0_ROW_H + MASK_TOP : TS + 4 + MASK_TOP;
+        const maskOx = beam === 0 ? baseX : baseX + MASK_ROW_LBL + n*MC + M0_MASK_COL_GAP;
+        drawMask(sub, data, maskOx, maskY, step, m);
+      });
+
+      const hw = allDataC[step][0].tokens.length * TP;
+      const hint = parent.append('g').attr('class','expand-hint').attr('cursor','pointer')
+        .on('click', () => toggleMask(step));
+      hint.append('rect').attr('x', baseX).attr('y', M0_ROW_H+1).attr('width', hw).attr('height',16)
+        .attr('fill','#3498DB').attr('fill-opacity',.04).attr('rx',3);
+      hint.append('text').attr('x', baseX+hw/2).attr('y', M0_ROW_H+11)
+        .attr('text-anchor','middle').attr('font-size',8).attr('fill','#3498DB').attr('opacity',.6)
+        .attr('class','hint-text').text('▼ click to show attention mask');
+    }
+  }
+})();
+
 buildMethod('A');
 buildMethod('B');
 
 /* ================================================================
    TOGGLE MASK
    ================================================================ */
+const ALL_METHODS = ['A','B','M0'];
+
 function toggleMask(step) {
-  const keyA = 'A'+step, keyB = 'B'+step;
-  if (expanded.has(keyA)) { expanded.delete(keyA); expanded.delete(keyB); }
-  else { expanded.add(keyA); expanded.add(keyB); }
+  const key = 'A'+step;
+  const expanding = !expanded.has(key);
+  ALL_METHODS.forEach(m => { if (expanding) expanded.add(m+step); else expanded.delete(m+step); });
   updateLayout();
 }
 
 function updateLayout() {
+  for (let step = 0; step <= STEPS; step++) {
+    const y = stepY(step, 'M0');
+    d3.select('#step-M0-'+step)
+      .transition().duration(300).attr('transform', `translate(0,${TOP_M + y})`);
+    if (step >= 1) {
+      const isExp = expanded.has('M0' + step);
+      ['C0','C1'].forEach(m => {
+        const grp = stepGroups[m+step];
+        if (grp) grp.select('.mask-group').transition().duration(250).attr('opacity', isExp?1:0);
+      });
+      d3.select('#step-M0-'+step).select('.hint-text')
+        .text(isExp ? '▲ click to hide attention mask' : '▼ click to show attention mask');
+    }
+  }
+  const aby = abTopY();
   ['A','B'].forEach(method => {
+    gRoot.select('.method-title-'+method).transition().duration(300).attr('y', aby - 20);
     for (let step = 0; step <= STEPS; step++) {
       const y = stepY(step, method);
       d3.select('#step-'+method+'-'+step)
-        .transition().duration(300).attr('transform',`translate(0,${TOP_M + y})`);
-
+        .transition().duration(300).attr('transform',`translate(0,${aby + y})`);
       if (step >= 1) {
         const isExp = expanded.has(method + step);
         const grp = stepGroups[method+step];
+        if (!grp) continue;
         grp.select('.mask-group').transition().duration(250).attr('opacity', isExp?1:0);
         grp.select('.hint-text').text(isExp ? '▲ click to hide attention mask' : '▼ click to show attention mask');
       }
@@ -883,7 +1068,7 @@ function beginDetail() {
   };
   return add;
 }
-const methodLabel = m => m==='A'?'A: Incremental Append':'B: Beam-Grouped';
+const methodLabel = m => m==='A'?'A: Incremental Append' : m==='B'?'B: Beam-Grouped' : '0: Independent Sequences ('+m+')';
 
 function showDetail(tok, step, method) {
   const add = beginDetail();
@@ -957,7 +1142,7 @@ window.fitToView = () => {
   const ty = (r.height - bb.height*s)/2 - bb.y*s;
   svg.transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity.translate(tx,ty).scale(s));
 };
-window.expandAll = () => { for(let s=1;s<=STEPS;s++){expanded.add('A'+s);expanded.add('B'+s);} updateLayout(); };
+window.expandAll = () => { for(let s=1;s<=STEPS;s++) ALL_METHODS.forEach(m=>expanded.add(m+s)); updateLayout(); };
 window.collapseAll = () => { expanded.clear(); updateLayout(); };
 setTimeout(fitToView, 150);
 window.addEventListener('resize', () => setTimeout(fitToView, 80));

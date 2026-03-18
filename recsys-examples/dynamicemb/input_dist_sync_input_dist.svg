@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1020" viewBox="0 0 1440 1020">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .mono{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:11px}
+      .ptcp{font-size:12px;font-weight:700}
+      .psub{font-size:9.5px;fill:#6B7280}
+      .msg{font-size:11px;fill:#1F2937}
+      .note{font-size:10.5px}
+      .nbold{font-size:10.5px;font-weight:600}
+      .sn{font-size:10px;font-weight:700}
+      .link{font-family:'SF Mono',Consolas,monospace;font-size:9.5px;fill:#7C3AED;text-decoration:underline;cursor:pointer}
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#1F2937"/>
+    </marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#9CA3AF"/>
+    </marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#059669"/>
+    </marker>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+
+  <rect width="1440" height="1020" fill="#FAFBFF"/>
+
+  <!-- Title -->
+  <text x="720" y="28" text-anchor="middle" font-size="17" font-weight="700" fill="#111827">## input_dist ## &#x2014; DynamicEmb + RW Sharding</text>
+  <text x="720" y="46" text-anchor="middle" font-size="11" fill="#9CA3AF">6 &#xD7; cudaMemcpyAsync (2 D2H &#x2605; + 4 H2D &#x25B2;) &#xB7; PID 5194, Step 53</text>
+
+  <!-- ===== PARTICIPANTS x: 110 330 560 780 1020 1240 ===== -->
+  <g filter="url(#sh)">
+    <rect x="30"  y="60" width="160" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/>
+    <text x="110" y="78" text-anchor="middle" class="ptcp" fill="#4338CA">Pipeline</text>
+    <text x="110" y="93" text-anchor="middle" class="psub">.progress()</text>
+
+    <rect x="240" y="60" width="180" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="330" y="78" text-anchor="middle" class="ptcp" fill="#0F766E">ShardedDynEmb</text>
+    <text x="330" y="93" text-anchor="middle" class="psub">Collection.input_dist()</text>
+
+    <rect x="470" y="60" width="180" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+    <text x="560" y="78" text-anchor="middle" class="ptcp" fill="#92400E">RwSparseFeatDist</text>
+    <text x="560" y="93" text-anchor="middle" class="psub">.forward()</text>
+
+    <rect x="690" y="60" width="180" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
+    <text x="780" y="78" text-anchor="middle" class="ptcp" fill="#1E40AF">KJTAllToAll</text>
+    <text x="780" y="93" text-anchor="middle" class="psub">SplitsAwaitable()</text>
+
+    <rect x="920" y="60" width="200" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/>
+    <text x="1020" y="78" text-anchor="middle" class="ptcp" fill="#374151">GPU</text>
+    <text x="1020" y="93" text-anchor="middle" class="psub">data_dist_stream</text>
+
+    <rect x="1160" y="60" width="160" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <text x="1240" y="78" text-anchor="middle" class="ptcp" fill="#065F46">NCCL</text>
+    <text x="1240" y="93" text-anchor="middle" class="psub">AllToAll</text>
+  </g>
+
+  <!-- Lifelines -->
+  <line x1="110"  y1="104" x2="110"  y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="330"  y1="104" x2="330"  y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="560"  y1="104" x2="560"  y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="780"  y1="104" x2="780"  y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="1020" y1="104" x2="1020" y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="1240" y1="104" x2="1240" y2="990" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+
+  <!-- Activation bars -->
+  <rect x="104" y="125" width="12" height="850" rx="2" fill="#C7D2FE" opacity="0.4"/>
+  <rect x="324" y="145" width="12" height="460" rx="2" fill="#99F6E4" opacity="0.4"/>
+  <rect x="554" y="410" width="12" height="190" rx="2" fill="#FED7AA" opacity="0.4"/>
+  <rect x="774" y="600" width="12" height="330" rx="2" fill="#BFDBFE" opacity="0.4"/>
+
+  <!-- ===== Step 1: Pipeline &#x2192; ShardedDynEmb ===== -->
+  <line x1="116" y1="140" x2="324" y2="140" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="130" y="134" class="mono" fill="#1F2937">_start_sparse_data_dist(batch_ip2)</text>
+
+  <!-- Step 2: stream sync -->
+  <line x1="336" y1="170" x2="1014" y2="170" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="440" y="164" class="note" fill="#6B7280">wait_stream(memcpy_stream) &#x2014; ensure batch H2D done</text>
+
+  <!-- Step 3: _dedup_indices &#x2192; GPU kernels -->
+  <path d="M336,210 L380,210 L380,225 L336,225" fill="none" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="392" y="220" class="mono" fill="#1F2937">_dedup_indices(ctx, features_by_shards)</text>
+
+  <line x1="336" y1="250" x2="1014" y2="250" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="440" y="244" class="mono" fill="#374151">segmented_unique_cuda(indices, table_ids)</text>
+
+  <!-- ===== &#x2605; D2H #1 ===== -->
+  <rect x="298" y="280" width="760" height="58" rx="5" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1.5"/>
+  <rect x="298" y="280" width="26" height="16" rx="4" fill="#DC2626"/>
+  <text x="311" y="292" text-anchor="middle" class="sn" fill="#fff">D1</text>
+  <text x="338" y="295" class="nbold" fill="#991B1B">&#x2605; D2H #1: 8 bytes &#x2014; num_uniques.item()</text>
+  <line x1="1014" y1="308" x2="336" y2="308" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>
+  <text x="440" y="318" class="mono" fill="#991B1B">total_unique = num_uniques.item() &#x2192; CPU stall ~11.8&#x3BC;s</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/shard/embedding.py#L255" target="_blank">
+  <text x="338" y="332" class="link">shard/embedding.py:255</text>
+</a>
+
+  <!-- Step 5: unique_keys slice -->
+  <text x="344" y="363" class="mono" fill="#374151">unique_keys = unique_keys[:total_unique]</text>
+
+  <!-- Step 6: &#x2192; RwSparseFeaturesDist.forward -->
+  <line x1="336" y1="385" x2="554" y2="385" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="350" y="379" class="mono" fill="#1F2937">forward(dedup_features)</text>
+
+  <!-- ===== &#x25B2; H2D #1 ===== -->
+  <rect x="518" y="405" width="540" height="48" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1.5"/>
+  <rect x="518" y="405" width="26" height="16" rx="4" fill="#2563EB"/>
+  <text x="531" y="417" text-anchor="middle" class="sn" fill="#fff">H1</text>
+  <text x="558" y="420" class="nbold" fill="#1E40AF">&#x25B2; H2D #1: ~4B &#x2014; dist_type tensor (int32)</text>
+  <line x1="566" y1="432" x2="1014" y2="432" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="580" y="446" class="mono" fill="#1E40AF">torch.tensor(dist_type_list, device=cuda)</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/input_dist.py#L128" target="_blank">
+  <text x="900" y="446" class="link">input_dist.py:128</text>
+</a>
+
+  <!-- Step 8: block_bucketize -->
+  <line x1="566" y1="475" x2="1014" y2="475" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="580" y="469" class="mono" fill="#374151">block_bucketize_sparse_features()</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/input_dist.py#L138" target="_blank">
+  <text x="900" y="469" class="link">input_dist.py:138</text>
+</a>
+
+  <!-- Step 9: GPU kernel box -->
+  <rect x="980" y="482" width="80" height="18" rx="3" fill="#F3F4F6" stroke="#D1D5DB"/>
+  <text x="1020" y="494" text-anchor="middle" font-size="9" fill="#6B7280">GPU kernel</text>
+
+  <!-- Step 10: bucketized KJT note -->
+  <rect x="570" y="510" width="340" height="22" rx="4" fill="#FFF7ED" stroke="#FED7AA"/>
+  <text x="580" y="525" class="note" fill="#92400E">&#x2192; bucketized KJT: 8 keys (1 feat &#xD7; 8 ranks)</text>
+
+  <!-- Step 11: &#x2192; KJTAllToAll -->
+  <line x1="566" y1="555" x2="774" y2="555" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="575" y="549" class="mono" fill="#1F2937">self._dist(bucketized_features)</text>
+
+  <!-- Step 12: dist_splits(splits) self-call -->
+  <path d="M786,580 L830,580 L830,595 L786,595" fill="none" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="840" y="590" class="mono" fill="#1F2937">bucketized_kjt.dist_splits(splits)</text>
+
+  <!-- ===== &#x2605; D2H #2 ===== -->
+  <rect x="738" y="610" width="320" height="58" rx="5" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1.5"/>
+  <rect x="738" y="610" width="26" height="16" rx="4" fill="#DC2626"/>
+  <text x="751" y="622" text-anchor="middle" class="sn" fill="#fff">D2</text>
+  <text x="778" y="625" class="nbold" fill="#991B1B">&#x2605; D2H #2: 64B &#x2014; length_per_key().tolist()</text>
+  <line x1="1014" y1="640" x2="786" y2="640" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>
+  <text x="798" y="660" class="mono" fill="#991B1B">torch.sum(lengths.view(8,stride),1).tolist()</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/sparse/jagged_tensor.py#L1165" target="_blank">
+  <text x="838" y="678" class="link">jagged_tensor.py:1165</text>
+</a>
+
+  <!-- ===== &#x25B2; H2D #2 ===== -->
+  <rect x="738" y="695" width="320" height="30" rx="4" fill="#EFF6FF" stroke="#93C5FD"/>
+  <rect x="738" y="695" width="26" height="16" rx="4" fill="#2563EB"/>
+  <text x="751" y="707" text-anchor="middle" class="sn" fill="#fff">H2</text>
+  <line x1="786" y1="710" x2="1014" y2="710" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="798" y="720" class="mono" fill="#1E40AF">torch.tensor(batch_size_per_split, cuda) 64B</text>
+
+  <!-- ===== &#x25B2; H2D #3 ===== -->
+  <rect x="738" y="732" width="320" height="30" rx="4" fill="#EFF6FF" stroke="#93C5FD"/>
+  <rect x="738" y="732" width="26" height="16" rx="4" fill="#2563EB"/>
+  <text x="751" y="744" text-anchor="middle" class="sn" fill="#fff">H3</text>
+  <line x1="786" y1="748" x2="1014" y2="748" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="798" y="758" class="mono" fill="#1E40AF">torch.tensor(length_per_split, cuda)   64B</text>
+
+  <!-- ===== &#x25B2; H2D #4 ===== -->
+  <rect x="738" y="770" width="320" height="30" rx="4" fill="#EFF6FF" stroke="#93C5FD"/>
+  <rect x="738" y="770" width="26" height="16" rx="4" fill="#2563EB"/>
+  <text x="751" y="782" text-anchor="middle" class="sn" fill="#fff">H4</text>
+  <line x1="786" y1="786" x2="1014" y2="786" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="798" y="796" class="mono" fill="#1E40AF">torch.tensor([stride]&#xD7;8, cuda)         64B</text>
+
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/distributed/dist_data.py" target="_blank">
+  <text x="1070" y="745" class="link">torchrec/dist_data.py</text>
+</a>
+
+  <!-- Step: SplitsAllToAllAwaitable.__init__ -->
+  <line x1="786" y1="830" x2="1014" y2="830" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <text x="798" y="824" class="mono" fill="#374151">torch.stack(splits_tensors).flatten()</text>
+
+  <!-- Step: AllToAll #1 async launch -->
+  <line x1="786" y1="860" x2="1234" y2="860" stroke="#059669" stroke-width="1.8" marker-end="url(#ag)"/>
+  <text x="798" y="854" class="mono" fill="#059669">all_to_all_single(splits, async_op=True)</text>
+
+  <rect x="1130" y="865" width="220" height="38" rx="4" fill="#ECFDF5" stroke="#A7F3D0"/>
+  <text x="1140" y="882" class="nbold" fill="#065F46">AllToAll #1 launched async</text>
+  <text x="1140" y="896" class="note" fill="#6B7280">exchange splits metadata, non-blocking</text>
+
+  <!-- Return arrows -->
+  <line x1="774" y1="930" x2="566" y2="930" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+  <text x="610" y="924" class="note" fill="#9CA3AF">KJTListSplitsAwaitable</text>
+  <line x1="554" y1="945" x2="336" y2="945" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+  <line x1="324" y1="960" x2="116" y2="960" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+  <text x="135" y="954" class="note" fill="#9CA3AF">&#x2192; _fuse_input_dist_splits(ctx)</text>
+
+  <!-- Legend -->
+  <rect x="20" y="980" width="14" height="14" rx="3" fill="#FEF2F2" stroke="#DC2626"/>
+  <text x="40" y="991" class="note" fill="#991B1B">&#x2605; D2H (CPU stall)</text>
+  <rect x="180" y="980" width="14" height="14" rx="3" fill="#EFF6FF" stroke="#2563EB"/>
+  <text x="200" y="991" class="note" fill="#1E40AF">&#x25B2; H2D (CPU &#x2192; GPU)</text>
+  <rect x="350" y="980" width="14" height="14" rx="3" fill="#ECFDF5" stroke="#059669"/>
+  <text x="370" y="991" class="note" fill="#065F46">NCCL AllToAll (async)</text>
+  <text x="550" y="991" class="link">purple = source path</text>
+</svg>

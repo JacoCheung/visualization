@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1580" viewBox="0 0 1200 1580">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .mb{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:11px;font-weight:700;fill:#1F2937}
+      .ptcp{font-size:12px;font-weight:700}
+      .psub{font-size:9px;fill:#6B7280}
+      .ret{font-size:10px;fill:#9CA3AF}
+      .note{font-size:10.5px}
+      .nbold{font-size:10.5px;font-weight:600}
+      .sn{font-size:10px;font-weight:700}
+      .src{font-family:'SF Mono',Consolas,monospace;font-size:9px;fill:#9CA3AF;font-style:italic;cursor:pointer}
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#1F2937"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#9CA3AF"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#059669"/></marker>
+    <marker id="ao" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#EA580C"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+
+  <rect width="1200" height="1580" fill="#FAFBFF"/>
+  <text x="600" y="26" text-anchor="middle" font-size="15" font-weight="700" fill="#111827">DynamicEmb Forward Phase</text>
+  <text x="600" y="44" text-anchor="middle" font-size="10" fill="#9CA3AF">Cache path: consumes PrefetchState (no hash lookup) &#x2502; DEFAULT path: _generic_forward_path (hash lookup + admission)</text>
+
+  <!-- PARTICIPANTS: x=130, 400, 700, 1020 -->
+  <g filter="url(#sh)">
+    <rect x="35" y="56" width="190" height="48" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/>
+    <text x="130" y="72" text-anchor="middle" class="ptcp" fill="#4338CA">ShardedDynamic</text>
+    <text x="130" y="86" text-anchor="middle" class="ptcp" fill="#4338CA">EmbeddingCollection</text>
+    <text x="130" y="99" text-anchor="middle" class="psub">shard/embedding.py</text>
+
+    <rect x="305" y="56" width="190" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="400" y="72" text-anchor="middle" class="ptcp" fill="#0F766E">BatchedDynamic</text>
+    <text x="400" y="86" text-anchor="middle" class="ptcp" fill="#0F766E">EmbeddingTablesV2</text>
+    <text x="400" y="99" text-anchor="middle" class="psub">batched_dynamicemb_tables.py</text>
+
+    <rect x="595" y="56" width="210" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <text x="700" y="72" text-anchor="middle" class="ptcp" fill="#065F46">DynamicEmbeddingFunction</text>
+    <text x="700" y="86" text-anchor="middle" class="ptcp" fill="#065F46">(autograd Function)</text>
+    <text x="700" y="99" text-anchor="middle" class="psub">batched_dynamicemb_function.py</text>
+
+    <rect x="940" y="56" width="160" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
+    <text x="1020" y="76" text-anchor="middle" class="ptcp" fill="#92400E">CUDA Kernels</text>
+    <text x="1020" y="92" text-anchor="middle" class="psub">(dynamicemb_ext)</text>
+  </g>
+
+  <!-- Lifelines -->
+  <line x1="130" y1="104" x2="130" y2="1440" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="400" y1="104" x2="400" y2="1440" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="700" y1="104" x2="700" y2="1440" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="1020" y1="104" x2="1020" y2="1440" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+
+  <!-- Activation bars -->
+  <rect x="124" y="195" width="12" height="1130" rx="2" fill="#C7D2FE" stroke="#6366F1" stroke-width="0.5" opacity="0.4"/>
+  <rect x="394" y="320" width="12" height="900" rx="2" fill="#99F6E4" stroke="#0D9488" stroke-width="0.5" opacity="0.4"/>
+  <rect x="694" y="490" width="12" height="720" rx="2" fill="#A7F3D0" stroke="#059669" stroke-width="0.5" opacity="0.4"/>
+
+  <!-- Sync-free badge (cache path) -->
+  <rect x="860" y="116" width="300" height="22" rx="4" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1"/>
+  <text x="874" y="131" font-size="8" font-weight="700" fill="#059669">&#x2714; Cache path: No hash lookup / sync in forward</text>
+
+  <!-- PrefetchState explanation -->
+  <rect x="30" y="116" width="1140" height="66" rx="8" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.2" filter="url(#sh)"/>
+  <text x="46" y="134" font-size="11" font-weight="700" fill="#92400E">PrefetchState (produced by prefetch() on separate CUDA stream)</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L951" target="_blank"><text x="46" y="149" class="src">prefetch() [batched_dynamicemb_tables.py:951] &#x2192; dynamicemb_prefetch() [batched_dynamicemb_function.py:575]</text></a>
+  <text x="46" y="162" class="src">Stored in self._prefetch_states (Deque). Fields: slot_indices, unique_keys, reverse_indices,</text>
+  <text x="46" y="174" class="src">unique_table_ids, update_slot_indices, non_admitted_positions, storage_mode</text>
+
+  <!-- ====== [1] _dedup_indices ====== -->
+  <rect x="10" y="198" width="18" height="14" rx="3" fill="#EEF2FF" stroke="#6366F1"/>
+  <text x="19" y="209" text-anchor="middle" class="sn" fill="#4338CA">1</text>
+  <rect x="440" y="192" width="246" height="22" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="575" y="207" text-anchor="middle" class="mb">_dedup_indices(features_by_shards)</text>
+  <line x1="136" y1="218" x2="1014" y2="218" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/shard/embedding.py#L174" target="_blank"><text x="575" y="232" text-anchor="middle" class="src">shard/embedding.py:174 (called at line 295 in input_dist)</text></a>
+  <rect x="40" y="240" width="440" height="24" rx="5" fill="#EEF2FF" stroke="#C7D2FE" stroke-dasharray="3,2"/>
+  <text x="48" y="256" class="nbold" fill="#4338CA">[if use_index_dedup] segmented_unique_cuda: remove duplicate key lookups</text>
+  <line x1="1014" y1="280" x2="136" y2="280" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="575" y="275" text-anchor="middle" class="ret">unique_keys, reverse_indices, lfu_accumulated_frequency</text>
+
+  <!-- ====== [2] forward(indices, offsets, ...) (2 lines) ====== -->
+  <rect x="10" y="300" width="18" height="14" rx="3" fill="#F0FDFA" stroke="#0D9488"/>
+  <text x="19" y="311" text-anchor="middle" class="sn" fill="#0F766E">2</text>
+  <rect x="168" y="293" width="198" height="34" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="267" y="308" text-anchor="middle" class="mb">forward(indices, offsets,</text>
+  <text x="267" y="321" text-anchor="middle" class="mb">per_sample_weights)</text>
+  <line x1="136" y1="332" x2="394" y2="332" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_compute_kernel.py#L524" target="_blank"><text x="267" y="346" text-anchor="middle" class="src">batched_dynamicemb_compute_kernel.py:524</text></a>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L860" target="_blank"><text x="267" y="358" text-anchor="middle" class="src">&#x2192; batched_dynamicemb_tables.py:860</text></a>
+
+  <!-- ====== [2a] self._prefetch_states.popleft() ====== -->
+  <rect x="10" y="377" width="18" height="14" rx="3" fill="#FFFBEB" stroke="#D97706"/>
+  <text x="19" y="388" text-anchor="middle" class="sn" fill="#92400E">2a</text>
+  <rect x="418" y="370" width="232" height="22" rx="4" fill="#FFFBEB" stroke="#FDE68A" stroke-width="0.8"/>
+  <text x="534" y="385" text-anchor="middle" class="mb">self._prefetch_states.popleft()</text>
+  <path d="M406,396 L560,396 L560,416 L406,416" fill="none" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L923" target="_blank"><text x="534" y="430" text-anchor="middle" class="src">batched_dynamicemb_tables.py:923</text></a>
+  <rect x="310" y="438" width="440" height="24" rx="5" fill="#FFFBEB" stroke="#FDE68A" stroke-dasharray="3,2"/>
+  <text x="318" y="454" class="nbold" fill="#92400E">Retrieves PrefetchState from deque. If empty: auto-calls prefetch() [line 921-922]</text>
+
+  <!-- ====== [3] DynamicEmbeddingFunction.apply (2 lines) ====== -->
+  <rect x="10" y="478" width="18" height="14" rx="3" fill="#ECFDF5" stroke="#059669"/>
+  <text x="19" y="489" text-anchor="middle" class="sn" fill="#065F46">3</text>
+  <rect x="430" y="462" width="240" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="550" y="477" text-anchor="middle" class="mb">DynamicEmbeddingFunction</text>
+  <text x="550" y="490" text-anchor="middle" class="mb">.apply(prefetch_state,</text>
+  <text x="550" y="503" text-anchor="middle" class="mb">offsets, cache, storage, ...)</text>
+  <line x1="406" y1="508" x2="694" y2="508" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L925" target="_blank"><text x="550" y="522" text-anchor="middle" class="src">batched_dynamicemb_tables.py:925</text></a>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L895" target="_blank"><text x="550" y="534" text-anchor="middle" class="src">&#x2192; batched_dynamicemb_function.py:895</text></a>
+  <rect x="40" y="542" width="450" height="24" rx="5" fill="#ECFDF5" stroke="#86EFAC" stroke-dasharray="3,2"/>
+  <text x="48" y="558" class="nbold" fill="#065F46">autograd Function: forward() reads embeddings, backward() will update them</text>
+
+  <!-- ======================================================= -->
+  <!-- ALT FRAME: Cache/HBM_DIRECT vs DEFAULT forward paths     -->
+  <!-- ======================================================= -->
+  <rect x="20" y="570" width="1160" height="536" rx="8" fill="none" stroke="#6366F1" stroke-width="2"/>
+  <rect x="20" y="570" width="52" height="20" rx="4" fill="#6366F1"/>
+  <text x="46" y="584" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">alt</text>
+
+  <!-- ── Path A: Cache / HBM_DIRECT (use_counter=True) ── -->
+  <rect x="30" y="592" width="380" height="18" rx="3" fill="#EEF2FF" stroke="#C7D2FE"/>
+  <text x="38" y="605" font-size="10" font-weight="700" fill="#4338CA">[use_counter = True] &#x2014; CACHE / HBM_DIRECT Path</text>
+
+  <!-- [4A] load_from_flat -->
+  <rect x="10" y="620" width="18" height="14" rx="3" fill="#FFFBEB" stroke="#D97706"/>
+  <text x="19" y="631" text-anchor="middle" class="sn" fill="#92400E">4a</text>
+  <rect x="748" y="612" width="224" height="34" rx="4" fill="#ECFDF5" stroke="#86EFAC" stroke-width="0.8"/>
+  <text x="860" y="628" text-anchor="middle" class="mb" fill="#059669">load_from_flat(state,</text>
+  <text x="860" y="641" text-anchor="middle" class="mb" fill="#059669">slot_indices, unique_table_ids)</text>
+  <line x1="706" y1="650" x2="1014" y2="650" stroke="#059669" stroke-width="1.5" marker-end="url(#ag)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L931" target="_blank"><text x="860" y="664" text-anchor="middle" class="src">batched_dynamicemb_function.py:931</text></a>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L281" target="_blank"><text x="860" y="676" text-anchor="middle" class="src">&#x2192; key_value_table.py:281</text></a>
+  <rect x="590" y="684" width="560" height="38" rx="5" fill="#FFFBEB" stroke="#FDE68A" stroke-dasharray="3,2"/>
+  <text x="598" y="700" class="nbold" fill="#92400E">slot_indices from PrefetchState &#x2192; direct indexed read (no hash lookup!)</text>
+  <text x="598" y="714" class="note" fill="#6B7280">load_from_flat_table_emb kernel reads embedding by flat-table offset. State from cache._state or storage._state.</text>
+  <line x1="1014" y1="738" x2="706" y2="738" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="860" y="733" text-anchor="middle" class="ret">unique_embs [N &#x00D7; max_D]</text>
+
+  <!-- [4A.5] non-admitted init -->
+  <rect x="600" y="748" width="400" height="22" rx="5" fill="#F0FDF4" stroke="#86EFAC" stroke-dasharray="3,2"/>
+  <text x="608" y="762" class="note" fill="#065F46">[if non_admitted_positions] initializer for new embeddings [line 940]</text>
+
+  <!-- ── Divider ── -->
+  <line x1="20" y1="782" x2="1180" y2="782" stroke="#6366F1" stroke-width="1" stroke-dasharray="8,4"/>
+
+  <!-- ── Path B: DEFAULT (use_counter=False) ── -->
+  <rect x="30" y="790" width="370" height="18" rx="3" fill="#FFF7ED" stroke="#FDBA74"/>
+  <text x="38" y="803" font-size="10" font-weight="700" fill="#9A3412">[use_counter = False] &#x2014; DEFAULT Path (_generic_forward_path)</text>
+
+  <!-- [4B] _generic_forward_path entry -->
+  <rect x="10" y="818" width="18" height="14" rx="3" fill="#FFF7ED" stroke="#F97316"/>
+  <text x="19" y="829" text-anchor="middle" class="sn" fill="#9A3412">4b</text>
+  <rect x="730" y="810" width="262" height="22" rx="4" fill="#FFF7ED" stroke="#FDBA74" stroke-width="0.8"/>
+  <text x="860" y="825" text-anchor="middle" class="mb" fill="#9A3412">_generic_forward_path(storage, ...)</text>
+  <line x1="706" y1="836" x2="1014" y2="836" stroke="#EA580C" stroke-width="1.5" marker-end="url(#ao)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L953" target="_blank"><text x="860" y="850" text-anchor="middle" class="src">batched_dynamicemb_function.py:953 &#x2192; _generic_forward_path:811</text></a>
+
+  <!-- [4B.1] storage.find -->
+  <rect x="738" y="862" width="220" height="22" rx="4" fill="#FFF7ED" stroke="#FDBA74" stroke-width="0.8"/>
+  <text x="848" y="877" text-anchor="middle" class="mb" fill="#9A3412">storage.find(unique_keys, VALUE)</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L842" target="_blank"><text x="860" y="896" text-anchor="middle" class="src">batched_dynamicemb_function.py:842 &#x2192; key_value_table.py find()</text></a>
+  <rect x="590" y="904" width="560" height="24" rx="5" fill="#FFF7ED" stroke="#FDBA74" stroke-dasharray="3,2"/>
+  <text x="598" y="920" class="note" fill="#9A3412">Returns unique_values [N &#x00D7; val_dim] with full VALUE columns (emb + optimizer states)</text>
+
+  <!-- [4B.2] _apply_admission -->
+  <rect x="738" y="938" width="220" height="22" rx="4" fill="#FFF7ED" stroke="#FDBA74" stroke-width="0.8"/>
+  <text x="848" y="953" text-anchor="middle" class="mb" fill="#9A3412">_apply_admission(missing_keys)</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L863" target="_blank"><text x="860" y="968" text-anchor="middle" class="src">batched_dynamicemb_function.py:863 [if missing keys exist]</text></a>
+  <rect x="590" y="976" width="560" height="24" rx="5" fill="#FFF7ED" stroke="#FDBA74" stroke-dasharray="3,2"/>
+  <text x="598" y="992" class="note" fill="#9A3412">Applies admit_strategy filter; admitted keys get initializer() for embedding init [line 849]</text>
+
+  <!-- [4B.3] storage.insert -->
+  <rect x="738" y="1010" width="220" height="22" rx="4" fill="#FFF7ED" stroke="#FDBA74" stroke-width="0.8"/>
+  <text x="848" y="1025" text-anchor="middle" class="mb" fill="#9A3412">storage.insert(new keys, values)</text>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L884" target="_blank"><text x="860" y="1040" text-anchor="middle" class="src">batched_dynamicemb_function.py:884 &#x2192; key_value_table.py insert()</text></a>
+  <rect x="590" y="1048" width="560" height="24" rx="5" fill="#FFF7ED" stroke="#FDBA74" stroke-dasharray="3,2"/>
+  <text x="598" y="1064" class="note" fill="#9A3412">Persist newly admitted keys with initialized embeddings + zero optimizer states</text>
+
+  <!-- [4B] return -->
+  <line x1="1014" y1="1088" x2="706" y2="1088" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="860" y="1083" text-anchor="middle" class="ret">unique_embs = unique_values[:, :out_dim]</text>
+
+  <!-- End of alt frame at y=1106 -->
+
+  <!-- ====== [5] gather_embedding_pooled (SHARED by both paths) ====== -->
+  <rect x="10" y="1120" width="18" height="14" rx="3" fill="#F5F3FF" stroke="#7C3AED"/>
+  <text x="19" y="1131" text-anchor="middle" class="sn" fill="#6D28D9">5</text>
+  <rect x="754" y="1112" width="212" height="22" rx="4" fill="#ECFDF5" stroke="#86EFAC" stroke-width="0.8"/>
+  <text x="860" y="1127" text-anchor="middle" class="mb" fill="#059669">gather_embedding_pooled(...)</text>
+  <line x1="706" y1="1138" x2="1014" y2="1138" stroke="#059669" stroke-width="1.5" marker-end="url(#ag)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L977" target="_blank"><text x="860" y="1152" text-anchor="middle" class="src">batched_dynamicemb_function.py:977</text></a>
+  <rect x="590" y="1160" width="560" height="38" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-dasharray="3,2"/>
+  <text x="598" y="1176" class="nbold" fill="#6D28D9">Scatter: unique_embs [N &#x00D7; D] &#x2192; output_embs [B &#x00D7; total_D]</text>
+  <text x="598" y="1190" class="note" fill="#6B7280">Applies pooling (SUM/MEAN) + per_sample_weights via D_offsets for mixed dims.</text>
+  <line x1="1014" y1="1214" x2="706" y2="1214" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="860" y="1209" text-anchor="middle" class="ret">output_embs [B &#x00D7; total_D]</text>
+
+  <!-- ctx assignments -->
+  <rect x="600" y="1228" width="400" height="28" rx="5" fill="#F0FDF4" stroke="#86EFAC"/>
+  <text x="608" y="1243" class="note" fill="#065F46">ctx stores for backward: slot_indices, unique_keys,</text>
+  <text x="608" y="1254" class="src">reverse_indices, update_slot_indices, storage_mode, optimizer [line 1000-1035]</text>
+
+  <!-- Return chain -->
+  <line x1="694" y1="1282" x2="406" y2="1282" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="550" y="1277" text-anchor="middle" class="ret">output_embs</text>
+  <line x1="394" y1="1307" x2="136" y2="1307" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="267" y="1302" text-anchor="middle" class="ret">embeddings &#x2192; output_dist</text>
+
+  <!-- KEY INSIGHT BOX -->
+  <rect x="30" y="1340" width="1140" height="110" rx="10" fill="#fff" stroke="#E5E7EB" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="46" y="1364" font-size="12" font-weight="700" fill="#065F46">Cache/HBM_DIRECT vs DEFAULT: Why forward differs</text>
+  <text x="46" y="1382" font-size="11" fill="#374151"><tspan font-weight="700" fill="#4338CA">Cache/HBM_DIRECT:</tspan> prefetch() already resolved hash &#x2192; slot_indices. Forward just does load_from_flat (indexed read) &#x2014; no hash, no I/O.</text>
+  <text x="46" y="1400" font-size="11" fill="#374151"><tspan font-weight="700" fill="#9A3412">DEFAULT:</tspan> No prefetch cache. Forward calls _generic_forward_path: storage.find (hash lookup) &#x2192; admission &#x2192; init &#x2192; insert for new keys.</text>
+  <text x="46" y="1418" font-size="11" fill="#374151"><tspan font-weight="700" fill="#6D28D9">Shared:</tspan> Both paths end with gather_embedding_pooled to scatter unique_embs into batched output_embs.</text>
+  <text x="46" y="1436" font-size="11" fill="#6B7280">Key PrefetchState fields (Cache path): slot_indices, reverse_indices, non_admitted_positions, update_slot_indices.</text>
+</svg>

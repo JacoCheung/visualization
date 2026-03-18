@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1440" viewBox="0 0 1200 1440">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .mb{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:11px;font-weight:700;fill:#1F2937}
+      .ptcp{font-size:12px;font-weight:700}
+      .psub{font-size:9px;fill:#6B7280}
+      .ret{font-size:10px;fill:#9CA3AF}
+      .note{font-size:10.5px}
+      .nbold{font-size:10.5px;font-weight:600}
+      .sn{font-size:10px;font-weight:700}
+      .src{font-family:'SF Mono',Consolas,monospace;font-size:9px;fill:#9CA3AF;font-style:italic;cursor:pointer}
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#1F2937"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#9CA3AF"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,1 7,4 0,7" fill="#059669"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+
+  <rect width="1200" height="1440" fill="#FAFBFF"/>
+  <text x="600" y="26" text-anchor="middle" font-size="15" font-weight="700" fill="#111827">DynamicEmb Backward Phase</text>
+  <text x="600" y="44" text-anchor="middle" font-size="10" fill="#9CA3AF">autograd backward() &#x2192; grad reduction &#x2192; fused optimizer update</text>
+
+  <!-- PARTICIPANTS: x=110, 340, 560, 800, 1050 -->
+  <g filter="url(#sh)">
+    <rect x="15" y="56" width="190" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <text x="110" y="72" text-anchor="middle" class="ptcp" fill="#065F46">DynamicEmbedding</text>
+    <text x="110" y="86" text-anchor="middle" class="ptcp" fill="#065F46">Function</text>
+    <text x="110" y="99" text-anchor="middle" class="psub">batched_dynamicemb_function.py</text>
+
+    <rect x="245" y="56" width="190" height="48" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/>
+    <text x="340" y="72" text-anchor="middle" class="ptcp" fill="#991B1B">DynamicEmbStorage</text>
+    <text x="340" y="86" text-anchor="middle" class="ptcp" fill="#991B1B">(Storage)</text>
+    <text x="340" y="99" text-anchor="middle" class="psub">key_value_table.py</text>
+
+    <rect x="465" y="56" width="190" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
+    <text x="560" y="72" text-anchor="middle" class="ptcp" fill="#92400E">DynamicEmbCache</text>
+    <text x="560" y="86" text-anchor="middle" class="ptcp" fill="#92400E">(Cache)</text>
+    <text x="560" y="99" text-anchor="middle" class="psub">key_value_table.py</text>
+
+    <rect x="695" y="56" width="210" height="48" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
+    <text x="800" y="72" text-anchor="middle" class="ptcp" fill="#1E40AF">BaseDynamicEmbedding</text>
+    <text x="800" y="86" text-anchor="middle" class="ptcp" fill="#1E40AF">Optimizer</text>
+    <text x="800" y="99" text-anchor="middle" class="psub">optimizer.py</text>
+
+    <rect x="970" y="56" width="160" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="1050" y="76" text-anchor="middle" class="ptcp" fill="#0F766E">CUDA Kernels</text>
+    <text x="1050" y="92" text-anchor="middle" class="psub">(dynamicemb_ext)</text>
+  </g>
+
+  <line x1="110" y1="104" x2="110" y2="1120" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="340" y1="104" x2="340" y2="1120" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="560" y1="104" x2="560" y2="1120" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="800" y1="104" x2="800" y2="1120" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="1050" y1="104" x2="1050" y2="1120" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+
+  <rect x="104" y="118" width="12" height="990" rx="2" fill="#A7F3D0" stroke="#059669" stroke-width="0.5" opacity="0.4"/>
+  <rect x="794" y="495" width="12" height="200" rx="2" fill="#BFDBFE" stroke="#2563EB" stroke-width="0.5" opacity="0.35"/>
+  <rect x="794" y="890" width="12" height="200" rx="2" fill="#BFDBFE" stroke="#2563EB" stroke-width="0.5" opacity="0.35"/>
+
+  <!-- Sync-free badge -->
+  <rect x="890" y="114" width="270" height="22" rx="4" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1"/>
+  <text x="904" y="129" font-size="8" font-weight="700" fill="#059669">&#x2714; No cudaStreamSynchronize in backward path</text>
+
+  <!-- ====== [B1] reduce_grads (pooling) ====== -->
+  <rect x="10" y="125" width="18" height="14" rx="3" fill="#ECFDF5" stroke="#059669"/>
+  <text x="19" y="136" text-anchor="middle" class="sn" fill="#065F46">B1</text>
+  <rect x="380" y="112" width="400" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="580" y="128" text-anchor="middle" class="mb">reduce_grads(reverse_indices,</text>
+  <text x="580" y="141" text-anchor="middle" class="mb">grads, unique_keys.numel(),</text>
+  <text x="580" y="154" text-anchor="middle" class="mb">batch_size, out_dim, offsets, ...)</text>
+  <line x1="116" y1="156" x2="1044" y2="156" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1052" target="_blank"><text x="580" y="170" text-anchor="middle" class="src">batched_dynamicemb_function.py:1052 (pooling) / 1064 (non-pooling)</text></a>
+  <rect x="40" y="180" width="460" height="38" rx="5" fill="#ECFDF5" stroke="#86EFAC" stroke-dasharray="3,2"/>
+  <text x="48" y="196" class="nbold" fill="#065F46">Reverse of gather: [B &#x00D7; total_D] &#x2192; [unique_N &#x00D7; max_D]</text>
+  <text x="48" y="210" class="note" fill="#6B7280">multi_to_one_reduce_kernel: sort &#x2192; segmented reduce for duplicate keys.</text>
+  <line x1="1044" y1="234" x2="116" y2="234" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+  <text x="580" y="229" text-anchor="middle" class="ret">unique_grads [unique_N &#x00D7; max_D]</text>
+
+  <!-- ====== [B2] reduce_freq_counters ====== -->
+  <rect x="10" y="254" width="18" height="14" rx="3" fill="#F5F3FF" stroke="#7C3AED"/>
+  <text x="19" y="265" text-anchor="middle" class="sn" fill="#6D28D9">B2</text>
+  <rect x="380" y="240" width="400" height="46" rx="4" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="0.8"/>
+  <text x="580" y="256" text-anchor="middle" class="mb" fill="#6D28D9">reduce_freq_counters(</text>
+  <text x="580" y="269" text-anchor="middle" class="mb" fill="#6D28D9">lfu_accumulated_frequency,</text>
+  <text x="580" y="282" text-anchor="middle" class="mb" fill="#6D28D9">reverse_indices)</text>
+  <line x1="116" y1="284" x2="1044" y2="284" stroke="#059669" stroke-width="1.2" marker-end="url(#ag)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1064" target="_blank"><text x="580" y="298" text-anchor="middle" class="src">batched_dynamicemb_function.py:1064 [if admission_counter]</text></a>
+  <rect x="40" y="306" width="380" height="22" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-dasharray="3,2"/>
+  <text x="48" y="321" class="nbold" fill="#6D28D9">Frequency info feeds admission policy for next prefetch cycle.</text>
+
+  <!-- ALT FRAME -->
+  <rect x="25" y="345" width="1150" height="770" fill="none" rx="5" stroke="#6B7280" stroke-width="2"/>
+  <rect x="25" y="345" width="28" height="18" fill="#6B7280" rx="3"/>
+  <text x="32" y="358" font-size="8" font-weight="700" fill="#fff">alt</text>
+
+  <!-- CACHE / HBM_DIRECT PATH -->
+  <text x="60" y="360" font-size="11" font-weight="700" fill="#D97706">[CACHE / HBM_DIRECT Path &#x2014; use_counter=True, update flat table in-place]</text>
+  <rect x="40" y="370" width="1120" height="358" fill="#FFFBEB" opacity="0.05"/>
+
+  <!-- [B3a] fused_update_for_flat_table (2 lines) -->
+  <rect x="10" y="385" width="18" height="14" rx="3" fill="#EFF6FF" stroke="#2563EB"/>
+  <text x="19" y="396" text-anchor="middle" class="sn" fill="#1E40AF">B3a</text>
+  <rect x="260" y="372" width="400" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="460" y="388" text-anchor="middle" class="mb">optimizer.fused_update_for_</text>
+  <text x="460" y="401" text-anchor="middle" class="mb">flat_table(unique_grads,</text>
+  <text x="460" y="414" text-anchor="middle" class="mb">update_slot_indices, table_ptrs, ...)</text>
+  <line x1="116" y1="416" x2="794" y2="416" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1083" target="_blank"><text x="460" y="430" text-anchor="middle" class="src">batched_dynamicemb_function.py:1083 &#x2192; optimizer.py:128</text></a>
+  <rect x="40" y="438" width="420" height="22" rx="5" fill="#EFF6FF" stroke="#BFDBFE" stroke-dasharray="3,2"/>
+  <text x="48" y="453" class="nbold" fill="#1E40AF">update_slot_indices from PrefetchState &#x2192; cache/storage buffer positions</text>
+
+  <rect x="816" y="462" width="254" height="34" rx="4" fill="#ECFDF5" stroke="#86EFAC" stroke-width="0.8"/>
+  <text x="943" y="478" text-anchor="middle" class="mb" fill="#059669">_update_for_flat_table_kernel</text>
+  <text x="943" y="491" text-anchor="middle" class="mb" fill="#059669">(fused read+optimizer+write)</text>
+  <line x1="806" y1="500" x2="1044" y2="500" stroke="#059669" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="930" y="514" text-anchor="middle" class="src">optimizer.cu (SGD / Adam / AdaGrad / RowWiseAdaGrad)</text>
+  <rect x="590" y="522" width="380" height="38" rx="5" fill="#EFF6FF" stroke="#BFDBFE" stroke-dasharray="3,2"/>
+  <text x="598" y="538" class="nbold" fill="#1E40AF">Fused: read emb + apply optimizer + write back in one pass.</text>
+  <text x="598" y="552" class="note" fill="#6B7280">SGD / Adam / AdaGrad / RowWiseAdaGrad all have fused kernels.</text>
+  <line x1="794" y1="576" x2="116" y2="576" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+
+  <!-- [B4a] decrement_counter (2 lines) -->
+  <rect x="10" y="592" width="18" height="14" rx="3" fill="#F0FDFA" stroke="#0D9488"/>
+  <text x="19" y="603" text-anchor="middle" class="sn" fill="#0F766E">B4a</text>
+  <rect x="194" y="578" width="292" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="340" y="594" text-anchor="middle" class="mb">counter_owner.decrement_counter(</text>
+  <text x="340" y="607" text-anchor="middle" class="mb">update_slot_indices,</text>
+  <text x="340" y="620" text-anchor="middle" class="mb">unique_table_ids)</text>
+  <line x1="116" y1="622" x2="554" y2="622" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1099" target="_blank"><text x="340" y="636" text-anchor="middle" class="src">batched_dynamicemb_function.py:1099</text></a>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L953" target="_blank"><text x="340" y="648" text-anchor="middle" class="src">&#x2192; key_value_table.py:953 (cache) or key_value_table.py:1113 (storage)</text></a>
+  <rect x="40" y="656" width="360" height="22" rx="5" fill="#F0FDFA" stroke="#99F6E4" stroke-dasharray="3,2"/>
+  <text x="48" y="671" class="nbold" fill="#0F766E">Release refcount lock. Keys can be evicted by future prefetch batches.</text>
+
+  <!-- DIVIDER -->
+  <line x1="25" y1="700" x2="1175" y2="700" stroke="#6B7280" stroke-width="1.8" stroke-dasharray="12,6"/>
+
+  <!-- DEFAULT PATH -->
+  <text x="60" y="717" font-size="11" font-weight="700" fill="#059669">[DEFAULT Path &#x2014; use_counter=False, update padded buffer + re-insert]</text>
+  <rect x="40" y="730" width="1120" height="375" fill="#ECFDF5" opacity="0.05"/>
+
+  <!-- [B3b] update_for_padded_buffer (2 lines) -->
+  <rect x="10" y="746" width="18" height="14" rx="3" fill="#EFF6FF" stroke="#2563EB"/>
+  <text x="19" y="757" text-anchor="middle" class="sn" fill="#1E40AF">B3b</text>
+  <rect x="260" y="732" width="400" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="460" y="748" text-anchor="middle" class="mb">optimizer.update_for_</text>
+  <text x="460" y="761" text-anchor="middle" class="mb">padded_buffer(unique_grads,</text>
+  <text x="460" y="774" text-anchor="middle" class="mb">unique_values, emb_dim, value_dim)</text>
+  <line x1="116" y1="776" x2="794" y2="776" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1104" target="_blank"><text x="460" y="790" text-anchor="middle" class="src">batched_dynamicemb_function.py:1104 &#x2192; optimizer.py:143</text></a>
+  <rect x="40" y="798" width="400" height="22" rx="5" fill="#ECFDF5" stroke="#86EFAC" stroke-dasharray="3,2"/>
+  <text x="48" y="813" class="nbold" fill="#065F46">Updates on per-key padded buffer (unique_values tensor).</text>
+
+  <rect x="808" y="822" width="270" height="34" rx="4" fill="#ECFDF5" stroke="#86EFAC" stroke-width="0.8"/>
+  <text x="943" y="838" text-anchor="middle" class="mb" fill="#059669">_update_for_padded_buffer_kernel</text>
+  <text x="943" y="851" text-anchor="middle" class="mb" fill="#059669">(fused read+optimizer+write)</text>
+  <line x1="806" y1="860" x2="1044" y2="860" stroke="#059669" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="930" y="874" text-anchor="middle" class="src">optimizer.cu (SGD / Adam / AdaGrad / RowWiseAdaGrad)</text>
+  <rect x="590" y="882" width="380" height="38" rx="5" fill="#ECFDF5" stroke="#86EFAC" stroke-dasharray="3,2"/>
+  <text x="598" y="898" class="nbold" fill="#065F46">Same fused approach, but on padded buffer layout.</text>
+  <text x="598" y="912" class="note" fill="#6B7280">Contiguous variable-length per table, no padding waste.</text>
+  <line x1="794" y1="936" x2="116" y2="936" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#ar)"/>
+
+  <!-- [B4b] storage.insert (2 lines) -->
+  <rect x="10" y="952" width="18" height="14" rx="3" fill="#FEF2F2" stroke="#DC2626"/>
+  <text x="19" y="963" text-anchor="middle" class="sn" fill="#991B1B">B4b</text>
+  <rect x="100" y="938" width="260" height="46" rx="4" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="0.8"/>
+  <text x="230" y="954" text-anchor="middle" class="mb">storage.insert(unique_keys,</text>
+  <text x="230" y="967" text-anchor="middle" class="mb">unique_table_ids,</text>
+  <text x="230" y="980" text-anchor="middle" class="mb">unique_values, preserve=True)</text>
+  <line x1="116" y1="982" x2="334" y2="982" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L1110" target="_blank"><text x="230" y="996" text-anchor="middle" class="src">batched_dynamicemb_function.py:1110</text></a>
+  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L1121" target="_blank"><text x="230" y="1008" text-anchor="middle" class="src">&#x2192; key_value_table.py:1121 / 1455</text></a>
+  <rect x="40" y="1016" width="450" height="38" rx="5" fill="#FEF2F2" stroke="#FECACA" stroke-dasharray="3,2"/>
+  <text x="48" y="1032" class="nbold" fill="#991B1B">[DEFAULT storage] Re-insert updated unique_values back to hash table.</text>
+  <text x="48" y="1046" class="note" fill="#6B7280">Cache/HBM_DIRECT update flat table in-place (Path A). DEFAULT must re-insert because optimizer worked on a copy.</text>
+
+  <rect x="590" y="1060" width="260" height="22" rx="4" fill="#ECFDF5" stroke="#86EFAC" stroke-width="0.8"/>
+  <text x="710" y="1075" text-anchor="middle" class="mb" fill="#059669">table_insert + store_to_flat_table</text>
+  <line x1="346" y1="1086" x2="1044" y2="1086" stroke="#059669" stroke-width="1.2" marker-end="url(#ag)"/>
+
+  <!-- (B5b/B6b removed: DEFAULT backward has no update_counter/decrement_counter) -->
+
+  <!-- COMPARISON TABLE -->
+  <rect x="25" y="1140" width="1150" height="158" rx="10" fill="#fff" stroke="#E5E7EB" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="600" y="1164" text-anchor="middle" font-size="13" font-weight="700" fill="#111827">Backward Path Comparison</text>
+  <rect x="40" y="1174" width="180" height="18" rx="0" fill="#F3F4F6"/>
+  <rect x="220" y="1174" width="380" height="18" rx="0" fill="#FFFBEB"/>
+  <rect x="600" y="1174" width="560" height="18" rx="0" fill="#ECFDF5"/>
+  <text x="130" y="1187" text-anchor="middle" font-size="10" font-weight="700" fill="#374151">Step</text>
+  <text x="410" y="1187" text-anchor="middle" font-size="10" font-weight="700" fill="#D97706">CACHE / HBM_DIRECT (use_counter=True)</text>
+  <text x="880" y="1187" text-anchor="middle" font-size="10" font-weight="700" fill="#059669">DEFAULT (use_counter=False)</text>
+  <line x1="40" y1="1192" x2="1160" y2="1192" stroke="#E5E7EB"/>
+  <text x="48" y="1208" class="note" fill="#374151" font-weight="600">Update target</text>
+  <text x="228" y="1208" class="note" fill="#374151">Cache/storage flat table via slot_indices</text>
+  <text x="608" y="1208" class="note" fill="#374151">unique_values padded buffer (in memory)</text>
+  <line x1="40" y1="1216" x2="1160" y2="1216" stroke="#E5E7EB"/>
+  <text x="48" y="1232" class="note" fill="#374151" font-weight="600">Kernel</text>
+  <text x="228" y="1232" class="note" fill="#D97706">_update_for_flat_table_kernel</text>
+  <text x="608" y="1232" class="note" fill="#059669">_update_for_padded_buffer_kernel</text>
+  <line x1="40" y1="1240" x2="1160" y2="1240" stroke="#E5E7EB"/>
+  <text x="48" y="1256" class="note" fill="#374151" font-weight="600">Post-update</text>
+  <text x="228" y="1256" class="note" fill="#374151">decrement_counter (release refcount lock)</text>
+  <text x="608" y="1256" class="note" fill="#374151">storage.insert (re-insert updated values to hash table)</text>
+  <line x1="40" y1="1264" x2="1160" y2="1264" stroke="#E5E7EB"/>
+  <text x="48" y="1280" class="note" fill="#374151" font-weight="600">Memory layout</text>
+  <text x="228" y="1280" class="note" fill="#D97706">Flat table (contiguous, variable-length per table)</text>
+  <text x="608" y="1280" class="note" fill="#059669">Padded buffer (padded to max_D, then re-insert)</text>
+
+  <!-- KEY INSIGHT BOX -->
+  <rect x="25" y="1320" width="1150" height="70" rx="10" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.5"/>
+  <text x="46" y="1345" font-size="12" font-weight="700" fill="#92400E">Why fused optimizer kernels?</text>
+  <text x="46" y="1363" font-size="11" fill="#374151">Traditional: 4 memory round-trips (read emb, read grad, update state, write emb).</text>
+  <text x="46" y="1379" font-size="11" fill="#374151">Fused: 1 kernel reads + applies optimizer + writes in one pass. 4x memory traffic reduction.</text>
+</svg>

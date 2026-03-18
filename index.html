@@ -17,6 +17,7 @@ h1{font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:8px}
 .tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;margin-bottom:10px}
 .tag-interactive{background:#E8F5E9;color:#2E7D32}
 .tag-static{background:#E3F2FD;color:#1565C0}
+.tag-doc{background:#FFF3E0;color:#E65100}
 footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
 </style>
 </head>
@@ -33,6 +34,11 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
     <span class="tag tag-interactive">Interactive</span>
     <h2>Prefetch Pipeline Timeline</h2>
     <p>预取流水线时间线可视化，展示各阶段的执行时序与依赖关系。</p>
+  </a>
+  <a class="card" href="recsys-examples/dynamicemb/index.html">
+    <span class="tag tag-doc">Documentation</span>
+    <h2>DynamicEmb Training Pipeline</h2>
+    <p>NVIDIA DynamicEmb 训练迭代五阶段（input_dist → wait_sparse → prefetch → forward → backward）序列图与文档，涵盖 CACHE / HBM_DIRECT / DEFAULT 三种 StorageMode 路径对比。</p>
   </a>
 </div>
 <footer>GitHub Pages · JacoCheung/visualization</footer>

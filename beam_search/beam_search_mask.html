@@ -7,16 +7,25 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#333;overflow:hidden}
-#header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#333}
+#header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
 #header h1{font-size:17px;font-weight:600}
 #header .sub{font-size:12px;color:rgba(255,255,255,.5);font-weight:400}
 .controls{display:flex;gap:6px}
 .controls button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s}
 .controls button:hover{background:rgba(255,255,255,.25)}
-#main{display:flex;height:calc(100vh - 48px)}
-#chart-container{flex:1;overflow:hidden;position:relative;background:#fafbfc}
-.left-col{position:relative;width:300px;min-width:300px;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;order:-1}
+#content-wrapper{display:flex;height:calc(100vh - 48px)}
+.left-col{position:relative;width:300px;min-width:180px;display:flex;flex-direction:column}
+.resizer-v{width:5px;cursor:col-resize;background:#e0e0e0;flex-shrink:0;transition:background .15s}
+.resizer-v:hover,.resizer-v.active{background:#a0a0ff}
+.resizer-h{height:5px;cursor:row-resize;background:#e0e0e0;flex-shrink:0;transition:background .15s}
+.resizer-h:hover,.resizer-h.active{background:#a0a0ff}
+#right-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.panel-title{background:#f0f1f4;padding:4px 14px;font-size:12px;font-weight:700;color:#1a1a2e;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;user-select:none;flex-shrink:0}
+.panel-title .sub{font-size:10px;color:#9CA3AF;font-weight:400;margin-left:8px}
+#tree-wrapper{flex:1;overflow:hidden;position:relative;background:#fafbfc;min-height:120px}
+#tree-zoom-ind{position:absolute;bottom:6px;right:8px;background:rgba(255,255,255,.88);border:1px solid #ddd;border-radius:5px;padding:2px 8px;font-size:10px;color:#888}
+#chart-container{flex:1;overflow:hidden;position:relative;background:#fafbfc;min-height:120px}
 #detail-panel{position:absolute;inset:0;background:#fff;padding:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .2s ease,padding .2s ease;z-index:2}
 #detail-panel.open{padding:20px;opacity:1;pointer-events:auto;overflow-y:auto}
 #detail-panel h2{font-size:14px;margin-bottom:10px;color:#1a1a2e;display:flex;justify-content:space-between;align-items:center}
@@ -32,7 +41,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .legend-item.hl{border-color:#333;background:rgba(0,0,0,.07);transform:scale(1.08)}
 .legend-swatch{width:14px;height:14px;border-radius:2px;flex-shrink:0}
 #zoom-ind{position:absolute;bottom:10px;right:10px;background:rgba(255,255,255,.88);border:1px solid #ddd;border-radius:5px;padding:3px 10px;font-size:10px;color:#888}
-.help-hint{position:absolute;top:8px;right:8px;font-size:10px;color:#aaa}
 #docs-section{flex:1;overflow-y:auto;padding:20px 18px 40px;background:#fff}
 .guide-section{margin-bottom:16px}
 .guide-section h3{font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e0e0e0}
@@ -47,6 +55,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .guide-section .compare-tbl th,.guide-section .compare-tbl td{padding:4px 5px;border:1px solid #e0e0e0;text-align:left}
 .guide-section .compare-tbl th{background:#f4f5f8;font-weight:700;color:#555}
 .docs-title{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a1a2e}
+#tree-section{display:flex;flex-direction:column;flex:1;min-height:120px}
+.tree-legend{display:flex;gap:12px;font-size:10px;color:#374151}
+.tree-legend-item{display:flex;align-items:center;gap:4px}
+.tree-lsw{width:11px;height:11px;border-radius:3px;border:1.5px solid}
+#tree-svg text{font-family:'SF Mono',Consolas,'Courier New',monospace}
 </style>
 </head>
 <body>
@@ -63,13 +76,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   </div>
 </div>
 
-<div id="main">
-  <div id="chart-container">
-    <div class="tooltip" id="tooltip"></div>
-    <div id="legend"></div>
-    <div id="zoom-ind">100%</div>
-    <div class="help-hint">scroll = pan · ⌘+scroll = zoom · drag = pan · click row = toggle mask</div>
-  </div>
+<div id="content-wrapper">
   <div class="left-col">
     <div id="docs-section">
   <div class="docs-title">Beam Search 可视化文档</div>
@@ -186,6 +193,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div id="detail-panel">
       <h2><span>Details</span><button class="close-panel" onclick="closePanel()">✕</button></h2>
       <div id="detail-content"></div>
+    </div>
+  </div>
+  <div class="resizer-v" id="resizer-v"></div>
+  <div id="right-col">
+    <div id="tree-section">
+      <div class="panel-title">
+        Beam Search Tree
+        <span class="sub">点击顶部 Step 标签折叠/展开子树</span>
+        <div class="tree-legend">
+          <div class="tree-legend-item"><div class="tree-lsw" style="background:#FADBD8;border-color:#E74C3C"></div>Beam 0</div>
+          <div class="tree-legend-item"><div class="tree-lsw" style="background:#D4E6F1;border-color:#3498DB"></div>Beam 1</div>
+          <div class="tree-legend-item"><div class="tree-lsw" style="background:#F3F4F6;border-color:#374151;border-width:2px"></div>共享</div>
+          <div class="tree-legend-item"><div class="tree-lsw" style="background:#F9FAFB;border-color:#D1D5DB;border-style:dashed"></div><span style="color:#9CA3AF">Dead</span></div>
+        </div>
+      </div>
+      <div id="tree-wrapper">
+        <div id="tree-zoom-ind">100%</div>
+      </div>
+    </div>
+    <div class="resizer-h" id="resizer-h"></div>
+    <div id="mask-section" style="display:flex;flex-direction:column;flex:1;min-height:120px">
+      <div class="panel-title">
+        Token Layout &amp; Attention Mask
+        <span class="sub">scroll = pan · ⌘+scroll = zoom · click row = toggle mask</span>
+      </div>
+      <div id="chart-container">
+        <div class="tooltip" id="tooltip"></div>
+        <div id="legend"></div>
+        <div id="zoom-ind">100%</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1146,6 +1183,276 @@ window.expandAll = () => { for(let s=1;s<=STEPS;s++) ALL_METHODS.forEach(m=>expa
 window.collapseAll = () => { expanded.clear(); updateLayout(); };
 setTimeout(fitToView, 150);
 window.addEventListener('resize', () => setTimeout(fitToView, 80));
+
+/* ================================================================
+   RESIZERS
+   ================================================================ */
+(function() {
+  function setupResizer(id, dir) {
+    const el = document.getElementById(id);
+    let startPos, startSize, target;
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      el.classList.add('active');
+      if (dir === 'v') {
+        target = el.previousElementSibling;
+        startPos = e.clientX;
+        startSize = target.getBoundingClientRect().width;
+      } else {
+        target = el.previousElementSibling;
+        startPos = e.clientY;
+        startSize = target.getBoundingClientRect().height;
+      }
+      function onMove(e2) {
+        const delta = dir === 'v' ? e2.clientX - startPos : e2.clientY - startPos;
+        const ns = Math.max(dir === 'v' ? 180 : 80, startSize + delta);
+        target.style[dir === 'v' ? 'width' : 'height'] = ns + 'px';
+        target.style.flex = 'none';
+      }
+      function onUp() {
+        el.classList.remove('active');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+  setupResizer('resizer-v', 'v');
+  setupResizer('resizer-h', 'h');
+})();
+</script>
+<script>
+(function() {
+  'use strict';
+  const TNW = 56, TNH = 28, TCW = 84, TNR = 6;
+  const TX = [70, 180, 290, 400, 510, 620];
+
+  const treeNodes = [
+    {id:'ctx',  label:'context', step:0, x:TX[0], y:290, w:TCW, prob:1.0},
+    {id:'s0t0', label:'s0t0', step:1, x:TX[1], y:220, w:TNW, tok:[1,0], prob:0.600},
+    {id:'s0t1', label:'s0t1', step:1, x:TX[1], y:360, w:TNW, tok:[1,1], prob:0.300},
+    {id:'s1t0', label:'s1t0', step:2, x:TX[2], y:220, w:TNW, tok:[2,0], prob:0.420},
+    {id:'s1t1', label:'s1t1', step:2, x:TX[2], y:360, w:TNW, tok:[2,1], prob:0.240},
+    {id:'s2t0', label:'s2t0', step:3, x:TX[3], y:160, w:TNW, tok:[3,0], prob:0.210},
+    {id:'s2t1', label:'s2t1', step:3, x:TX[3], y:280, w:TNW, tok:[3,1], prob:0.168},
+    {id:'s3t0', label:'s3t0', step:4, x:TX[4], y:160, w:TNW, tok:[4,0], prob:0.126},
+    {id:'s3t1', label:'s3t1', step:4, x:TX[4], y:280, w:TNW, tok:[4,1], prob:0.084},
+    {id:'s4t0', label:'s4t0', step:5, x:TX[5], y:120, w:TNW, tok:[5,0], prob:0.063},
+    {id:'s4t1', label:'s4t1', step:5, x:TX[5], y:200, w:TNW, tok:[5,1], prob:0.050},
+  ];
+
+  const treeEdges = [
+    ['ctx','s0t0'], ['ctx','s0t1'],
+    ['s0t0','s1t0'], ['s0t1','s1t1'],
+    ['s1t0','s2t0'], ['s1t0','s2t1'],
+    ['s2t0','s3t0'], ['s2t1','s3t1'],
+    ['s3t0','s4t0'], ['s3t0','s4t1'],
+  ];
+
+  const TNM = Object.fromEntries(treeNodes.map(n => [n.id, n]));
+
+  const tSvg = d3.select('#tree-wrapper').append('svg').attr('width','100%').attr('height','100%');
+  const tDefs = tSvg.append('defs');
+  tDefs.append('filter').attr('id','tree-sh').append('feDropShadow')
+    .attr('dx',0).attr('dy',1).attr('stdDeviation',1.5).attr('flood-color','#000').attr('flood-opacity',0.06);
+  [['ta-shared','#374151'],['ta-beam0','#E74C3C'],['ta-beam1','#3498DB']].forEach(([id,c]) => {
+    tDefs.append('marker').attr('id',id).attr('markerWidth',7).attr('markerHeight',7)
+      .attr('refX',6).attr('refY',3.5).attr('orient','auto')
+      .append('polygon').attr('points','0,0.7 6,3.5 0,6.3').attr('fill',c);
+  });
+  const tRoot = tSvg.append('g');
+  const tZoom = d3.zoom().scaleExtent([.15,5])
+    .filter(e => { if (e.type === 'wheel') return e.metaKey || e.ctrlKey; return !e.button; })
+    .on('zoom', e => { tRoot.attr('transform', e.transform); d3.select('#tree-zoom-ind').text(Math.round(e.transform.k*100)+'%'); });
+  tSvg.call(tZoom);
+  tSvg.on('wheel', function(e) {
+    if (e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    const t = d3.zoomTransform(this);
+    tSvg.call(tZoom.transform, d3.zoomIdentity.translate(t.x, t.y - e.deltaY).scale(t.k));
+  }, {passive: false});
+
+  const tsc = tRoot.node();
+  const tns = 'http://www.w3.org/2000/svg';
+
+  function tmk(t, a, p) {
+    const e = document.createElementNS(tns, t);
+    for (const [k, v] of Object.entries(a || {})) e.setAttribute(k, v);
+    if (p) p.appendChild(e);
+    return e;
+  }
+
+  function tBPath(depth, beam) {
+    const p = []; let idx = beam;
+    for (let k = depth; k >= 1; k--) {
+      p.push([k, idx]);
+      if (k >= 2) idx = CONN[k - 2][idx];
+    }
+    return p.reverse();
+  }
+
+  function tNStat(step, tok, vd) {
+    if (step === 0) return 'shared';
+    if (step > vd) return 'hidden';
+    const p0 = tBPath(vd, 0), p1 = tBPath(vd, 1);
+    const i0 = p0.some(([s, t]) => s === step && t === tok);
+    const i1 = p1.some(([s, t]) => s === step && t === tok);
+    if (i0 && i1) return 'shared';
+    if (i0) return 'beam0';
+    if (i1) return 'beam1';
+    return 'dead';
+  }
+
+  const TC = {
+    shared: {f:'#F3F4F6', s:'#374151', t:'#1F2937', e:'#374151'},
+    beam0:  {f:'#FADBD8', s:'#E74C3C', t:'#991B1B', e:'#E74C3C'},
+    beam1:  {f:'#D4E6F1', s:'#3498DB', t:'#1E3A5F', e:'#3498DB'},
+    dead:   {f:'#F9FAFB', s:'#D1D5DB', t:'#B0B0B0', e:'#E5E7EB'},
+  };
+
+  let tvd = STEPS;
+
+  function treeRender() {
+    while (tsc.firstChild) tsc.removeChild(tsc.firstChild);
+
+    for (let s = 0; s <= STEPS; s++) {
+      tmk('line', {
+        x1: TX[s], y1: 42, x2: TX[s], y2: 400,
+        stroke: '#E5E7EB', 'stroke-width': 1, 'stroke-dasharray': '4,4',
+        opacity: s <= tvd ? 0.25 : 0.06
+      }, tsc);
+    }
+
+    for (const [fid, tid] of treeEdges) {
+      const fn = TNM[fid], tn = TNM[tid];
+      if (tn.step > tvd) continue;
+      const st = tn.tok ? tNStat(tn.tok[0], tn.tok[1], tvd) : 'shared';
+      const c = TC[st] || TC.dead;
+      const x1 = fn.x + fn.w / 2, x2 = tn.x - tn.w / 2;
+      const mx = (x1 + x2) / 2;
+      tmk('path', {
+        d: `M${x1},${fn.y} C${mx},${fn.y} ${mx},${tn.y} ${x2},${tn.y}`,
+        fill: 'none', stroke: c.e,
+        'stroke-width': st === 'dead' ? 1.2 : 2,
+        'stroke-dasharray': st === 'dead' ? '5,3' : 'none',
+        'marker-end': st !== 'dead' ? `url(#ta-${st})` : ''
+      }, tsc);
+    }
+
+    for (const n of treeNodes) {
+      let st;
+      if (n.step === 0) st = 'shared';
+      else if (n.step > tvd) continue;
+      else st = tNStat(n.tok[0], n.tok[1], tvd);
+      const c = TC[st];
+      const g = tmk('g', {transform: `translate(${n.x - n.w / 2},${n.y - TNH / 2})`, filter: 'url(#tree-sh)'}, tsc);
+
+      tmk('rect', {
+        width: n.w, height: TNH, rx: TNR, fill: c.f, stroke: c.s,
+        'stroke-width': st === 'shared' && n.step > 0 ? 2.2 : 1.5,
+        'stroke-dasharray': st === 'dead' ? '4,2' : 'none'
+      }, g);
+
+      const fw = (st === 'shared' && n.step > 0) ? 700 : 500;
+      tmk('text', {
+        x: n.w / 2, y: TNH / 2 + 1,
+        'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        fill: c.t, 'font-size': n.step === 0 ? 11 : 12, 'font-weight': fw,
+        'font-family': "'SF Mono',Consolas,'Courier New',monospace"
+      }, g).textContent = n.label;
+
+      if (st === 'dead') {
+        tmk('text', {
+          x: n.w / 2, y: -6, 'text-anchor': 'middle',
+          fill: '#DC2626', 'font-size': 13, 'font-weight': 700,
+          'font-family': '-apple-system,sans-serif'
+        }, g).textContent = '\u2717';
+      }
+
+      const probStr = n.prob >= 0.1 ? n.prob.toFixed(2) : n.prob.toFixed(3);
+      const probColor = st === 'dead' ? '#C0C0C0' : c.t;
+      tmk('text', {
+        x: n.w / 2, y: TNH + 13,
+        'text-anchor': 'middle', fill: probColor,
+        'font-size': 10, 'font-weight': 500, opacity: st === 'dead' ? 0.6 : 0.8,
+        'font-family': "'SF Mono',Consolas,'Courier New',monospace"
+      }, g).textContent = `p=${probStr}`;
+    }
+
+    for (let s = 0; s <= STEPS; s++) {
+      const vis = s <= tvd;
+      const isCutoff = s === tvd && s < STEPS;
+      const lw = s === 0 ? 48 : 42;
+      const g = tmk('g', {transform: `translate(${TX[s] - lw / 2}, 4)`}, tsc);
+
+      tmk('rect', {
+        width: lw + 16, height: 22, rx: 5, x: -8,
+        fill: isCutoff ? '#EEF2FF' : 'transparent',
+        stroke: isCutoff ? '#C7D2FE' : 'none', 'stroke-width': 1
+      }, g);
+
+      const label = s === 0 ? 'Context' : `Step ${s}`;
+      tmk('text', {
+        x: lw / 2, y: 15, fill: vis ? '#374151' : '#D1D5DB',
+        'font-size': 11, 'font-weight': 600, 'text-anchor': 'middle',
+        'font-family': '-apple-system,sans-serif'
+      }, g).textContent = label;
+
+      if (s >= 1 && s <= STEPS - 1) {
+        const arrow = s < tvd ? '\u25BE' : '\u25B8';
+        tmk('text', {
+          x: lw / 2 + 22, y: 15, fill: vis ? '#9CA3AF' : '#D1D5DB',
+          'font-size': 10, 'font-family': '-apple-system,sans-serif'
+        }, g).textContent = arrow;
+      }
+
+      if (s >= 1) {
+        g.style.cursor = 'pointer';
+        const bg = g.querySelector('rect');
+        g.addEventListener('mouseenter', () => bg.setAttribute('fill', '#EEF2FF'));
+        g.addEventListener('mouseleave', () => {
+          const cut = tvd === s && s < STEPS;
+          bg.setAttribute('fill', cut ? '#EEF2FF' : 'transparent');
+          bg.setAttribute('stroke', cut ? '#C7D2FE' : 'none');
+        });
+        g.addEventListener('click', () => {
+          tvd = tvd === s ? (s === STEPS ? s - 1 : STEPS) : s;
+          treeRender();
+        });
+      }
+    }
+
+    if (tvd >= 1) {
+      const p0 = tBPath(tvd, 0), p1 = tBPath(tvd, 1);
+      const fmt = p => 'ctx \u2192 ' + p.map(([s, t]) => `s${s - 1}t${t}`).join(' \u2192 ');
+
+      tmk('text', {
+        x: 20, y: 418, fill: '#E74C3C', 'font-size': 11, 'font-weight': 600,
+        'font-family': "'SF Mono',Consolas,monospace"
+      }, tsc).textContent = `Beam 0: ${fmt(p0)}`;
+      tmk('text', {
+        x: 20, y: 435, fill: '#3498DB', 'font-size': 11, 'font-weight': 600,
+        'font-family': "'SF Mono',Consolas,monospace"
+      }, tsc).textContent = `Beam 1: ${fmt(p1)}`;
+    }
+  }
+
+  treeRender();
+
+  function treeFit() {
+    const r = document.getElementById('tree-wrapper').getBoundingClientRect();
+    if (r.width < 10 || r.height < 10) return;
+    const bb = tRoot.node().getBBox();
+    if (bb.width < 1) return;
+    const s = Math.min(0.95 * r.width / bb.width, 0.95 * r.height / bb.height, 2);
+    const tx = (r.width - bb.width * s) / 2 - bb.x * s;
+    const ty = (r.height - bb.height * s) / 2 - bb.y * s;
+    tSvg.call(tZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(s));
+  }
+  setTimeout(treeFit, 200);
+  window.addEventListener('resize', () => setTimeout(treeFit, 100));
+})();
 </script>
 </body>
 </html>

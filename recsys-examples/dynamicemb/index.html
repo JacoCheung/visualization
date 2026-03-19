@@ -471,8 +471,8 @@ else:
   </div>
 </div>
 
-<div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/distributed/train_pipeline.py" target="_blank">train_pipeline.py — _wait_sparse_data_dist()</a></div>
-<div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/distributed/dist_data.py" target="_blank">dist_data.py — SplitsAllToAllAwaitable, KJTAllToAll</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline.py" target="_blank">train_pipeline.py — _wait_sparse_data_dist()</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py" target="_blank">dist_data.py — SplitsAllToAllAwaitable, KJTAllToAll</a></div>
 
 <div class="callout callout-info">
   <div class="zh"><strong>D2H #1 (outputs.tolist())</strong> 是 <code>outputs.tolist()</code> 的开销——需要等 AllToAll #1 结束后把 splits metadata 搬回 CPU。这个 stall 是整个 input_dist 流程中最大的，因为它同时包含了 NCCL 通信等待和 stream 同步。</div>
@@ -647,6 +647,11 @@ else:
 <div class="callout callout-warn">
   <div class="zh"><strong>DEFAULT 路径的代价：</strong>没有 prefetch 缓存可用，forward 内部需要执行完整的 <code>storage.find</code>（hash lookup）→ admission → init → insert 流程，延迟明显高于 Cache 路径。这也是推荐使用 CACHE 或 HBM_DIRECT 模式的原因之一。</div>
   <div class="en"><strong>Cost of DEFAULT path:</strong> Without prefetch cache, forward must execute the full <code>storage.find</code> (hash lookup) → admission → init → insert flow inline, resulting in noticeably higher latency than the Cache path. This is one reason CACHE or HBM_DIRECT modes are recommended.</div>
+</div>
+
+<div class="callout callout-info">
+  <div class="zh"><strong>output_dist — ReduceScatterV（1 次 NCCL 通信）：</strong>在 TorchRec 的 <code>compute_and_output_dist</code> 阶段中，DynamicEmb 的 embedding lookup 完成后，还需要通过一次 <strong>ReduceScatterV</strong>（对于 pooled embeddings / <code>EmbeddingBagCollection</code>）将各 rank 的部分 pooled 结果归约回请求方。这是因为 RW sharding 将 embedding table 按行切分到各 rank，每个 rank 只持有部分行，lookup 后需要跨 rank 求和。此 NCCL 通信由 TorchRec 的 <code>RwPooledEmbeddingDist</code> 发起，不在上方 DynamicEmb 序列图的范围内。对于 sequence embeddings（非 pooled），则使用 <strong>AllToAll</strong> 替代 ReduceScatter，同样是 1 次 NCCL 通信。</div>
+  <div class="en"><strong>output_dist — ReduceScatterV (1 NCCL communication):</strong> In TorchRec's <code>compute_and_output_dist</code> stage, after DynamicEmb's embedding lookup completes, a <strong>ReduceScatterV</strong> (for pooled embeddings / <code>EmbeddingBagCollection</code>) is needed to reduce partial pooled results from each rank back to the requesting rank. This is because RW sharding partitions the embedding table by rows across ranks — each rank holds only a subset of rows, and a cross-rank sum is required after lookup. This NCCL communication is initiated by TorchRec's <code>RwPooledEmbeddingDist</code> and is outside the scope of the DynamicEmb sequence diagram above. For sequence embeddings (non-pooled), an <strong>AllToAll</strong> is used instead of ReduceScatter — still 1 NCCL communication.</div>
 </div>
 </section>
 

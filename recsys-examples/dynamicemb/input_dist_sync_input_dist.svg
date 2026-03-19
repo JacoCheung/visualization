@@ -154,7 +154,7 @@
     <tspan x="460" dy="0">torch.sum(lengths.view(8,</tspan>
     <tspan x="460" dy="13">stride),1).tolist()</tspan>
   </text>
-  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/sparse/jagged_tensor.py#L1165" target="_blank">
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/sparse/jagged_tensor.py#L1165" target="_blank">
   <text x="460" y="706" class="link">jagged_tensor.py:1165</text>
 </a>
 
@@ -188,7 +188,7 @@
   </text>
   <line x1="496" y1="930" x2="624" y2="930" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
 
-  <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/distributed/dist_data.py" target="_blank">
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py" target="_blank">
   <text x="460" y="958" class="link">torchrec/dist_data.py</text>
 </a>
 

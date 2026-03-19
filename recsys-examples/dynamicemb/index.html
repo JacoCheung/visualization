@@ -11,16 +11,23 @@ a{color:#2563eb;text-decoration:none}
 a:hover{text-decoration:underline}
 code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:3px;color:#0f172a}
 
-header{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;padding:28px 0 22px;text-align:center;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+header{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;padding:28px 0 22px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.15)}
 header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
 header p{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px}
 header .gh{display:inline-block;margin-top:8px;padding:4px 14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px;color:#fff;transition:background .15s}
 header .gh:hover{background:rgba(255,255,255,.22);text-decoration:none}
 
-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:82px;z-index:40;overflow-x:auto;white-space:nowrap}
-nav a{display:inline-block;padding:10px 16px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;transition:all .15s}
-nav a:hover{color:#1e293b;text-decoration:none}
-nav a.active{color:#2563eb;border-bottom-color:#2563eb}
+nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:0;z-index:50;overflow-x:auto;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;align-items:center}
+.nav-links{overflow-x:auto;white-space:nowrap;flex:1}
+.nav-links a{display:inline-block;padding:10px 16px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;transition:all .15s}
+.nav-links a:hover{color:#1e293b;text-decoration:none}
+.nav-links a.active{color:#2563eb;border-bottom-color:#2563eb}
+.lang-btn{flex-shrink:0;margin-left:auto;padding:5px 14px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer;transition:all .15s;white-space:nowrap}
+.lang-btn:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+
+/* Language toggle */
+body.lang-en .zh{display:none!important}
+body.lang-zh .en{display:none!important}
 
 .container{max-width:1280px;margin:0 auto;padding:0 24px 80px}
 
@@ -31,7 +38,7 @@ nav a.active{color:#2563eb;border-bottom-color:#2563eb}
 .phase-banner.emb{background:#ecfdf5;border-color:#059669;color:#065f46}
 
 section{margin-bottom:40px}
-section h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px}
+section h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;color:#fff;letter-spacing:.3px}
 .tag-dist{background:#2563eb}
 .tag-prefetch{background:#059669}
@@ -47,8 +54,10 @@ section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 
 .svg-header{background:#f8fafc;padding:8px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
 .svg-header span{font-size:11px;font-weight:600;color:#64748b}
 .svg-header .hint{font-size:10px;color:#94a3b8}
-.svg-container{overflow:auto;max-height:700px;padding:12px;text-align:center}
+.svg-container{overflow:auto;max-height:700px;padding:12px;text-align:center;position:relative}
 .svg-container img{max-width:100%;height:auto}
+.sticky-ptcp{position:absolute;top:0;left:12px;right:12px;z-index:9999;opacity:0;pointer-events:none;transition:opacity .12s;text-align:center}
+.sticky-ptcp svg{display:block;margin:0 auto;max-width:100%;height:auto;border-bottom:2px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.1)}
 
 .src-link{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#7c3aed;margin-top:4px}
 .src-link::before{content:'📄'}
@@ -68,23 +77,41 @@ section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 
 .tbl td code{background:#f1f5f9;font-size:11px}
 
 footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
+
+/* ── Floating TOC ── */
+.ftoc{position:fixed;right:20px;top:140px;z-index:100;font-size:12px;width:240px}
+.ftoc-toggle{width:36px;height:36px;border-radius:50%;background:#1e293b;color:#fff;border:none;cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .2s,background .2s;position:absolute;top:0;right:0}
+.ftoc-toggle:hover{background:#334155;transform:scale(1.08)}
+.ftoc.collapsed .ftoc-toggle{display:flex}
+.ftoc-panel{width:100%;max-height:calc(100vh - 180px);background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden;transition:transform .2s ease,opacity .15s ease;transform-origin:top right}
+.ftoc.collapsed .ftoc-panel{transform:scale(.9);opacity:0;pointer-events:none}
+.ftoc-head{background:#f8fafc;padding:8px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none}
+.ftoc-head span{font-weight:700;color:#334155;font-size:12px}
+.ftoc-list{list-style:none;overflow-y:auto;max-height:calc(100vh - 230px);padding:4px 0}
+.ftoc-list li a{display:block;padding:6px 14px;color:#475569;text-decoration:none;transition:background .1s,color .1s;border-left:3px solid transparent}
+.ftoc-list li a:hover{background:#f1f5f9;color:#1e293b;text-decoration:none}
+.ftoc-list li a.cur{color:#2563eb;border-left-color:#2563eb;background:#eff6ff;font-weight:600}
+.ftoc-list li a .toc-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;color:#fff;margin-right:5px;vertical-align:1px}
 </style>
 </head>
-<body>
+<body class="lang-en">
 
 <header>
-  <h1>DynamicEmb Training Pipeline — Sequence Diagram 解析</h1>
+  <h1>DynamicEmb Training Pipeline — <span class="zh">序列图解析</span><span class="en">Sequence Diagram Analysis</span></h1>
   <p>NVIDIA recsys-examples · DynamicEmb Embedding Layer · RW Sharding</p>
   <a class="gh" href="https://github.com/shijieliu/recsys-examples/tree/fea-dynamicemb_table_fusion" target="_blank">⭐ GitHub: shijieliu/recsys-examples (fea-dynamicemb_table_fusion)</a>
 </header>
 
 <nav id="nav">
-  <a href="#overview" class="active">概览</a>
-  <a href="#input-dist">Phase 1: input_dist</a>
-  <a href="#wait-sparse">Phase 2: wait_sparse</a>
-  <a href="#prefetch">Phase 3: prefetch</a>
-  <a href="#forward">Phase 4: forward</a>
-  <a href="#backward">Phase 5: backward</a>
+  <div class="nav-links">
+    <a href="#overview" class="active"><span class="zh">概览</span><span class="en">Overview</span></a>
+    <a href="#input-dist">Phase 1: input_dist</a>
+    <a href="#wait-sparse">Phase 2: wait_sparse</a>
+    <a href="#prefetch">Phase 3: prefetch</a>
+    <a href="#forward">Phase 4: forward</a>
+    <a href="#backward">Phase 5: backward</a>
+  </div>
+  <button id="langBtn" class="lang-btn" onclick="toggleLang()">中文</button>
 </nav>
 
 <div class="container">
@@ -92,83 +119,119 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
 <!-- ==================== OVERVIEW ==================== -->
 <section id="overview">
 <div class="phase-banner dist" style="border-color:#0f172a;background:#f1f5f9;color:#0f172a">
-  <h2>DynamicEmb 训练迭代总览</h2>
-  <p>DynamicEmb 是 NVIDIA recsys-examples 中的动态嵌入层，支持 GPU 加速的 hash table、LRU/LFU 缓存、以及融合优化器。</p>
+  <h2><span class="zh">DynamicEmb 训练迭代总览</span><span class="en">DynamicEmb Training Iteration Overview</span></h2>
+  <p><span class="zh">DynamicEmb 是 NVIDIA recsys-examples 中的动态嵌入层，支持 GPU 加速的 hash table、LRU/LFU 缓存、以及融合优化器。</span><span class="en">DynamicEmb is a dynamic embedding layer in NVIDIA recsys-examples, featuring GPU-accelerated hash tables, LRU/LFU caching, and fused optimizers.</span></p>
 </div>
 
 <div class="desc">
-  <p>在分布式训练的一个 iteration 中，DynamicEmb 的 Embedding 层经历以下 5 个阶段。前两个阶段处理 <strong>input keys 的跨 rank 通信</strong>（发生在 DynamicEmb 正式 forward 之前），后三个阶段是 DynamicEmb 自身的 <strong>prefetch → forward → backward</strong> 流程。</p>
+  <p class="zh">在分布式训练的一个 iteration 中，DynamicEmb 的 Embedding 层经历以下 5 个阶段。前两个阶段处理 <strong>input keys 的跨 rank 通信</strong>（发生在 DynamicEmb 正式 forward 之前），后三个阶段是 DynamicEmb 自身的 <strong>prefetch → forward → backward</strong> 流程。</p>
+  <p class="en">During one iteration of distributed training, DynamicEmb's embedding layer goes through the following 5 phases. The first two handle <strong>cross-rank communication of input keys</strong> (before DynamicEmb's forward pass), and the latter three are DynamicEmb's own <strong>prefetch → forward → backward</strong> pipeline.</p>
+</div>
+
+<div class="callout callout-info">
+  <div class="zh">
+  <strong>📌 文档讨论范围说明</strong>
+  <p style="margin:6px 0 0 0">本文档聚焦于 <strong>DynamicEmb Embedding 层</strong>在一次训练迭代中的内部流程。在 TorchRec <code>TrainPipelineSparseDist</code> 的完整 pipeline 中，forward 阶段实际包含 <code>output_dist</code>（将各 shard 的 embedding lookup 结果通过 AllToAll 汇总回原 rank），backward 阶段同理包含对应的反向 output_dist 通信。</p>
+  <ul style="margin:6px 0 0 0">
+    <li><strong>input_dist / wait_sparse</strong>（Phase 1-2）：本文给出了<strong>详细的内部序列图</strong>，涵盖 dedup、bucketize、AllToAll 发起与等待的每一步</li>
+    <li><strong>forward / backward</strong>（Phase 4-5）：序列图侧重于 <strong>DynamicEmb 自身的 embedding lookup / gradient update 逻辑</strong>（包括 Cache/HBM_DIRECT/DEFAULT 三种路径），TorchRec 层面的 <code>output_dist</code>（AllToAll 回收 embedding 结果）流程未在图中展开</li>
+  </ul>
+  <p style="margin:6px 0 0 0;font-size:12px;color:#6B7280">即：input 侧通信（input_dist + wait_sparse）讲得很细，output 侧通信（output_dist）在本文中仅作为 forward/backward 的一部分提及，内部细节不在讨论范围。</p>
+  </div>
+  <div class="en">
+  <strong>📌 Scope of This Document</strong>
+  <p style="margin:6px 0 0 0">This document focuses on the <strong>internal flow of the DynamicEmb Embedding layer</strong> during one training iteration. In TorchRec's full <code>TrainPipelineSparseDist</code> pipeline, the forward phase actually includes <code>output_dist</code> (AllToAll to gather embedding lookup results back to each rank), and similarly, backward includes the corresponding reverse output_dist communication.</p>
+  <ul style="margin:6px 0 0 0">
+    <li><strong>input_dist / wait_sparse</strong> (Phase 1-2): This document provides <strong>detailed internal sequence diagrams</strong> covering every step of dedup, bucketize, AllToAll initiation and awaiting</li>
+    <li><strong>forward / backward</strong> (Phase 4-5): The sequence diagrams focus on <strong>DynamicEmb's own embedding lookup / gradient update logic</strong> (including Cache/HBM_DIRECT/DEFAULT paths); TorchRec's <code>output_dist</code> (AllToAll to collect embedding results) is not expanded in the diagrams</li>
+  </ul>
+  <p style="margin:6px 0 0 0;font-size:12px;color:#6B7280">In summary: input-side communication (input_dist + wait_sparse) is covered in detail; output-side communication (output_dist) is only mentioned as part of forward/backward, with its internals outside the scope of this document.</p>
+  </div>
 </div>
 
 <!-- StorageMode 详解 -->
-<h3 style="margin-top:24px">StorageMode 三种模式详解</h3>
+<h3 style="margin-top:24px"><span class="zh">StorageMode 三种模式详解</span><span class="en">StorageMode: Three Storage Modes Explained</span></h3>
 <div class="desc">
-  <p>DynamicEmb 根据 <strong>用户配置</strong> 和 <strong>可用 HBM 容量</strong> 自动选择三种内部存储模式之一（<a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L131" target="_blank"><code>StorageMode</code></a>），决定了 prefetch / forward / backward 各阶段的执行路径。</p>
+  <p class="zh">DynamicEmb 根据 <strong>用户配置</strong> 和 <strong>可用 HBM 容量</strong> 自动选择三种内部存储模式之一（<a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L131" target="_blank"><code>StorageMode</code></a>），决定了 prefetch / forward / backward 各阶段的执行路径。</p>
+  <p class="en">DynamicEmb automatically selects one of three internal storage modes based on <strong>user configuration</strong> and <strong>available HBM capacity</strong> (<a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L131" target="_blank"><code>StorageMode</code></a>), determining the execution path for prefetch / forward / backward phases.</p>
 </div>
 
 <table class="tbl" style="font-size:12px">
   <tr>
-    <th style="width:13%">模式</th>
-    <th style="width:18%">触发条件</th>
-    <th style="width:22%">存储架构</th>
-    <th style="width:22%">各阶段行为</th>
-    <th style="width:25%">适用场景</th>
+    <th style="width:13%"><span class="zh">模式</span><span class="en">Mode</span></th>
+    <th style="width:18%"><span class="zh">触发条件</span><span class="en">Trigger</span></th>
+    <th style="width:22%"><span class="zh">存储架构</span><span class="en">Storage Architecture</span></th>
+    <th style="width:22%"><span class="zh">各阶段行为</span><span class="en">Phase Behavior</span></th>
+    <th style="width:25%"><span class="zh">适用场景</span><span class="en">Use Cases</span></th>
   </tr>
   <tr>
     <td><strong style="color:#D97706">CACHE</strong></td>
     <td>
       <code>caching=True</code><br>
-      且 embedding 总大小 &gt; <code>local_hbm_for_values</code>
+      <span class="zh">且 embedding 总大小 &gt; <code>local_hbm_for_values</code></span>
+      <span class="en">and total embedding size &gt; <code>local_hbm_for_values</code></span>
     </td>
     <td>
-      <strong>HBM Cache</strong>（<code>DynamicEmbCache</code>）+ <strong>Host/PS Storage</strong>（<code>DynamicEmbStorage</code> 或 <code>external_storage</code>）<br>
-      <span style="font-size:10px;color:#6B7280">GPU 表作为 hot key 缓存，cold key 驻留 host 端</span>
+      <strong>HBM Cache</strong>（<code>DynamicEmbCache</code>）+ <strong>Host/PS Storage</strong>（<code>DynamicEmbStorage</code> / <code>external_storage</code>）<br>
+      <span style="font-size:10px;color:#6B7280" class="zh">GPU 表作为 hot key 缓存，cold key 驻留 host 端</span>
+      <span style="font-size:10px;color:#6B7280" class="en">GPU table acts as hot-key cache; cold keys reside on host</span>
     </td>
     <td>
-      <strong>prefetch:</strong> <code>_prefetch_cache_path</code>（hash lookup → cache hit/miss → evict → store）<br>
-      <strong>forward:</strong> <code>load_from_flat</code>（slot_indices 直接读，无 hash）<br>
+      <strong>prefetch:</strong> <code>_prefetch_cache_path</code><span class="zh">（hash lookup → cache hit/miss → evict → store）</span><span class="en"> (hash lookup → cache hit/miss → evict → store)</span><br>
+      <strong>forward:</strong> <code>load_from_flat</code><span class="zh">（slot_indices 直接读，无 hash）</span><span class="en"> (direct read via slot_indices, no hash)</span><br>
       <strong>backward:</strong> <code>fused_update_for_flat_table</code> + <code>decrement_counter</code>
     </td>
-    <td>Embedding table 远大于 GPU 显存，稀疏特征有时间局部性，热 key 缓存在 HBM 可显著提速</td>
+    <td><span class="zh">Embedding table 远大于 GPU 显存，稀疏特征有时间局部性，热 key 缓存在 HBM 可显著提速</span><span class="en">Embedding table far exceeds GPU memory; sparse features have temporal locality; caching hot keys in HBM yields significant speedup</span></td>
   </tr>
   <tr>
     <td><strong style="color:#059669">HBM_DIRECT</strong></td>
     <td>
       <code>caching=False</code><br>
-      且 embedding 总大小 ≤ <code>local_hbm_for_values</code>
+      <span class="zh">且 embedding 总大小 ≤ <code>local_hbm_for_values</code></span>
+      <span class="en">and total embedding size ≤ <code>local_hbm_for_values</code></span>
     </td>
     <td>
-      <strong>单一 HBM Hash Table</strong>（<code>DynamicEmbStorage</code>，<code>.is_cuda = True</code>）<br>
-      <span style="font-size:10px;color:#6B7280">所有 embedding + optimizer 状态全部在 GPU 显存</span>
+      <span class="zh"><strong>单一 HBM Hash Table</strong>（<code>DynamicEmbStorage</code>，<code>.is_cuda = True</code>）<br>
+      <span style="font-size:10px;color:#6B7280">所有 embedding + optimizer 状态全部在 GPU 显存</span></span>
+      <span class="en"><strong>Single HBM Hash Table</strong> (<code>DynamicEmbStorage</code>, <code>.is_cuda = True</code>)<br>
+      <span style="font-size:10px;color:#6B7280">All embeddings + optimizer states reside entirely in GPU memory</span></span>
     </td>
     <td>
-      <strong>prefetch:</strong> <code>_prefetch_hbm_direct_path</code>（hash lookup → 无 evict，直接 slot 分配）<br>
-      <strong>forward:</strong> <code>load_from_flat</code>（同 CACHE 路径）<br>
+      <strong>prefetch:</strong> <code>_prefetch_hbm_direct_path</code><span class="zh">（hash lookup → 无 evict，直接 slot 分配）</span><span class="en"> (hash lookup → no eviction, direct slot allocation)</span><br>
+      <strong>forward:</strong> <code>load_from_flat</code><span class="zh">（同 CACHE 路径）</span><span class="en"> (same as CACHE path)</span><br>
       <strong>backward:</strong> <code>fused_update_for_flat_table</code> + <code>decrement_counter</code>
     </td>
-    <td>Embedding table 可完全放入 GPU 显存，性能最佳（无 host ↔ GPU 数据搬运）</td>
+    <td><span class="zh">Embedding table 可完全放入 GPU 显存，性能最佳（无 host ↔ GPU 数据搬运）</span><span class="en">Embedding table fits entirely in GPU memory — best performance (no host ↔ GPU data transfer)</span></td>
   </tr>
   <tr>
     <td><strong style="color:#9A3412">DEFAULT</strong></td>
     <td>
       <code>caching=False</code><br>
-      且 embedding 总大小 &gt; <code>local_hbm_for_values</code>
+      <span class="zh">且 embedding 总大小 &gt; <code>local_hbm_for_values</code></span>
+      <span class="en">and total embedding size &gt; <code>local_hbm_for_values</code></span>
     </td>
     <td>
-      <strong>HybridStorage</strong>（HBM tier + Host tier 拼接，无缓存层）<br>
-      <span style="font-size:10px;color:#6B7280">key 由 hash 函数决定存放位置（HBM 或 host），不可主动调度</span>
+      <span class="zh"><strong>HybridStorage</strong>（HBM tier + Host tier 拼接，无缓存层）<br>
+      <span style="font-size:10px;color:#6B7280">key 由 hash 函数决定存放位置（HBM 或 host），不可主动调度</span></span>
+      <span class="en"><strong>HybridStorage</strong> (HBM tier + Host tier hybrid, no cache layer)<br>
+      <span style="font-size:10px;color:#6B7280">Key placement (HBM or host) determined by hash function, not actively managed</span></span>
     </td>
     <td>
-      <strong>prefetch:</strong> 仅做 dedup（<code>segmented_unique</code>），跳过 hash lookup / slot 分配（<code>slot_indices = None</code>）<br>
+      <span class="zh"><strong>prefetch:</strong> 仅做 dedup（<code>segmented_unique</code>），跳过 hash lookup / slot 分配（<code>slot_indices = None</code>）<br>
       <strong>forward:</strong> <code>_generic_forward_path</code>（storage.find hash lookup → admission → init → insert）<br>
       <strong>backward:</strong> <code>update_for_padded_buffer</code> + <code>storage.insert</code>（re-insert）<br>
-      <span style="font-size:10px;color:#991B1B">⚠ 无法利用 prefetch stream 与 compute 重叠隐藏 lookup 延迟</span>
+      <span style="font-size:10px;color:#991B1B">⚠ 无法利用 prefetch stream 与 compute 重叠隐藏 lookup 延迟</span></span>
+      <span class="en"><strong>prefetch:</strong> Only dedup (<code>segmented_unique</code>), skips hash lookup / slot allocation (<code>slot_indices = None</code>)<br>
+      <strong>forward:</strong> <code>_generic_forward_path</code> (storage.find hash lookup → admission → init → insert)<br>
+      <strong>backward:</strong> <code>update_for_padded_buffer</code> + <code>storage.insert</code> (re-insert)<br>
+      <span style="font-size:10px;color:#991B1B">⚠ Cannot overlap prefetch stream with compute to hide lookup latency</span></span>
     </td>
-    <td>不需要缓存或缓存收益不大的场景；HBM + Host 拼接模式，key 的存储位置由 hash 决定</td>
+    <td><span class="zh">不需要缓存或缓存收益不大的场景；HBM + Host 拼接模式，key 的存储位置由 hash 决定</span><span class="en">Cases where caching is unnecessary or offers little benefit; HBM + Host hybrid mode, key placement determined by hash</span></td>
   </tr>
 </table>
 
 <div class="callout callout-info">
+  <div class="zh">
   <strong>用户接口：</strong>模式选择由 <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/dynamicemb_config.py#L203" target="_blank"><code>DynamicEmbTableOptions</code></a> 的两个核心参数决定：
   <ul style="margin:6px 0 0 0">
     <li><code>caching: bool = False</code> — 是否启用 GPU 缓存模式</li>
@@ -182,12 +245,31 @@ if total_memory &gt; local_hbm:
 else:
     → <strong style="color:#059669">HBM_DIRECT</strong> (单一 DynamicEmbStorage，全在 GPU)</pre>
   <p style="margin:6px 0 0 0">运行时通过 <code>_is_hbm_storage(storage)</code> 判断是否为 HBM_DIRECT（<code>isinstance(storage, DynamicEmbStorage) and storage._state.tables[0].is_cuda</code>）。</p>
+  </div>
+  <div class="en">
+  <strong>User Interface:</strong> Mode selection is controlled by two key parameters of <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/dynamicemb_config.py#L203" target="_blank"><code>DynamicEmbTableOptions</code></a>:
+  <ul style="margin:6px 0 0 0">
+    <li><code>caching: bool = False</code> — whether to enable GPU cache mode</li>
+    <li><code>global_hbm_for_values: int = 0</code> — GPU memory allocated for embeddings + optimizer states (bytes)</li>
+  </ul>
+  <p style="margin:6px 0 0 0">Auto-detection logic (<a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L560" target="_blank"><code>_create_cache_storage()</code></a>):</p>
+  <pre style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;margin:8px 0;font-size:11px;line-height:1.5">total_memory = sum(init_capacity * dtype_bytes * value_dim)  # embedding + optimizer states
+if total_memory &gt; local_hbm:
+    if caching:     → <strong style="color:#D97706">CACHE</strong>  (DynamicEmbCache + Storage backend)
+    else:           → <strong style="color:#9A3412">DEFAULT</strong> (HybridStorage: HBM + Host hybrid)
+else:
+    → <strong style="color:#059669">HBM_DIRECT</strong> (single DynamicEmbStorage, all on GPU)</pre>
+  <p style="margin:6px 0 0 0">At runtime, <code>_is_hbm_storage(storage)</code> checks for HBM_DIRECT (<code>isinstance(storage, DynamicEmbStorage) and storage._state.tables[0].is_cuda</code>).</p>
+  </div>
 </div>
 
 <div class="callout callout-warn">
-  <strong>图中的对应关系：</strong>
+  <div class="zh"><strong>图中的对应关系：</strong>
   input_dist / wait_sparse 阶段与 StorageMode 无关；
-  prefetch / forward / backward 图中使用 <code>alt</code> 帧区分不同路径。CACHE 与 HBM_DIRECT 共享 <code>use_counter=True</code> 分支（区别仅在于 state 来源），DEFAULT 走 <code>use_counter=False</code> 分支。
+  prefetch / forward / backward 图中使用 <code>alt</code> 帧区分不同路径。CACHE 与 HBM_DIRECT 共享 <code>use_counter=True</code> 分支（区别仅在于 state 来源），DEFAULT 走 <code>use_counter=False</code> 分支。</div>
+  <div class="en"><strong>Diagram Mapping:</strong>
+  The input_dist / wait_sparse phases are independent of StorageMode;
+  prefetch / forward / backward diagrams use <code>alt</code> frames to distinguish paths. CACHE and HBM_DIRECT share the <code>use_counter=True</code> branch (differing only in state source), while DEFAULT takes the <code>use_counter=False</code> branch.</div>
 </div>
 
 <div class="pipeline-flow">
@@ -195,7 +277,7 @@ else:
   <div class="pipeline-arrow">→</div>
   <div class="pipeline-step" style="background:#0d9488">wait_sparse<br><span style="font-size:9px;font-weight:400;opacity:.7">sub-stage 1</span></div>
   <div class="pipeline-arrow">→</div>
-  <div class="pipeline-step" style="background:#059669;position:relative">prefetch<br><span style="font-size:9px;font-weight:400;opacity:.7">含 wait_sparse sub-stage 2</span></div>
+  <div class="pipeline-step" style="background:#059669;position:relative">prefetch<br><span style="font-size:9px;font-weight:400;opacity:.7" class="zh">含 wait_sparse sub-stage 2</span><span style="font-size:9px;font-weight:400;opacity:.7" class="en">incl. wait_sparse sub-stage 2</span></div>
   <div class="pipeline-arrow">→</div>
   <div class="pipeline-step" style="background:#6366f1">forward</div>
   <div class="pipeline-arrow">→</div>
@@ -204,11 +286,16 @@ else:
 
 <table class="tbl">
   <tr>
-    <th>阶段</th><th>关键操作</th><th>CUDA Stream</th><th>D2H Stall</th><th>H2D Transfer</th><th>核心文件</th>
+    <th><span class="zh">阶段</span><span class="en">Phase</span></th>
+    <th><span class="zh">关键操作</span><span class="en">Key Operations</span></th>
+    <th>CUDA Stream</th>
+    <th>D2H Stall</th>
+    <th>H2D Transfer</th>
+    <th><span class="zh">核心文件</span><span class="en">Core Files</span></th>
   </tr>
   <tr>
     <td><strong>input_dist</strong></td>
-    <td>dedup keys → bucketize → 发起 splits AllToAll (async)</td>
+    <td><span class="zh">dedup keys → bucketize → 发起 splits AllToAll (async)</span><span class="en">dedup keys → bucketize → initiate splits AllToAll (async)</span></td>
     <td>data_dist_stream</td>
     <td>2× D2H<br><span style="font-size:10px;color:#991B1B">num_uniques.item()<br>length_per_key.tolist()</span></td>
     <td>4× H2D<br><span style="font-size:10px;color:#1E40AF">dist_type, batch_size_per_split,<br>length_per_split, stride tensors</span></td>
@@ -216,85 +303,87 @@ else:
   </tr>
   <tr>
     <td><strong>wait_sparse</strong><br><span style="font-size:10px;color:#6B7280">sub-stage 1</span></td>
-    <td>等 splits AllToAll → 发起 lengths/values AllToAll</td>
+    <td><span class="zh">等 splits AllToAll → 发起 lengths/values AllToAll</span><span class="en">await splits AllToAll → initiate lengths/values AllToAll</span></td>
     <td>data_dist_stream</td>
     <td>1× D2H<br><span style="font-size:10px;color:#991B1B">output_splits.tolist()</span></td>
     <td>1× H2D<br><span style="font-size:10px;color:#1E40AF">recat permute index</span></td>
     <td><code>train_pipeline.py</code>, <code>dist_data.py</code></td>
   </tr>
   <tr>
-    <td><strong>wait_sparse</strong><br><span style="font-size:10px;color:#6B7280">sub-stage 2</span><br><span style="font-size:10px;color:#D97706">⚠ 已延迟到 prefetch</span></td>
-    <td>等待 lengths/values AllToAll 完成 → build KJT → permute</td>
+    <td><strong>wait_sparse</strong><br><span style="font-size:10px;color:#6B7280">sub-stage 2</span><br><span style="font-size:10px;color:#D97706"><span class="zh">⚠ 已延迟到 prefetch</span><span class="en">⚠ deferred to prefetch</span></span></td>
+    <td><span class="zh">等待 lengths/values AllToAll 完成 → build KJT → permute</span><span class="en">await lengths/values AllToAll → build KJT → permute</span></td>
     <td>data_dist_stream</td>
     <td>1× D2H<br><span style="font-size:10px;color:#991B1B">length_per_key.tolist()</span></td>
-    <td>无</td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
     <td><code>utils.py</code> (<code>_prefetch_embeddings</code>)</td>
   </tr>
   <tr>
     <td><strong>prefetch</strong><br><span style="font-size:10px;color:#4338CA">Cache/HBM path</span></td>
-    <td>dedup → hash lookup → cache hit/miss → storage fallback → insert & evict</td>
+    <td>dedup → hash lookup → cache hit/miss → storage fallback → insert &amp; evict</td>
     <td>prefetch_stream (separate)</td>
-    <td>多处 .item()/.any() 隐式同步</td>
-    <td>无</td>
+    <td><span class="zh">多处 .item()/.any() 隐式同步</span><span class="en">multiple .item()/.any() implicit syncs</span></td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
     <td><code>batched_dynamicemb_function.py</code></td>
   </tr>
   <tr>
     <td><strong>prefetch</strong><br><span style="font-size:10px;color:#9A3412">DEFAULT path</span></td>
-    <td>仅 dedup（segmented_unique），跳过 hash lookup / slot 分配</td>
+    <td><span class="zh">仅 dedup（segmented_unique），跳过 hash lookup / slot 分配</span><span class="en">dedup only (segmented_unique), skip hash lookup / slot allocation</span></td>
     <td>prefetch_stream</td>
-    <td>无</td>
-    <td>无</td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
     <td><code>batched_dynamicemb_function.py</code></td>
   </tr>
   <tr>
     <td><strong>forward</strong><br><span style="font-size:10px;color:#4338CA">Cache path</span></td>
     <td>consume PrefetchState → load_from_flat → gather_embedding_pooled</td>
     <td>default_stream</td>
-    <td>无 ✅</td>
-    <td>无 ✅</td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
     <td><code>batched_dynamicemb_function.py</code></td>
   </tr>
   <tr>
     <td><strong>forward</strong><br><span style="font-size:10px;color:#9A3412">DEFAULT path</span></td>
     <td>_generic_forward_path: storage.find → admission → init → insert → gather_embedding_pooled</td>
     <td>default_stream</td>
-    <td>无</td>
-    <td>无</td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
+    <td><span class="zh">无</span><span class="en">None</span></td>
     <td><code>batched_dynamicemb_function.py</code></td>
   </tr>
   <tr>
     <td><strong>backward</strong><br><span style="font-size:10px;color:#4338CA">Cache/HBM path</span></td>
     <td>reduce_grads → fused_update_for_flat_table → decrement_counter</td>
     <td>default_stream</td>
-    <td>无 ✅</td>
-    <td>无 ✅</td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
     <td><code>batched_dynamicemb_function.py</code>, <code>optimizer.py</code></td>
   </tr>
   <tr>
     <td><strong>backward</strong><br><span style="font-size:10px;color:#9A3412">DEFAULT path</span></td>
     <td>reduce_grads → update_for_padded_buffer → storage.insert (re-insert)</td>
     <td>default_stream</td>
-    <td>无 ✅</td>
-    <td>无 ✅</td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
     <td><code>batched_dynamicemb_function.py</code>, <code>optimizer.py</code></td>
   </tr>
 </table>
 
 <div class="callout callout-info">
-  <strong>Pipeline 机制：</strong>TorchRec <code>TrainPipelineSparseDist</code> 通过 pipeline rewrite 将 <code>input_dist</code> / <code>wait_sparse</code> 与上一批次的 <code>forward</code> 重叠执行。关键优化：<code>wait_sparse</code> 的第二个子阶段（等待 lengths/values AllToAll 完成 + rebuild KJT）被延迟到 <code>_prefetch_embeddings()</code> 入口处执行，使得 AllToAll #2/#3 的通信时间可以被 forward compute 完全覆盖。prefetch 自身在独立的 CUDA stream 上运行，隐藏 hash lookup + cache miss + I/O 延迟。
+  <div class="zh"><strong>Pipeline 机制：</strong>TorchRec <code>TrainPipelineSparseDist</code> 通过 pipeline rewrite 将 <code>input_dist</code> / <code>wait_sparse</code> 与上一批次的 <code>forward</code> 重叠执行。关键优化：<code>wait_sparse</code> 的第二个子阶段（等待 lengths/values AllToAll 完成 + rebuild KJT）被延迟到 <code>_prefetch_embeddings()</code> 入口处执行，使得 AllToAll #2/#3 的通信时间可以被 forward compute 完全覆盖。prefetch 自身在独立的 CUDA stream 上运行，隐藏 hash lookup + cache miss + I/O 延迟。</div>
+  <div class="en"><strong>Pipeline Mechanism:</strong> TorchRec <code>TrainPipelineSparseDist</code> uses pipeline rewrite to overlap <code>input_dist</code> / <code>wait_sparse</code> with the previous batch's <code>forward</code>. Key optimization: the second sub-stage of <code>wait_sparse</code> (awaiting lengths/values AllToAll completion + rebuilding KJT) is deferred to the entry of <code>_prefetch_embeddings()</code>, allowing AllToAll #2/#3 communication to be fully overlapped with forward compute. Prefetch itself runs on a separate CUDA stream, hiding hash lookup + cache miss + I/O latency.</div>
 </div>
 </section>
 
 <!-- ==================== INPUT_DIST ==================== -->
 <div class="phase-banner dist">
-  <h2>Input Distribution — Keys 的跨 Rank 通信</h2>
-  <p>在 DynamicEmb forward 之前，需要将各 rank 的 input keys 按 RW Sharding 策略重新分配到对应的 rank。</p>
+  <h2><span class="zh">Input Distribution — Keys 的跨 Rank 通信</span><span class="en">Input Distribution — Cross-Rank Key Communication</span></h2>
+  <p><span class="zh">在 DynamicEmb forward 之前，需要将各 rank 的 input keys 按 RW Sharding 策略重新分配到对应的 rank。</span><span class="en">Before DynamicEmb's forward pass, input keys from each rank are redistributed according to the RW Sharding strategy.</span></p>
 </div>
 
 <section id="input-dist">
-<h3><span class="tag tag-dist">Phase 1</span> input_dist — 发起 Splits AllToAll <span style="font-size:11px;color:#6B7280;font-weight:400">（与 caching 模式无关）</span></h3>
+<h3><span class="tag tag-dist">Phase 1</span> input_dist — <span class="zh">发起 Splits AllToAll</span><span class="en">Initiate Splits AllToAll</span> <span style="font-size:11px;color:#6B7280;font-weight:400"><span class="zh">（与 caching 模式无关）</span><span class="en">(independent of caching mode)</span></span></h3>
 
 <div class="desc">
+  <div class="zh">
   <p><code>input_dist</code> 是 Pipeline 调用 <code>_start_sparse_data_dist()</code> 触发的第一个阶段，在 <code>data_dist_stream</code> 上执行。核心任务：</p>
   <ul>
     <li><strong>Dedup</strong>：调用 <code>segmented_unique_cuda</code> 对 batch 内的 keys 去重，减少后续通信量</li>
@@ -302,14 +391,32 @@ else:
     <li><strong>发起 splits AllToAll</strong>：异步发送各 rank 的 split sizes metadata（AllToAll #1）</li>
   </ul>
   <p>此阶段包含 <strong>2 次 D2H 同步</strong>（<code>num_uniques.item()</code> 和 <code>length_per_key().tolist()</code>）以及 <strong>4 次 H2D 传输</strong>（dist_type, batch_size_per_split, length_per_split, stride tensors），这些是 nsys timeline 上可观察到的 cudaMemcpy。</p>
+  </div>
+  <div class="en">
+  <p><code>input_dist</code> is the first phase triggered by the pipeline's <code>_start_sparse_data_dist()</code>, executing on <code>data_dist_stream</code>. Core tasks:</p>
+  <ul>
+    <li><strong>Dedup</strong>: calls <code>segmented_unique_cuda</code> to deduplicate keys within the batch, reducing subsequent communication volume</li>
+    <li><strong>Bucketize</strong>: uses <code>block_bucketize_sparse_features</code> to bucket keys by target rank</li>
+    <li><strong>Initiate splits AllToAll</strong>: asynchronously sends split sizes metadata for each rank (AllToAll #1)</li>
+  </ul>
+  <p>This phase involves <strong>2 D2H syncs</strong> (<code>num_uniques.item()</code> and <code>length_per_key().tolist()</code>) and <strong>4 H2D transfers</strong> (dist_type, batch_size_per_split, length_per_split, stride tensors), visible as cudaMemcpy on the nsys timeline.</p>
+  </div>
 </div>
 
 <div class="svg-wrap">
   <div class="svg-header">
     <span>input_dist_sync_input_dist.svg</span>
-    <span class="hint">滚动查看完整时序图</span>
+    <span class="hint"><span class="zh">滚动查看完整时序图</span><span class="en">Scroll to view full sequence diagram</span></span>
   </div>
   <div class="svg-container">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="850" viewBox="0 0 850 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="850" height="48" fill="#FAFBFF"/>
+      <rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text>
+      <rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">ShardedDynEmb</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Collection.input_dist()</text>
+      <rect x="290" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">RwSparseFeatDist</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.forward()</text>
+      <rect x="430" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">SplitsAwaitable()</text>
+      <rect x="570" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">data_dist_stream</text>
+      <rect x="710" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
+    </svg></div>
     <object type="image/svg+xml" data="input_dist_sync_input_dist.svg" style="max-width:100%;height:auto">input_dist sequence diagram</object>
   </div>
 </div>
@@ -318,29 +425,48 @@ else:
 <div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/input_dist.py" target="_blank">input_dist.py — RwSparseFeatDist.forward()</a></div>
 
 <div class="callout callout-warn">
-  <strong>D2H #1 (num_uniques.item())</strong> 会触发 GPU→CPU 同步等待（~11.8μs），因为 CPU 需要知道去重后的 key 数量来做 tensor slice。这是目前 DynamicEmb 在 input_dist 阶段不可避免的 stall。
+  <div class="zh"><strong>D2H #1 (num_uniques.item())</strong> 会触发 GPU→CPU 同步等待，因为 CPU 需要知道去重后的 key 数量来做 tensor slice。这是目前 DynamicEmb 在 input_dist 阶段不可避免的 stall。</div>
+  <div class="en"><strong>D2H #1 (num_uniques.item())</strong> triggers a GPU→CPU synchronization wait because the CPU needs the deduplicated key count for tensor slicing. This is an unavoidable stall in DynamicEmb's input_dist phase.</div>
 </div>
 </section>
 
 <!-- ==================== WAIT_SPARSE ==================== -->
 <section id="wait-sparse">
-<h3><span class="tag tag-dist">Phase 2</span> wait_sparse_data_dist — 两个子阶段（pipeline rewrite 拆分执行）<span style="font-size:11px;color:#6B7280;font-weight:400">（与 caching 模式无关）</span></h3>
+<h3><span class="tag tag-dist">Phase 2</span> wait_sparse_data_dist — <span class="zh">两个子阶段（pipeline rewrite 拆分执行）</span><span class="en">Two Sub-stages (split by pipeline rewrite)</span> <span style="font-size:11px;color:#6B7280;font-weight:400"><span class="zh">（与 caching 模式无关）</span><span class="en">(independent of caching mode)</span></span></h3>
 
 <div class="desc">
+  <div class="zh">
   <p><code>wait_sparse_data_dist</code> 包含 <strong>两个子阶段</strong>，经过 <code>train_pipeline</code> 的 rewrite 后被拆分执行：</p>
   <ul>
     <li><strong>Sub-stage 1</strong>（<code>_wait_sparse_data_dist()</code>，在 forward 之前）：等待 AllToAll #1（splits metadata）完成 → 用 output_splits 发起 AllToAll #2（lengths）+ AllToAll #3（values）</li>
     <li><strong>Sub-stage 2</strong>（<strong>已被延迟到 <code>_prefetch_embeddings()</code></strong> 内部）：等待 AllToAll #2 + #3 完成 → 重建 KJT（KeyedJaggedTensor）→ <code>permute_2D_sparse_data</code> 重排序</li>
   </ul>
   <p>这种 rewrite 的核心目的：Sub-stage 1 发起 lengths/values AllToAll 后立即返回，让 <code>forward(batch_i)</code> 在中间执行，此时 AllToAll #2/#3 的 NCCL 通信可以与 forward compute 完全重叠。Sub-stage 2 延迟到 <code>_prefetch_embeddings()</code> 入口处再等待通信完成。具体代码在 <code>utils.py:1639</code>（<code>_prefetch_embeddings</code> 仅 wrap 了 <code>request.wait()</code>，prefetch 逻辑在其外部）。</p>
+  </div>
+  <div class="en">
+  <p><code>wait_sparse_data_dist</code> consists of <strong>two sub-stages</strong>, split by the <code>train_pipeline</code> rewrite:</p>
+  <ul>
+    <li><strong>Sub-stage 1</strong> (<code>_wait_sparse_data_dist()</code>, before forward): await AllToAll #1 (splits metadata) completion → use output_splits to initiate AllToAll #2 (lengths) + AllToAll #3 (values)</li>
+    <li><strong>Sub-stage 2</strong> (<strong>deferred to <code>_prefetch_embeddings()</code></strong>): await AllToAll #2 + #3 completion → rebuild KJT (KeyedJaggedTensor) → <code>permute_2D_sparse_data</code> reorder</li>
+  </ul>
+  <p>Purpose of this rewrite: Sub-stage 1 returns immediately after initiating lengths/values AllToAll, allowing <code>forward(batch_i)</code> to execute in between, during which AllToAll #2/#3 NCCL communication fully overlaps with forward compute. Sub-stage 2 defers waiting for communication completion to the entry of <code>_prefetch_embeddings()</code>. See <code>utils.py:1639</code> (<code>_prefetch_embeddings</code> wraps <code>request.wait()</code>; prefetch logic is external to it).</p>
+  </div>
 </div>
 
 <div class="svg-wrap">
   <div class="svg-header">
     <span>input_dist_sync_wait_sparse.svg</span>
-    <span class="hint">滚动查看完整时序图</span>
+    <span class="hint"><span class="zh">滚动查看完整时序图</span><span class="en">Scroll to view full sequence diagram</span></span>
   </div>
   <div class="svg-container">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="850" viewBox="0 0 850 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="850" height="48" fill="#FAFBFF"/>
+      <rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text>
+      <rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">FusedKJTList</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">SplitsAwaitable.wait()</text>
+      <rect x="290" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">KJTAllToAllSplits</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Awaitable._wait_impl()</text>
+      <rect x="430" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">TensorsAwaitable</text>
+      <rect x="570" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">data_dist_stream</text>
+      <rect x="710" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
+    </svg></div>
     <object type="image/svg+xml" data="input_dist_sync_wait_sparse.svg" style="max-width:100%;height:auto">wait_sparse sequence diagram</object>
   </div>
 </div>
@@ -349,51 +475,76 @@ else:
 <div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/third_party/torchrec/torchrec/distributed/dist_data.py" target="_blank">dist_data.py — SplitsAllToAllAwaitable, KJTAllToAll</a></div>
 
 <div class="callout callout-info">
-  <strong>D2H #1 (~1312.8μs)</strong> 是 <code>outputs.tolist()</code> 的开销——需要等 AllToAll #1 结束后把 splits metadata 搬回 CPU。这个 stall 是整个 input_dist 流程中最大的，因为它同时包含了 NCCL 通信等待和 stream 同步。
+  <div class="zh"><strong>D2H #1 (outputs.tolist())</strong> 是 <code>outputs.tolist()</code> 的开销——需要等 AllToAll #1 结束后把 splits metadata 搬回 CPU。这个 stall 是整个 input_dist 流程中最大的，因为它同时包含了 NCCL 通信等待和 stream 同步。</div>
+  <div class="en"><strong>D2H #1 (outputs.tolist())</strong> is the cost of <code>outputs.tolist()</code> — waiting for AllToAll #1 to finish and moving splits metadata back to CPU. This stall is the largest in the entire input_dist flow, as it includes both NCCL communication wait and stream synchronization.</div>
 </div>
 </section>
 
 <!-- ==================== PREFETCH ==================== -->
 <div class="phase-banner emb">
-  <h2>DynamicEmb Embedding — Forward / Backward 流程</h2>
-  <p>keys 通信完成后，进入 DynamicEmb 自身的三阶段流程：prefetch（key 解析）→ forward（embedding 读取）→ backward（梯度更新）。</p>
+  <h2><span class="zh">DynamicEmb Embedding — Forward / Backward 流程</span><span class="en">DynamicEmb Embedding — Forward / Backward Pipeline</span></h2>
+  <p><span class="zh">keys 通信完成后，进入 DynamicEmb 自身的三阶段流程：prefetch（key 解析）→ forward（embedding 读取）→ backward（梯度更新）。</span><span class="en">After key communication completes, DynamicEmb enters its own three-phase pipeline: prefetch (key resolution) → forward (embedding lookup) → backward (gradient update).</span></p>
 </div>
 
 <section id="prefetch">
-<h3><span class="tag tag-prefetch">Phase 3</span> prefetch — Key 解析与缓存管理 <span style="font-size:11px;color:#D97706;font-weight:400">（图中 alt 帧：Cache Path + HBM Direct Path）</span></h3>
+<h3><span class="tag tag-prefetch">Phase 3</span> prefetch — <span class="zh">Key 解析与缓存管理</span><span class="en">Key Resolution &amp; Cache Management</span> <span style="font-size:11px;color:#D97706;font-weight:400"><span class="zh">（图中 alt 帧：Cache Path + HBM Direct Path）</span><span class="en">(alt frames: Cache Path + HBM Direct Path)</span></span></h3>
 
 <div class="desc">
+  <div class="zh">
   <p>实际执行时，<code>_prefetch_embeddings()</code> 入口处会先执行 <strong>wait_sparse sub-stage 2</strong>（等待 lengths/values AllToAll 完成 + rebuild KJT），然后再进入 DynamicEmb 自身的 prefetch 逻辑。</p>
   <p>Prefetch 在 <strong>独立的 CUDA stream</strong> 上运行，目标是将 unique keys 解析为 flat-table slot 位置（<code>slot_indices</code>），供 forward 直接使用。核心路径分两种：</p>
+  </div>
+  <div class="en">
+  <p>At execution time, <code>_prefetch_embeddings()</code> first executes <strong>wait_sparse sub-stage 2</strong> at its entry (awaiting lengths/values AllToAll completion + rebuilding KJT), then proceeds to DynamicEmb's own prefetch logic.</p>
+  <p>Prefetch runs on a <strong>separate CUDA stream</strong>, aiming to resolve unique keys into flat-table slot positions (<code>slot_indices</code>) for direct use by forward. Two core paths:</p>
+  </div>
 </div>
 
 <table class="tbl">
-  <tr><th></th><th>Cache Path (caching=True)</th><th>HBM Direct Path (no cache)</th></tr>
-  <tr><td><strong>适用场景</strong></td><td>Zipf 分布、热点 key 集中</td><td>均匀分布或表完全放入 HBM</td></tr>
   <tr>
-    <td><strong>流程</strong></td>
+    <th></th>
+    <th>Cache Path (caching=True)</th>
+    <th>HBM Direct Path (no cache)</th>
+  </tr>
+  <tr>
+    <td><strong><span class="zh">适用场景</span><span class="en">Use Case</span></strong></td>
+    <td><span class="zh">Zipf 分布、热点 key 集中</span><span class="en">Zipf distribution, concentrated hot keys</span></td>
+    <td><span class="zh">均匀分布或表完全放入 HBM</span><span class="en">Uniform distribution or table fits entirely in HBM</span></td>
+  </tr>
+  <tr>
+    <td><strong><span class="zh">流程</span><span class="en">Flow</span></strong></td>
     <td>
-      <code>cache.lookup</code> → 区分 hit/miss →<br>
-      <code>storage.find</code>（miss fallback）→<br>
+      <code>cache.lookup</code> → <span class="zh">区分 hit/miss</span><span class="en">separate hit/miss</span> →<br>
+      <code>storage.find</code><span class="zh">（miss fallback）</span><span class="en"> (miss fallback)</span> →<br>
       <code>cache.insert_and_evict</code>（LRU/LFU）→<br>
-      <code>load_from_flat</code> / <code>store_to_flat</code>（搬迁数据）→<br>
-      <code>storage.insert</code>（write-back evicted）
+      <code>load_from_flat</code> / <code>store_to_flat</code><span class="zh">（搬迁数据）</span><span class="en"> (data migration)</span> →<br>
+      <code>storage.insert</code><span class="zh">（write-back evicted）</span><span class="en"> (write-back evicted)</span>
     </td>
     <td>
-      <code>_find_keys</code>（hash table lookup）→<br>
-      <code>key_index_map.insert</code>（新 key 入表）→<br>
-      <code>store_to_flat</code>（初始化 embedding）
+      <code>_find_keys</code><span class="zh">（hash table lookup）</span><span class="en"> (hash table lookup)</span> →<br>
+      <code>key_index_map.insert</code><span class="zh">（新 key 入表）</span><span class="en"> (insert new keys)</span> →<br>
+      <code>store_to_flat</code><span class="zh">（初始化 embedding）</span><span class="en"> (initialize embeddings)</span>
     </td>
   </tr>
-  <tr><td><strong>隐式同步</strong></td><td>多处 <code>.item()</code> / <code>.any()</code> 同步</td><td>较少同步</td></tr>
+  <tr>
+    <td><strong><span class="zh">隐式同步</span><span class="en">Implicit Sync</span></strong></td>
+    <td><span class="zh">多处 <code>.item()</code> / <code>.any()</code> 同步</span><span class="en">multiple <code>.item()</code> / <code>.any()</code> syncs</span></td>
+    <td><span class="zh">较少同步</span><span class="en">fewer syncs</span></td>
+  </tr>
 </table>
 
 <div class="svg-wrap">
   <div class="svg-header">
     <span>dynamicemb_prefetch.svg</span>
-    <span class="hint">滚动查看完整时序图 · 红色条 = 隐式 cudaStreamSynchronize</span>
+    <span class="hint"><span class="zh">滚动查看完整时序图 · 红色条 = 隐式 cudaStreamSynchronize</span><span class="en">Scroll to view · Red bars = implicit cudaStreamSynchronize</span></span>
   </div>
   <div class="svg-container" style="max-height:900px">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 50"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="50" fill="#FAFBFF"/>
+      <rect x="25" y="2" width="150" height="46" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="100" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">BatchedDynamic</text><text x="100" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">EmbTablesV2</text><text x="100" y="44" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text>
+      <rect x="225" y="2" width="150" height="46" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="300" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="300" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">Storage</text><text x="300" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
+      <rect x="420" y="2" width="160" height="46" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="500" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">DynamicEmb</text><text x="500" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">Cache</text><text x="500" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
+      <rect x="640" y="2" width="120" height="46" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="700" y="22" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0F766E">CUDA Kernels</text><text x="700" y="36" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
+    </svg></div>
     <object type="image/svg+xml" data="dynamicemb_prefetch.svg" style="max-width:100%;height:auto">prefetch sequence diagram</object>
   </div>
 </div>
@@ -402,19 +553,22 @@ else:
 <div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py" target="_blank">key_value_table.py — DynamicEmbCache, DynamicEmbStorage</a></div>
 
 <div class="callout callout-tip">
-  <strong>为什么需要独立 stream？</strong>Prefetch 与上一批次的 compute 重叠执行，这样 hash lookup + cache miss + storage I/O 的延迟被隐藏在 GPU compute 时间内。输出 <code>PrefetchState</code> 包含 slot_indices、unique_keys、reverse_indices 等，供 forward 零查询使用。
+  <div class="zh"><strong>为什么需要独立 stream？</strong>Prefetch 与上一批次的 compute 重叠执行，这样 hash lookup + cache miss + storage I/O 的延迟被隐藏在 GPU compute 时间内。输出 <code>PrefetchState</code> 包含 slot_indices、unique_keys、reverse_indices 等，供 forward 零查询使用。</div>
+  <div class="en"><strong>Why a separate stream?</strong> Prefetch overlaps with the previous batch's compute, hiding hash lookup + cache miss + storage I/O latency within GPU compute time. The output <code>PrefetchState</code> contains slot_indices, unique_keys, reverse_indices, etc., enabling zero-lookup forward pass.</div>
 </div>
 
 <div class="callout callout-warn">
-  <strong>同步热点：</strong>Prefetch 中有多处 <code>.item()</code> / <code>.any()</code> 调用（图中红色 SYNC 标记），每一处都会触发隐式 cudaStreamSynchronize。这是当前 DynamicEmb 的主要性能瓶颈之一，未来有望通过 kernel fusion 或异步化消除。
+  <div class="zh"><strong>同步热点：</strong>Prefetch 中有多处 <code>.item()</code> / <code>.any()</code> 调用（图中红色 SYNC 标记），每一处都会触发隐式 cudaStreamSynchronize。这是当前 DynamicEmb 的主要性能瓶颈之一，未来有望通过 kernel fusion 或异步化消除。</div>
+  <div class="en"><strong>Sync Hotspots:</strong> Multiple <code>.item()</code> / <code>.any()</code> calls in prefetch (red SYNC markers in diagram) each trigger an implicit cudaStreamSynchronize. This is one of DynamicEmb's main performance bottlenecks, potentially addressable via kernel fusion or asynchronous approaches.</div>
 </div>
 </section>
 
 <!-- ==================== FORWARD ==================== -->
 <section id="forward">
-<h3><span class="tag tag-fwd">Phase 4</span> forward — Embedding 读取 <span style="font-size:11px;color:#D97706;font-weight:400">（图中 alt 帧：Cache/HBM_DIRECT Path + DEFAULT Path）</span></h3>
+<h3><span class="tag tag-fwd">Phase 4</span> forward — <span class="zh">Embedding 读取</span><span class="en">Embedding Lookup</span> <span style="font-size:11px;color:#D97706;font-weight:400"><span class="zh">（图中 alt 帧：Cache/HBM_DIRECT Path + DEFAULT Path）</span><span class="en">(alt frames: Cache/HBM_DIRECT Path + DEFAULT Path)</span></span></h3>
 
 <div class="desc">
+  <div class="zh">
   <p>Forward 阶段根据 <code>use_counter</code>（即 <code>update_slot_indices is not None</code>）分为两条路径：</p>
   <table class="tbl" style="font-size:12px">
     <tr><th style="width:30%">Cache / HBM_DIRECT Path</th><th style="width:30%">DEFAULT Path</th><th>共同步骤</th></tr>
@@ -438,14 +592,46 @@ else:
   <ul>
     <li>如果 PrefetchState 队列为空，会自动 fallback 调用 <code>prefetch()</code>（line 921-922）</li>
   </ul>
+  </div>
+  <div class="en">
+  <p>The forward phase branches into two paths based on <code>use_counter</code> (i.e., <code>update_slot_indices is not None</code>):</p>
+  <table class="tbl" style="font-size:12px">
+    <tr><th style="width:30%">Cache / HBM_DIRECT Path</th><th style="width:30%">DEFAULT Path</th><th>Common Step</th></tr>
+    <tr>
+      <td>
+        <code>use_counter = True</code><br>
+        <strong>load_from_flat</strong>: reads embeddings directly via PrefetchState's <code>slot_indices</code>, <strong>no hash lookup</strong>, extremely fast<br>
+        <span style="font-size:10px;color:#6B7280">[if non_admitted_positions] initializer initializes new embeddings</span>
+      </td>
+      <td>
+        <code>use_counter = False</code><br>
+        <strong>_generic_forward_path</strong>:<br>
+        ① <code>storage.find</code> (hash lookup for existing keys)<br>
+        ② <code>_apply_admission</code> (filter new keys)<br>
+        ③ <code>initializer</code> (initialize new embeddings)<br>
+        ④ <code>storage.insert</code> (persist new keys)
+      </td>
+      <td><strong>gather_embedding_pooled</strong>: scatter unique_embs to output tensor, apply SUM/MEAN pooling and per_sample_weights</td>
+    </tr>
+  </table>
+  <ul>
+    <li>If the PrefetchState queue is empty, it automatically falls back to calling <code>prefetch()</code> (line 921-922)</li>
+  </ul>
+  </div>
 </div>
 
 <div class="svg-wrap">
   <div class="svg-header">
     <span>dynamicemb_forward.svg</span>
-    <span class="hint">alt 帧区分 Cache 与 DEFAULT 路径</span>
+    <span class="hint"><span class="zh">alt 帧区分 Cache 与 DEFAULT 路径</span><span class="en">alt frames distinguish Cache vs DEFAULT paths</span></span>
   </div>
   <div class="svg-container" style="max-height:900px">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 52"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="52" fill="#FAFBFF"/>
+      <rect x="25" y="2" width="150" height="48" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="100" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">ShardedDynamic</text><text x="100" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">EmbeddingCollection</text><text x="100" y="45" text-anchor="middle" font-size="9" fill="#6B7280">shard/embedding.py</text>
+      <rect x="225" y="2" width="150" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="300" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">BatchedDynamic</text><text x="300" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">EmbeddingTablesV2</text><text x="300" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text>
+      <rect x="415" y="2" width="170" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="500" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbeddingFunction</text><text x="500" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">(autograd Function)</text><text x="500" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text>
+      <rect x="640" y="2" width="120" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="700" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">CUDA Kernels</text><text x="700" y="38" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
+    </svg></div>
     <object type="image/svg+xml" data="dynamicemb_forward.svg" style="max-width:100%;height:auto">forward sequence diagram</object>
   </div>
 </div>
@@ -454,33 +640,52 @@ else:
 <div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py" target="_blank">batched_dynamicemb_tables.py — BatchedDynamicEmbeddingTablesV2.forward()</a></div>
 
 <div class="callout callout-tip">
-  <strong>Cache 路径为什么 forward 这么快？</strong>所有重活（hash lookup、cache miss、eviction、storage I/O）都在 prefetch 阶段的独立 stream 上完成了。Forward 只做两步：<code>load_from_flat</code>（按 slot 索引读）→ <code>gather_embedding_pooled</code>（scatter + pool），且全程无 CPU-GPU 同步。
+  <div class="zh"><strong>Cache 路径为什么 forward 这么快？</strong>所有重活（hash lookup、cache miss、eviction、storage I/O）都在 prefetch 阶段的独立 stream 上完成了。Forward 只做两步：<code>load_from_flat</code>（按 slot 索引读）→ <code>gather_embedding_pooled</code>（scatter + pool），且全程无 CPU-GPU 同步。</div>
+  <div class="en"><strong>Why is the Cache path forward so fast?</strong> All the heavy lifting (hash lookup, cache miss, eviction, storage I/O) was completed on a separate stream during prefetch. Forward only does two steps: <code>load_from_flat</code> (read by slot index) → <code>gather_embedding_pooled</code> (scatter + pool), with zero CPU-GPU synchronization.</div>
 </div>
 
 <div class="callout callout-warn">
-  <strong>DEFAULT 路径的代价：</strong>没有 prefetch 缓存可用，forward 内部需要执行完整的 <code>storage.find</code>（hash lookup）→ admission → init → insert 流程，延迟明显高于 Cache 路径。这也是推荐使用 CACHE 或 HBM_DIRECT 模式的原因之一。
+  <div class="zh"><strong>DEFAULT 路径的代价：</strong>没有 prefetch 缓存可用，forward 内部需要执行完整的 <code>storage.find</code>（hash lookup）→ admission → init → insert 流程，延迟明显高于 Cache 路径。这也是推荐使用 CACHE 或 HBM_DIRECT 模式的原因之一。</div>
+  <div class="en"><strong>Cost of DEFAULT path:</strong> Without prefetch cache, forward must execute the full <code>storage.find</code> (hash lookup) → admission → init → insert flow inline, resulting in noticeably higher latency than the Cache path. This is one reason CACHE or HBM_DIRECT modes are recommended.</div>
 </div>
 </section>
 
 <!-- ==================== BACKWARD ==================== -->
 <section id="backward">
-<h3><span class="tag tag-bwd">Phase 5</span> backward — 梯度更新与融合优化器 <span style="font-size:11px;color:#D97706;font-weight:400">（图中 alt 帧：CACHE/HBM_DIRECT Path + DEFAULT Path）</span></h3>
+<h3><span class="tag tag-bwd">Phase 5</span> backward — <span class="zh">梯度更新与融合优化器</span><span class="en">Gradient Update &amp; Fused Optimizer</span> <span style="font-size:11px;color:#D97706;font-weight:400"><span class="zh">（图中 alt 帧：CACHE/HBM_DIRECT Path + DEFAULT Path）</span><span class="en">(alt frames: CACHE/HBM_DIRECT Path + DEFAULT Path)</span></span></h3>
 
 <div class="desc">
+  <div class="zh">
   <p>Backward 由 PyTorch autograd 触发 <code>DynamicEmbeddingFunction.backward()</code>，核心步骤：</p>
   <ul>
     <li><strong>reduce_grads</strong>：反向的 gather——将 <code>[B × total_D]</code> 梯度归约到 <code>[unique_N × max_D]</code></li>
     <li><strong>Fused optimizer update</strong>：一个 kernel 完成 read emb + apply optimizer + write back（SGD/Adam/AdaGrad/RowWiseAdaGrad 都有融合实现）</li>
     <li><strong>Post-update</strong>：CACHE/HBM_DIRECT Path 释放 refcount（<code>decrement_counter</code>）；DEFAULT Path 需要 <code>storage.insert</code> 将更新后的 values re-insert 到 hash table</li>
   </ul>
+  </div>
+  <div class="en">
+  <p>Backward is triggered by PyTorch autograd calling <code>DynamicEmbeddingFunction.backward()</code>. Core steps:</p>
+  <ul>
+    <li><strong>reduce_grads</strong>: reverse gather — reduces <code>[B × total_D]</code> gradients to <code>[unique_N × max_D]</code></li>
+    <li><strong>Fused optimizer update</strong>: a single kernel performs read emb + apply optimizer + write back (fused implementations for SGD/Adam/AdaGrad/RowWiseAdaGrad)</li>
+    <li><strong>Post-update</strong>: CACHE/HBM_DIRECT path releases refcount (<code>decrement_counter</code>); DEFAULT path re-inserts updated values into the hash table via <code>storage.insert</code></li>
+  </ul>
+  </div>
 </div>
 
 <div class="svg-wrap">
   <div class="svg-header">
     <span>dynamicemb_backward.svg</span>
-    <span class="hint">✅ 无 cudaStreamSynchronize</span>
+    <span class="hint">✅ <span class="zh">无 cudaStreamSynchronize</span><span class="en">No cudaStreamSynchronize</span></span>
   </div>
   <div class="svg-container" style="max-height:900px">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 52"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="52" fill="#FAFBFF"/>
+      <rect x="15" y="2" width="130" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="80" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbedding</text><text x="80" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">Function</text><text x="80" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text>
+      <rect x="175" y="2" width="130" height="48" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="240" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="240" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">Storage</text><text x="240" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
+      <rect x="335" y="2" width="130" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="400" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">DynamicEmb</text><text x="400" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">Cache</text><text x="400" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
+      <rect x="495" y="2" width="130" height="48" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="560" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">BaseDynamicEmb</text><text x="560" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Optimizer</text><text x="560" y="45" text-anchor="middle" font-size="9" fill="#6B7280">optimizer.py</text>
+      <rect x="660" y="2" width="120" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="720" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">CUDA Kernels</text><text x="720" y="38" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
+    </svg></div>
     <object type="image/svg+xml" data="dynamicemb_backward.svg" style="max-width:100%;height:auto">backward sequence diagram</object>
   </div>
 </div>
@@ -489,15 +694,36 @@ else:
 <div class="src-link"><a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/optimizer.py" target="_blank">optimizer.py — BaseDynamicEmbeddingOptimizer</a></div>
 
 <table class="tbl">
-  <tr><th>对比项</th><th>CACHE / HBM_DIRECT (use_counter=True)</th><th>DEFAULT (use_counter=False)</th></tr>
-  <tr><td><strong>更新目标</strong></td><td>Cache/storage flat table（via update_slot_indices）</td><td>unique_values padded buffer（in memory）</td></tr>
-  <tr><td><strong>Kernel</strong></td><td><code>_update_for_flat_table_kernel</code></td><td><code>_update_for_padded_buffer_kernel</code></td></tr>
-  <tr><td><strong>后处理</strong></td><td><code>decrement_counter</code>（释放引用计数锁，允许后续 prefetch evict）</td><td><code>storage.insert</code>（re-insert 更新后的 values 到 hash table）</td></tr>
-  <tr><td><strong>内存布局</strong></td><td>Flat table（连续、变长 per table）</td><td>Padded buffer（按 max_D 对齐，insert 后写入 hash table）</td></tr>
+  <tr>
+    <th><span class="zh">对比项</span><span class="en">Comparison</span></th>
+    <th>CACHE / HBM_DIRECT (use_counter=True)</th>
+    <th>DEFAULT (use_counter=False)</th>
+  </tr>
+  <tr>
+    <td><strong><span class="zh">更新目标</span><span class="en">Update Target</span></strong></td>
+    <td><span class="zh">Cache/storage flat table（via update_slot_indices）</span><span class="en">Cache/storage flat table (via update_slot_indices)</span></td>
+    <td><span class="zh">unique_values padded buffer（in memory）</span><span class="en">unique_values padded buffer (in memory)</span></td>
+  </tr>
+  <tr>
+    <td><strong>Kernel</strong></td>
+    <td><code>_update_for_flat_table_kernel</code></td>
+    <td><code>_update_for_padded_buffer_kernel</code></td>
+  </tr>
+  <tr>
+    <td><strong><span class="zh">后处理</span><span class="en">Post-processing</span></strong></td>
+    <td><span class="zh"><code>decrement_counter</code>（释放引用计数锁，允许后续 prefetch evict）</span><span class="en"><code>decrement_counter</code> (release ref-count lock, allowing subsequent prefetch eviction)</span></td>
+    <td><span class="zh"><code>storage.insert</code>（re-insert 更新后的 values 到 hash table）</span><span class="en"><code>storage.insert</code> (re-insert updated values into hash table)</span></td>
+  </tr>
+  <tr>
+    <td><strong><span class="zh">内存布局</span><span class="en">Memory Layout</span></strong></td>
+    <td><span class="zh">Flat table（连续、变长 per table）</span><span class="en">Flat table (contiguous, variable-length per table)</span></td>
+    <td><span class="zh">Padded buffer（按 max_D 对齐，insert 后写入 hash table）</span><span class="en">Padded buffer (aligned to max_D, written to hash table after insert)</span></td>
+  </tr>
 </table>
 
 <div class="callout callout-warn">
-  <strong>为什么用融合优化器？</strong>传统做法需要 4 次 memory round-trip（read emb → read grad → update state → write emb）。Fused kernel 在一次 pass 中完成所有操作，<strong>减少 4× 显存带宽消耗</strong>，这对 embedding table 的大规模稀疏更新至关重要。
+  <div class="zh"><strong>为什么用融合优化器？</strong>传统做法需要 4 次 memory round-trip（read emb → read grad → update state → write emb）。Fused kernel 在一次 pass 中完成所有操作，<strong>减少 4× 显存带宽消耗</strong>，这对 embedding table 的大规模稀疏更新至关重要。</div>
+  <div class="en"><strong>Why fused optimizers?</strong> The traditional approach requires 4 memory round-trips (read emb → read grad → update state → write emb). The fused kernel completes everything in a single pass, <strong>reducing memory bandwidth consumption by 4×</strong>, which is critical for large-scale sparse updates on embedding tables.</div>
 </div>
 </section>
 
@@ -507,18 +733,101 @@ else:
   Based on <a href="https://github.com/shijieliu/recsys-examples/tree/fea-dynamicemb_table_fusion" target="_blank">shijieliu/recsys-examples @ fea-dynamicemb_table_fusion</a> · DynamicEmb (PR pending merge)
 </footer>
 
+<!-- Floating TOC (default open, top-right) -->
+<div class="ftoc" id="ftoc">
+  <div class="ftoc-panel">
+    <div class="ftoc-head" id="ftocHead">
+      <span><span class="zh">目录导航</span><span class="en">Contents</span></span>
+      <button onclick="document.getElementById('ftoc').classList.add('collapsed')" title="Collapse">✕</button>
+    </div>
+    <ul class="ftoc-list" id="ftocList">
+      <li><a href="#overview"><span class="toc-tag" style="background:#0f172a"><span class="zh">总览</span><span class="en">ALL</span></span><span class="zh">训练迭代总览</span><span class="en">Training Iteration Overview</span></a></li>
+      <li><a href="#overview" data-sub="storage" style="padding-left:26px;font-size:11px"><span class="zh">StorageMode 三种模式</span><span class="en">StorageMode Explained</span></a></li>
+      <li><a href="#input-dist"><span class="toc-tag" style="background:#2563eb">P1</span>input_dist</a></li>
+      <li><a href="#wait-sparse"><span class="toc-tag" style="background:#0d9488">P2</span>wait_sparse</a></li>
+      <li><a href="#prefetch"><span class="toc-tag" style="background:#059669">P3</span>prefetch</a></li>
+      <li><a href="#forward"><span class="toc-tag" style="background:#6366f1">P4</span>forward</a></li>
+      <li><a href="#backward"><span class="toc-tag" style="background:#dc2626">P5</span>backward</a></li>
+    </ul>
+  </div>
+  <button class="ftoc-toggle" onclick="this.parentElement.classList.remove('collapsed')" title="Expand TOC">☰</button>
+</div>
+
 <script>
 const nav = document.getElementById('nav');
-const links = nav.querySelectorAll('a');
-const sections = document.querySelectorAll('section[id], .phase-banner');
+const links = nav.querySelectorAll('.nav-links a');
 window.addEventListener('scroll', () => {
   let cur = '';
   document.querySelectorAll('section[id]').forEach(s => {
-    if (s.getBoundingClientRect().top < 160) cur = s.id;
+    if (s.getBoundingClientRect().top < 60) cur = s.id;
   });
   links.forEach(a => {
     a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
   });
+  document.querySelectorAll('#ftocList a').forEach(a => {
+    a.classList.toggle('cur', a.getAttribute('href') === '#' + cur);
+  });
+});
+
+// Language toggle
+function toggleLang() {
+  const body = document.body;
+  const isZh = body.classList.contains('lang-zh');
+  body.classList.toggle('lang-zh', !isZh);
+  body.classList.toggle('lang-en', isZh);
+  const btn = document.getElementById('langBtn');
+  btn.textContent = isZh ? '中文' : 'EN';
+  document.documentElement.lang = isZh ? 'en' : 'zh-CN';
+  try { localStorage.setItem('dynEmb_lang', isZh ? 'en' : 'zh'); } catch(e) {}
+}
+(function initLang() {
+  var saved = 'en';
+  try { saved = localStorage.getItem('dynEmb_lang') || 'en'; } catch(e) {}
+  document.body.classList.add('lang-' + saved);
+  if (saved === 'zh') {
+    document.body.classList.remove('lang-en');
+    document.getElementById('langBtn').textContent = 'EN';  /* show "EN" so user can switch back */
+    document.documentElement.lang = 'zh-CN';
+  }
+})();
+
+// Draggable floating TOC
+(function(){
+  const ftoc = document.getElementById('ftoc');
+  const head = document.getElementById('ftocHead');
+  let dragging = false, ox, oy, sx, sy;
+  head.addEventListener('mousedown', e => {
+    dragging = true;
+    const r = ftoc.getBoundingClientRect();
+    ox = e.clientX; oy = e.clientY;
+    sx = r.left; sy = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    ftoc.style.right = 'auto';
+    ftoc.style.left = (sx + e.clientX - ox) + 'px';
+    ftoc.style.top = (sy + e.clientY - oy) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// Sticky participant headers — absolute positioning driven by scroll
+document.querySelectorAll('.svg-container').forEach(function(ctr) {
+  var sh = ctr.querySelector('.sticky-ptcp');
+  if (!sh) return;
+  ctr.addEventListener('scroll', function() {
+    var st = ctr.scrollTop;
+    if (st > 60) {
+      sh.style.transform = 'translateY(' + st + 'px)';
+      sh.style.opacity = '1';
+      sh.style.pointerEvents = 'auto';
+    } else {
+      sh.style.transform = 'translateY(0)';
+      sh.style.opacity = '0';
+      sh.style.pointerEvents = 'none';
+    }
+  }, {passive: true});
 });
 </script>
 </body>

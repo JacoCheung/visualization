@@ -146,7 +146,7 @@
   <rect x="448" y="610" width="26" height="16" rx="4" fill="#DC2626"/>
   <text x="461" y="622" text-anchor="middle" class="sn" fill="#fff">D2</text>
   <text x="480" y="628" class="nbold" fill="#991B1B">
-    <tspan x="480" dy="0">&#x2605; D2H #2: 64B</tspan>
+    <tspan x="480" dy="0">&#x2605; D2H #2: F&#xB7;8B (int64)</tspan>
     <tspan x="480" dy="13">&#x2014; length_per_key().tolist()</tspan>
   </text>
   <line x1="624" y1="655" x2="496" y2="655" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>
@@ -164,7 +164,7 @@
   <text x="461" y="732" text-anchor="middle" class="sn" fill="#fff">H2</text>
   <text x="480" y="746" class="mono" fill="#1E40AF">
     <tspan x="480" dy="0">torch.tensor(batch_size</tspan>
-    <tspan x="480" dy="13">_per_split, cuda) 64B</tspan>
+    <tspan x="480" dy="13">_per_split, cuda) W&#xB7;F&#xB7;4B</tspan>
   </text>
   <line x1="496" y1="774" x2="624" y2="774" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
 
@@ -174,7 +174,7 @@
   <text x="461" y="810" text-anchor="middle" class="sn" fill="#fff">H3</text>
   <text x="480" y="824" class="mono" fill="#1E40AF">
     <tspan x="480" dy="0">torch.tensor(length</tspan>
-    <tspan x="480" dy="13">_per_split, cuda) 64B</tspan>
+    <tspan x="480" dy="13">_per_split, cuda) W&#xB7;F&#xB7;4B</tspan>
   </text>
   <line x1="496" y1="852" x2="624" y2="852" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
 
@@ -184,7 +184,7 @@
   <text x="461" y="888" text-anchor="middle" class="sn" fill="#fff">H4</text>
   <text x="480" y="902" class="mono" fill="#1E40AF">
     <tspan x="480" dy="0">torch.tensor([stride]&#xD7;8,</tspan>
-    <tspan x="480" dy="13">cuda) 64B</tspan>
+    <tspan x="480" dy="13">cuda) W&#xB7;8B</tspan>
   </text>
   <line x1="496" y1="930" x2="624" y2="930" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
 

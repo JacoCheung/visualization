@@ -115,7 +115,7 @@
   <rect x="308" y="408" width="380" height="56" rx="5" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1.5"/>
   <rect x="308" y="408" width="26" height="16" rx="4" fill="#DC2626"/>
   <text x="321" y="420" text-anchor="middle" class="sn" fill="#fff">D1</text>
-  <text x="348" y="434" class="nbold" fill="#991B1B">&#x2605; D2H #1: 64B &#x2014; output_tensor.tolist()</text>
+  <text x="348" y="434" class="nbold" fill="#991B1B">&#x2605; D2H #1: W&#xB7;F&#xB7;8B &#x2014; output_tensor.tolist()</text>
   <line x1="624" y1="448" x2="356" y2="448" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>
 
   <text x="490" y="484" text-anchor="middle" class="mono" fill="#991B1B">
@@ -146,7 +146,7 @@
   <rect x="448" y="640" width="26" height="16" rx="4" fill="#2563EB"/>
   <text x="461" y="652" text-anchor="middle" class="sn" fill="#fff">H1</text>
   <text x="480" y="662" class="nbold" fill="#1E40AF">
-    <tspan x="480" dy="0">&#x25B2; H2D #1: ~96B</tspan>
+    <tspan x="480" dy="0">&#x25B2; H2D #1: N&#xB7;4B (int32)</tspan>
     <tspan x="480" dy="13">&#x2014; _get_recat() permute index</tspan>
   </text>
   <line x1="496" y1="688" x2="624" y2="688" stroke="#2563EB" stroke-width="1.2" marker-end="url(#a)"/>
@@ -255,7 +255,7 @@
   <rect x="448" y="1456" width="26" height="16" rx="4" fill="#DC2626"/>
   <text x="461" y="1468" text-anchor="middle" class="sn" fill="#fff">D2</text>
   <text x="480" y="1478" class="nbold" fill="#991B1B">
-    <tspan x="480" dy="0">&#x2605; D2H #2: 192B</tspan>
+    <tspan x="480" dy="0">&#x2605; D2H #2: F&#xB7;8B (int64)</tspan>
     <tspan x="480" dy="13">&#x2014; length_per_key().tolist()</tspan>
   </text>
   <line x1="624" y1="1506" x2="496" y2="1506" stroke="#DC2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>

@@ -100,25 +100,33 @@
 
   <!-- PARTICIPANTS: x=80, 240, 400, 560, 720 -->
   <g filter="url(#sh)">
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L893" target="_blank">
     <rect x="15" y="56" width="130" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
     <text x="80" y="72" text-anchor="middle" class="ptcp" fill="#065F46">DynamicEmbedding</text>
     <text x="80" y="86" text-anchor="middle" class="ptcp" fill="#065F46">Function</text>
     <text x="80" y="99" text-anchor="middle" class="psub">batched_dynamicemb_function.py</text>
+    </a>
 
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L1063" target="_blank">
     <rect x="175" y="56" width="130" height="48" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/>
     <text x="240" y="72" text-anchor="middle" class="ptcp" fill="#991B1B">DynamicEmbStorage</text>
     <text x="240" y="86" text-anchor="middle" class="ptcp" fill="#991B1B">(Storage)</text>
     <text x="240" y="99" text-anchor="middle" class="psub">key_value_table.py</text>
+    </a>
 
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L933" target="_blank">
     <rect x="335" y="56" width="130" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
     <text x="400" y="72" text-anchor="middle" class="ptcp" fill="#92400E">DynamicEmbCache</text>
     <text x="400" y="86" text-anchor="middle" class="ptcp" fill="#92400E">(Cache)</text>
     <text x="400" y="99" text-anchor="middle" class="psub">key_value_table.py</text>
+    </a>
 
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/optimizer.py#L120" target="_blank">
     <rect x="495" y="56" width="130" height="48" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
     <text x="560" y="72" text-anchor="middle" class="ptcp" fill="#1E40AF">BaseDynamicEmbedding</text>
     <text x="560" y="86" text-anchor="middle" class="ptcp" fill="#1E40AF">Optimizer</text>
     <text x="560" y="99" text-anchor="middle" class="psub">optimizer.py</text>
+    </a>
 
     <rect x="660" y="56" width="120" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
     <text x="720" y="76" text-anchor="middle" class="ptcp" fill="#0F766E">CUDA Kernels</text>

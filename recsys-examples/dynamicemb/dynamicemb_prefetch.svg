@@ -101,18 +101,24 @@
 
   <!-- Participants: A=100, B=300, C=500, D=700 -->
   <g filter="url(#sh)">
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L365" target="_blank">
     <rect x="25" y="58" width="150" height="46" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
     <text x="100" y="75" text-anchor="middle" class="ptcp" fill="#1E40AF">BatchedDynamic</text>
     <text x="100" y="89" text-anchor="middle" class="ptcp" fill="#1E40AF">EmbTablesV2</text>
     <text x="100" y="100" text-anchor="middle" class="psub">batched_dynamicemb_tables.py</text>
+    </a>
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L1063" target="_blank">
     <rect x="225" y="58" width="150" height="46" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/>
     <text x="300" y="75" text-anchor="middle" class="ptcp" fill="#991B1B">DynamicEmb</text>
     <text x="300" y="89" text-anchor="middle" class="ptcp" fill="#991B1B">Storage</text>
     <text x="300" y="100" text-anchor="middle" class="psub">key_value_table.py</text>
+    </a>
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L933" target="_blank">
     <rect x="420" y="58" width="160" height="46" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
     <text x="500" y="75" text-anchor="middle" class="ptcp" fill="#92400E">DynamicEmb</text>
     <text x="500" y="89" text-anchor="middle" class="ptcp" fill="#92400E">Cache</text>
     <text x="500" y="100" text-anchor="middle" class="psub">key_value_table.py</text>
+    </a>
     <rect x="640" y="58" width="120" height="46" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
     <text x="700" y="78" text-anchor="middle" class="ptcp" fill="#0F766E">CUDA Kernels</text>
     <text x="700" y="92" text-anchor="middle" class="psub">(dynamicemb_ext)</text>

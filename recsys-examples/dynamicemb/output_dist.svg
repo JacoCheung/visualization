@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="740" viewBox="0 0 850 740">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .mono{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:11px}
+      .ptcp{font-size:12px;font-weight:700}
+      .psub{font-size:9.5px;fill:#6B7280}
+      .note{font-size:10.5px}
+      .nbold{font-size:10.5px;font-weight:600}
+      .sn{font-size:10px;font-weight:700}
+      .link{font-family:'SF Mono',Consolas,monospace;font-size:9.5px;fill:#7C3AED;text-decoration:underline;cursor:pointer}
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#1F2937"/>
+    </marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#9CA3AF"/>
+    </marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#059669"/>
+    </marker>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+
+  <rect width="850" height="740" fill="#FAFBFF"/>
+
+  <!-- Title -->
+  <text x="425" y="28" text-anchor="middle" font-size="17" font-weight="700" fill="#111827">## output_dist ## &#x2014; RW Sequence Sharding</text>
+  <text x="425" y="46" text-anchor="middle" font-size="11" fill="#9CA3AF">1 &#xD7; NCCL AllToAll (all_to_all_single, async_op=True) &#xB7; 0 D2H / 0 H2D</text>
+
+  <!-- ===== PARTICIPANTS x: 70 210 350 490 630 770 ===== -->
+  <g filter="url(#sh)">
+    <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline/train_pipelines.py#L460" target="_blank">
+    <rect x="10"  y="60" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/>
+    <text x="70" y="78" text-anchor="middle" class="ptcp" fill="#4338CA">Pipeline</text>
+    <text x="70" y="93" text-anchor="middle" class="psub">compute_and_output_dist</text>
+    </a>
+
+    <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/sharding/rw_sequence_sharding.py#L56" target="_blank">
+    <rect x="150" y="60" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
+    <text x="210" y="78" text-anchor="middle" class="ptcp" fill="#0F766E">RwSequence</text>
+    <text x="210" y="93" text-anchor="middle" class="psub">EmbeddingDist</text>
+    </a>
+
+    <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1496" target="_blank">
+    <rect x="290" y="60" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
+    <text x="350" y="78" text-anchor="middle" class="ptcp" fill="#1E40AF">SequenceEmbs</text>
+    <text x="350" y="93" text-anchor="middle" class="psub">AllToAll</text>
+    </a>
+
+    <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1454" target="_blank">
+    <rect x="430" y="60" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+    <text x="490" y="78" text-anchor="middle" class="ptcp" fill="#92400E">SequenceEmbs</text>
+    <text x="490" y="93" text-anchor="middle" class="psub">Awaitable</text>
+    </a>
+
+    <rect x="570" y="60" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/>
+    <text x="630" y="78" text-anchor="middle" class="ptcp" fill="#374151">GPU</text>
+    <text x="630" y="93" text-anchor="middle" class="psub">default_stream</text>
+
+    <rect x="710" y="60" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
+    <text x="770" y="78" text-anchor="middle" class="ptcp" fill="#065F46">NCCL</text>
+    <text x="770" y="93" text-anchor="middle" class="psub">AllToAll</text>
+  </g>
+
+  <!-- Lifelines -->
+  <line x1="70"  y1="104" x2="70"  y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="210" y1="104" x2="210" y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="350" y1="104" x2="350" y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="490" y1="104" x2="490" y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="630" y1="104" x2="630" y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+  <line x1="770" y1="104" x2="770" y2="700" stroke="#D1D5DB" stroke-dasharray="6,4"/>
+
+  <!-- ==================== Phase 1: Async Launch ==================== -->
+  <rect x="15" y="118" width="815" height="296" rx="6" fill="none" stroke="#6366F1" stroke-width="1.8"/>
+  <rect x="15" y="118" width="280" height="22" fill="#6366F1" rx="3"/>
+  <text x="23" y="134" font-size="10" font-weight="700" fill="#fff">## output_dist ## (async launch)</text>
+  <text x="305" y="134" font-size="11" font-weight="600" fill="#4338CA">inside compute_and_output_dist()</text>
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/sharding/rw_sequence_sharding.py#L89" target="_blank">
+    <text x="305" y="150" class="link">rw_sequence_sharding.py:89 &#x2014; RwSequenceEmbeddingDist.forward()</text>
+  </a>
+
+  <!-- Activation bars (Phase 1) -->
+  <rect x="64"  y="160" width="12" height="240" rx="2" fill="#C7D2FE" opacity="0.4"/>
+  <rect x="204" y="178" width="12" height="200" rx="2" fill="#99F6E4" opacity="0.4"/>
+  <rect x="344" y="210" width="12" height="168" rx="2" fill="#BFDBFE" opacity="0.4"/>
+
+  <!-- Msg 1: Pipeline &#x2192; RwSeqEmbDist -->
+  <text x="140" y="170" text-anchor="middle" class="mono" fill="#1F2937">output_dist.forward(local_embs, ctx)</text>
+  <line x1="76" y1="180" x2="204" y2="180" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Msg 2: RwSeqEmbDist &#x2192; SeqEmbsAllToAll -->
+  <text x="280" y="204" text-anchor="middle" class="mono" fill="#1F2937">
+    <tspan x="280" dy="0">self._dist.forward(local_embs,</tspan>
+    <tspan x="280" dy="13">lengths, input_splits, output_splits)</tspan>
+  </text>
+  <line x1="216" y1="228" x2="344" y2="228" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1496" target="_blank">
+    <text x="280" y="244" text-anchor="middle" class="link">dist_data.py:1496 &#x2014; SequenceEmbeddingsAllToAll</text>
+  </a>
+
+  <!-- Msg 3: SeqEmbsAllToAll &#x2192; GPU: permute_2D -->
+  <text x="490" y="268" text-anchor="middle" class="mono" fill="#374151">fbgemm.permute_2D_sparse_data(recat, ...)</text>
+  <line x1="356" y1="278" x2="624" y2="278" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="590" y="284" width="80" height="18" rx="3" fill="#F3F4F6" stroke="#D1D5DB"/>
+  <text x="630" y="296" text-anchor="middle" font-size="9" fill="#6B7280">GPU kernel</text>
+
+  <!-- Msg 4: SeqEmbsAllToAll &#x2192; NCCL: all_to_all_single -->
+  <text x="500" y="322" text-anchor="middle" class="mono" fill="#059669">
+    <tspan x="500" dy="0">dist.all_to_all_single(output, input,</tspan>
+    <tspan x="500" dy="13">splits, pg, async_op=True)</tspan>
+  </text>
+  <line x1="356" y1="348" x2="764" y2="348" stroke="#059669" stroke-width="1.8" marker-end="url(#ag)"/>
+
+  <rect x="620" y="356" width="200" height="46" rx="4" fill="#ECFDF5" stroke="#A7F3D0"/>
+  <text x="630" y="372" class="nbold" fill="#065F46">NCCL AllToAll async</text>
+  <text x="630" y="386" class="note" fill="#6B7280">redistribute embeddings across ranks</text>
+
+  <!-- Return: SeqEmbsAllToAll &#x2192; Pipeline (via RwSeqEmbDist) -->
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1454" target="_blank">
+    <text x="280" y="408" text-anchor="middle" class="note" fill="#9CA3AF">return SequenceEmbeddingsAwaitable</text>
+  </a>
+  <line x1="344" y1="414" x2="76" y2="414" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+  <!-- ===== Divider: forward overlaps ===== -->
+  <rect x="30" y="430" width="790" height="28" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="1.5"/>
+  <text x="425" y="448" text-anchor="middle" font-size="12" font-weight="600" fill="#6D28D9">&#x2500;&#x2500; forward(batch_i) continues &#x2500;&#x2500; AllToAll overlaps with compute &#x2500;&#x2500;</text>
+
+  <!-- ==================== Phase 2: .wait() ==================== -->
+  <rect x="15" y="472" width="815" height="212" rx="6" fill="none" stroke="#D97706" stroke-width="1.8"/>
+  <rect x="15" y="472" width="280" height="22" fill="#D97706" rx="3"/>
+  <text x="23" y="488" font-size="10" font-weight="700" fill="#fff">## output_dist ## (.wait())</text>
+  <text x="305" y="488" font-size="11" font-weight="600" fill="#92400E">SequenceEmbeddingsAwaitable._wait_impl()</text>
+
+  <!-- Activation bars (Phase 2) -->
+  <rect x="64"  y="504" width="12" height="170" rx="2" fill="#C7D2FE" opacity="0.4"/>
+  <rect x="484" y="522" width="12" height="130" rx="2" fill="#FED7AA" opacity="0.4"/>
+
+  <!-- Msg 5: Pipeline &#x2192; SeqEmbsAwaitable: _wait_impl() -->
+  <text x="280" y="516" text-anchor="middle" class="mono" fill="#1F2937">awaitable._wait_impl()</text>
+  <line x1="76" y1="526" x2="484" y2="526" stroke="#1F2937" stroke-width="1.5" marker-end="url(#a)"/>
+  <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/comm_ops.py#L1888" target="_blank">
+    <text x="280" y="542" text-anchor="middle" class="link">comm_ops.py:1888 &#x2014; All2All_Seq_Req_Wait.forward()</text>
+  </a>
+
+  <!-- Msg 6: SeqEmbsAwaitable &#x2192; NCCL: myreq.req.wait() -->
+  <text x="630" y="564" text-anchor="middle" class="mono" fill="#059669">myreq.req.wait()</text>
+  <line x1="496" y1="574" x2="764" y2="574" stroke="#059669" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="764" y1="590" x2="496" y2="590" stroke="#059669" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
+  <text x="630" y="606" text-anchor="middle" class="note" fill="#065F46">&#x2605; NCCL sync point &#x2014; AllToAll complete &#x2713;</text>
+
+  <!-- Msg 7: SeqEmbsAwaitable &#x2192; GPU: index_select -->
+  <text x="560" y="630" text-anchor="middle" class="mono" fill="#374151">torch.index_select(ret, 0, unbucketize_permute)</text>
+  <line x1="496" y1="640" x2="624" y2="640" stroke="#1F2937" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="590" y="646" width="80" height="18" rx="3" fill="#F3F4F6" stroke="#D1D5DB"/>
+  <text x="630" y="658" text-anchor="middle" font-size="9" fill="#6B7280">GPU kernel</text>
+
+  <!-- Return: SeqEmbsAwaitable &#x2192; Pipeline -->
+  <text x="280" y="676" text-anchor="middle" class="note" fill="#9CA3AF">&#x2192; output embeddings (restored row order)</text>
+  <line x1="484" y1="682" x2="76" y2="682" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+  <!-- Legend -->
+  <rect x="20" y="706" width="14" height="14" rx="3" fill="#ECFDF5" stroke="#059669"/>
+  <text x="40" y="717" class="note" fill="#065F46">NCCL AllToAll (async &#x2192; sync)</text>
+  <rect x="240" y="706" width="14" height="14" rx="3" fill="#F3F4F6" stroke="#D1D5DB"/>
+  <text x="260" y="717" class="note" fill="#374151">GPU kernel</text>
+  <rect x="400" y="706" width="14" height="14" rx="3" fill="#F5F3FF" stroke="#6D28D9"/>
+  <text x="420" y="717" class="note" fill="#6D28D9">forward overlaps with AllToAll</text>
+  <text x="640" y="717" class="note" fill="#065F46">&#x2714; 0 D2H / 0 H2D</text>
+  <text x="770" y="717" class="link">purple = source</text>
+</svg>

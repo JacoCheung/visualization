@@ -43,6 +43,7 @@ section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 
 .tag-dist{background:#2563eb}
 .tag-prefetch{background:#059669}
 .tag-fwd{background:#6366f1}
+.tag-odist{background:#0891b2}
 .tag-bwd{background:#dc2626}
 
 .desc{font-size:13.5px;color:#334155;margin-bottom:14px}
@@ -109,7 +110,8 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
     <a href="#wait-sparse">Phase 2: wait_sparse</a>
     <a href="#prefetch">Phase 3: prefetch</a>
     <a href="#forward">Phase 4: forward</a>
-    <a href="#backward">Phase 5: backward</a>
+    <a href="#output-dist">Phase 5: output_dist</a>
+    <a href="#backward">Phase 6: backward</a>
   </div>
   <button id="langBtn" class="lang-btn" onclick="toggleLang()">中文</button>
 </nav>
@@ -131,21 +133,25 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
 <div class="callout callout-info">
   <div class="zh">
   <strong>📌 文档讨论范围说明</strong>
-  <p style="margin:6px 0 0 0">本文档聚焦于 <strong>DynamicEmb Embedding 层</strong>在一次训练迭代中的内部流程。在 TorchRec <code>TrainPipelineSparseDist</code> 的完整 pipeline 中，forward 阶段实际包含 <code>output_dist</code>（将各 shard 的 embedding lookup 结果通过 AllToAll 汇总回原 rank），backward 阶段同理包含对应的反向 output_dist 通信。</p>
+  <p style="margin:6px 0 0 0">本文档聚焦于 <strong>DynamicEmb Embedding 层</strong>在一次训练迭代中的完整流程，覆盖 TorchRec <code>TrainPipelineSparseDist</code> 的 6 个阶段：</p>
   <ul style="margin:6px 0 0 0">
-    <li><strong>input_dist / wait_sparse</strong>（Phase 1-2）：本文给出了<strong>详细的内部序列图</strong>，涵盖 dedup、bucketize、AllToAll 发起与等待的每一步</li>
-    <li><strong>forward / backward</strong>（Phase 4-5）：序列图侧重于 <strong>DynamicEmb 自身的 embedding lookup / gradient update 逻辑</strong>（包括 Cache/HBM_DIRECT/DEFAULT 三种路径），TorchRec 层面的 <code>output_dist</code>（AllToAll 回收 embedding 结果）流程未在图中展开</li>
+    <li><strong>input_dist / wait_sparse</strong>（Phase 1-2）：<strong>详细的内部序列图</strong>，涵盖 dedup、bucketize、AllToAll 发起与等待的每一步</li>
+    <li><strong>prefetch</strong>（Phase 3）：DynamicEmb 的 key 解析与缓存管理（Cache / HBM_DIRECT / DEFAULT 三种路径）</li>
+    <li><strong>forward</strong>（Phase 4）：DynamicEmb 自身的 embedding lookup 逻辑</li>
+    <li><strong>output_dist</strong>（Phase 5）：<strong>详细的内部序列图</strong>，展示 RW Sequence Sharding 下 AllToAll 将 embedding 结果重新分配到各 rank 的完整调用链</li>
+    <li><strong>backward</strong>（Phase 6）：梯度更新与融合优化器</li>
   </ul>
-  <p style="margin:6px 0 0 0;font-size:12px;color:#6B7280">即：input 侧通信（input_dist + wait_sparse）讲得很细，output 侧通信（output_dist）在本文中仅作为 forward/backward 的一部分提及，内部细节不在讨论范围。</p>
   </div>
   <div class="en">
   <strong>📌 Scope of This Document</strong>
-  <p style="margin:6px 0 0 0">This document focuses on the <strong>internal flow of the DynamicEmb Embedding layer</strong> during one training iteration. In TorchRec's full <code>TrainPipelineSparseDist</code> pipeline, the forward phase actually includes <code>output_dist</code> (AllToAll to gather embedding lookup results back to each rank), and similarly, backward includes the corresponding reverse output_dist communication.</p>
+  <p style="margin:6px 0 0 0">This document covers the <strong>complete flow of the DynamicEmb Embedding layer</strong> during one training iteration, spanning all 6 phases of TorchRec's <code>TrainPipelineSparseDist</code>:</p>
   <ul style="margin:6px 0 0 0">
-    <li><strong>input_dist / wait_sparse</strong> (Phase 1-2): This document provides <strong>detailed internal sequence diagrams</strong> covering every step of dedup, bucketize, AllToAll initiation and awaiting</li>
-    <li><strong>forward / backward</strong> (Phase 4-5): The sequence diagrams focus on <strong>DynamicEmb's own embedding lookup / gradient update logic</strong> (including Cache/HBM_DIRECT/DEFAULT paths); TorchRec's <code>output_dist</code> (AllToAll to collect embedding results) is not expanded in the diagrams</li>
+    <li><strong>input_dist / wait_sparse</strong> (Phase 1-2): <strong>Detailed internal sequence diagrams</strong> covering every step of dedup, bucketize, AllToAll initiation and awaiting</li>
+    <li><strong>prefetch</strong> (Phase 3): DynamicEmb's key resolution and cache management (Cache / HBM_DIRECT / DEFAULT paths)</li>
+    <li><strong>forward</strong> (Phase 4): DynamicEmb's own embedding lookup logic</li>
+    <li><strong>output_dist</strong> (Phase 5): <strong>Detailed internal sequence diagram</strong> showing the full call chain for AllToAll redistribution of embedding results under RW Sequence Sharding</li>
+    <li><strong>backward</strong> (Phase 6): Gradient update and fused optimizer</li>
   </ul>
-  <p style="margin:6px 0 0 0;font-size:12px;color:#6B7280">In summary: input-side communication (input_dist + wait_sparse) is covered in detail; output-side communication (output_dist) is only mentioned as part of forward/backward, with its internals outside the scope of this document.</p>
   </div>
 </div>
 
@@ -281,6 +287,8 @@ else:
   <div class="pipeline-arrow">→</div>
   <div class="pipeline-step" style="background:#6366f1">forward</div>
   <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#0891b2">output_dist</div>
+  <div class="pipeline-arrow">→</div>
   <div class="pipeline-step" style="background:#dc2626">backward</div>
 </div>
 
@@ -350,6 +358,14 @@ else:
     <td><code>batched_dynamicemb_function.py</code></td>
   </tr>
   <tr>
+    <td><strong>output_dist</strong><br><span style="font-size:10px;color:#0891B2">RW Sequence</span></td>
+    <td><span class="zh">permute_2D → AllToAll (async) → wait → index_select</span><span class="en">permute_2D → AllToAll (async) → wait → index_select</span></td>
+    <td>default_stream</td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
+    <td><span class="zh">无 ✅</span><span class="en">None ✅</span></td>
+    <td><code>rw_sequence_sharding.py</code>, <code>dist_data.py</code>, <code>comm_ops.py</code></td>
+  </tr>
+  <tr>
     <td><strong>backward</strong><br><span style="font-size:10px;color:#4338CA">Cache/HBM path</span></td>
     <td>reduce_grads → fused_update_for_flat_table → decrement_counter</td>
     <td>default_stream</td>
@@ -409,13 +425,14 @@ else:
     <span class="hint"><span class="zh">滚动查看完整时序图</span><span class="en">Scroll to view full sequence diagram</span></span>
   </div>
   <div class="svg-container">
-    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="850" viewBox="0 0 850 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="850" height="48" fill="#FAFBFF"/>
-      <rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text>
-      <rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">ShardedDynEmb</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Collection.input_dist()</text>
-      <rect x="290" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">RwSparseFeatDist</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.forward()</text>
-      <rect x="430" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">SplitsAwaitable()</text>
-      <rect x="570" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">data_dist_stream</text>
-      <rect x="710" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="1000" viewBox="0 0 1000 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="1000" height="48" fill="#FAFBFF"/>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline/train_pipelines.py#L460" target="_blank"><rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/shard/embedding.py#L73" target="_blank"><rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">ShardedDynEmb</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Collection.input_dist()</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/input_dist.py#L197" target="_blank"><rect x="290" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">RwSparseFeatDist</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.forward()</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L659" target="_blank"><rect x="430" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.forward()</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L220" target="_blank"><rect x="570" y="2" width="120" height="44" rx="6" fill="#F5F3FF" stroke="#7C3AED" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#5B21B6">SplitsAllToAll</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.forward()</text></a>
+      <rect x="710" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">data_dist_stream</text>
+      <rect x="850" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="910" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="910" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
     </svg></div>
     <object type="image/svg+xml" data="input_dist_sync_input_dist.svg" style="max-width:100%;height:auto">input_dist sequence diagram</object>
   </div>
@@ -460,10 +477,10 @@ else:
   </div>
   <div class="svg-container">
     <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="850" viewBox="0 0 850 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="850" height="48" fill="#FAFBFF"/>
-      <rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text>
-      <rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">FusedKJTList</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">SplitsAwaitable.wait()</text>
-      <rect x="290" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">KJTAllToAllSplits</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Awaitable._wait_impl()</text>
-      <rect x="430" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">TensorsAwaitable</text>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline/train_pipelines.py#L460" target="_blank"><rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">.progress()</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L446" target="_blank"><rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">KJTAllToAll</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">SplitsAwaitable</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L220" target="_blank"><rect x="290" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">SplitsAllToAll</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Awaitable._wait_impl()</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L294" target="_blank"><rect x="430" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">KJTAllToAll</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">TensorsAwaitable</text></a>
       <rect x="570" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">data_dist_stream</text>
       <rect x="710" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
     </svg></div>
@@ -471,8 +488,8 @@ else:
   </div>
 </div>
 
-<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline.py" target="_blank">train_pipeline.py — _wait_sparse_data_dist()</a></div>
-<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py" target="_blank">dist_data.py — SplitsAllToAllAwaitable, KJTAllToAll</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline/train_pipelines.py#L1013" target="_blank">train_pipelines.py:1013 — wait_sparse_data_dist()</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L220" target="_blank">dist_data.py:220 — SplitsAllToAllAwaitable</a> | <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L446" target="_blank">:446 — KJTAllToAllSplitsAwaitable</a> | <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L659" target="_blank">:659 — KJTAllToAll</a></div>
 
 <div class="callout callout-info">
   <div class="zh"><strong>D2H #1 (outputs.tolist())</strong> 是 <code>outputs.tolist()</code> 的开销——需要等 AllToAll #1 结束后把 splits metadata 搬回 CPU。这个 stall 是整个 input_dist 流程中最大的，因为它同时包含了 NCCL 通信等待和 stream 同步。</div>
@@ -540,9 +557,9 @@ else:
   </div>
   <div class="svg-container" style="max-height:900px">
     <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 50"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="50" fill="#FAFBFF"/>
-      <rect x="25" y="2" width="150" height="46" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="100" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">BatchedDynamic</text><text x="100" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">EmbTablesV2</text><text x="100" y="44" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text>
-      <rect x="225" y="2" width="150" height="46" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="300" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="300" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">Storage</text><text x="300" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
-      <rect x="420" y="2" width="160" height="46" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="500" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">DynamicEmb</text><text x="500" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">Cache</text><text x="500" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L365" target="_blank"><rect x="25" y="2" width="150" height="46" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="100" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">BatchedDynamic</text><text x="100" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1E40AF">EmbTablesV2</text><text x="100" y="44" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L1063" target="_blank"><rect x="225" y="2" width="150" height="46" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="300" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="300" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991B1B">Storage</text><text x="300" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L933" target="_blank"><rect x="420" y="2" width="160" height="46" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="500" y="19" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">DynamicEmb</text><text x="500" y="33" text-anchor="middle" font-size="11.5" font-weight="700" fill="#92400E">Cache</text><text x="500" y="44" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text></a>
       <rect x="640" y="2" width="120" height="46" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="700" y="22" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0F766E">CUDA Kernels</text><text x="700" y="36" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
     </svg></div>
     <object type="image/svg+xml" data="dynamicemb_prefetch.svg" style="max-width:100%;height:auto">prefetch sequence diagram</object>
@@ -627,9 +644,9 @@ else:
   </div>
   <div class="svg-container" style="max-height:900px">
     <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 52"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="52" fill="#FAFBFF"/>
-      <rect x="25" y="2" width="150" height="48" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="100" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">ShardedDynamic</text><text x="100" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">EmbeddingCollection</text><text x="100" y="45" text-anchor="middle" font-size="9" fill="#6B7280">shard/embedding.py</text>
-      <rect x="225" y="2" width="150" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="300" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">BatchedDynamic</text><text x="300" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">EmbeddingTablesV2</text><text x="300" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text>
-      <rect x="415" y="2" width="170" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="500" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbeddingFunction</text><text x="500" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">(autograd Function)</text><text x="500" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/shard/embedding.py#L73" target="_blank"><rect x="25" y="2" width="150" height="48" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="100" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">ShardedDynamic</text><text x="100" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">EmbeddingCollection</text><text x="100" y="45" text-anchor="middle" font-size="9" fill="#6B7280">shard/embedding.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L365" target="_blank"><rect x="225" y="2" width="150" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="300" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">BatchedDynamic</text><text x="300" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">EmbeddingTablesV2</text><text x="300" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_tables.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L893" target="_blank"><rect x="415" y="2" width="170" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="500" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbeddingFunction</text><text x="500" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">(autograd Function)</text><text x="500" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text></a>
       <rect x="640" y="2" width="120" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="700" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">CUDA Kernels</text><text x="700" y="38" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
     </svg></div>
     <object type="image/svg+xml" data="dynamicemb_forward.svg" style="max-width:100%;height:auto">forward sequence diagram</object>
@@ -649,15 +666,105 @@ else:
   <div class="en"><strong>Cost of DEFAULT path:</strong> Without prefetch cache, forward must execute the full <code>storage.find</code> (hash lookup) → admission → init → insert flow inline, resulting in noticeably higher latency than the Cache path. This is one reason CACHE or HBM_DIRECT modes are recommended.</div>
 </div>
 
+</section>
+
+<!-- ==================== OUTPUT_DIST ==================== -->
+<section id="output-dist">
+<h3><span class="tag tag-odist">Phase 5</span> output_dist — <span class="zh">Embedding 结果的跨 Rank 重分配</span><span class="en">Cross-Rank Redistribution of Embedding Results</span> <span style="font-size:11px;color:#6B7280;font-weight:400"><span class="zh">（RW Sequence Sharding · AllToAll）</span><span class="en">(RW Sequence Sharding · AllToAll)</span></span></h3>
+
+<div class="desc">
+  <div class="zh">
+  <p>DynamicEmb 使用 <code>EmbeddingCollection</code>（sequence / unpooled embeddings），因此 output_dist 走 <strong><code>all_to_all_single</code></strong>（而非 pooled 模式的 ReduceScatterV）。RW sharding 将 embedding table 按行切分到各 rank，每个 rank 只持有部分行的 lookup 结果，需要通过 AllToAll 将结果送回请求方。</p>
+  <p>Output_dist 分为两个子阶段：</p>
+  <ul>
+    <li><strong>Async Launch</strong>（<code>compute_and_output_dist()</code> 内部）：<code>fbgemm.permute_2D_sparse_data</code> 按 rank 重排 embeddings → <code>dist.all_to_all_single(async_op=True)</code> 异步发起 NCCL AllToAll</li>
+    <li><strong>.wait()</strong>（<code>SequenceEmbeddingsAwaitable._wait_impl()</code>）：等待 AllToAll 完成 → <code>torch.index_select</code> 恢复原始行序</li>
+  </ul>
+  <p>此路径 <strong>无 D2H / H2D 传输</strong>：<code>forward_recat_tensor</code> 在 <code>__init__</code> 时预注册为 GPU buffer；<code>input_splits</code> / <code>output_splits</code> 为 Python <code>List[int]</code>，由 NCCL backend 内部处理。唯一的同步点是 <code>myreq.req.wait()</code>。</p>
+  </div>
+  <div class="en">
+  <p>DynamicEmb uses <code>EmbeddingCollection</code> (sequence / unpooled embeddings), so output_dist uses <strong><code>all_to_all_single</code></strong> (not ReduceScatterV for pooled mode). RW sharding partitions embedding tables by rows across ranks — each rank holds only partial lookup results, requiring AllToAll to route results back to the requesting rank.</p>
+  <p>Output_dist consists of two sub-phases:</p>
+  <ul>
+    <li><strong>Async Launch</strong> (inside <code>compute_and_output_dist()</code>): <code>fbgemm.permute_2D_sparse_data</code> reorders embeddings by rank → <code>dist.all_to_all_single(async_op=True)</code> launches async NCCL AllToAll</li>
+    <li><strong>.wait()</strong> (<code>SequenceEmbeddingsAwaitable._wait_impl()</code>): waits for AllToAll completion → <code>torch.index_select</code> restores original row order</li>
+  </ul>
+  <p>This path has <strong>no D2H / H2D transfers</strong>: <code>forward_recat_tensor</code> is pre-registered as a GPU buffer in <code>__init__</code>; <code>input_splits</code> / <code>output_splits</code> are Python <code>List[int]</code>, handled internally by the NCCL backend. The only sync point is <code>myreq.req.wait()</code>.</p>
+  </div>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span>output_dist.svg</span>
+    <span class="hint"><span class="zh">RW Sequence Sharding · 1 次 NCCL AllToAll</span><span class="en">RW Sequence Sharding · 1 NCCL AllToAll</span></span>
+  </div>
+  <div class="svg-container">
+    <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="850" viewBox="0 0 850 48"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="850" height="48" fill="#FAFBFF"/>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/train_pipeline/train_pipelines.py#L460" target="_blank"><rect x="10" y="2" width="120" height="44" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/><text x="70" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#4338CA">Pipeline</text><text x="70" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">compute_and_output_dist</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/sharding/rw_sequence_sharding.py#L56" target="_blank"><rect x="150" y="2" width="120" height="44" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="210" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">RwSequence</text><text x="210" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">EmbeddingDist</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1496" target="_blank"><rect x="290" y="2" width="120" height="44" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="350" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">SequenceEmbs</text><text x="350" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text></a>
+      <a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1454" target="_blank"><rect x="430" y="2" width="120" height="44" rx="6" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/><text x="490" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">SequenceEmbs</text><text x="490" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">Awaitable</text></a>
+      <rect x="570" y="2" width="120" height="44" rx="6" fill="#F9FAFB" stroke="#6B7280" stroke-width="1.5"/><text x="630" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">GPU</text><text x="630" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">default_stream</text>
+      <rect x="710" y="2" width="120" height="44" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="770" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">NCCL</text><text x="770" y="35" text-anchor="middle" font-size="9.5" fill="#6B7280">AllToAll</text>
+    </svg></div>
+    <object type="image/svg+xml" data="output_dist.svg" style="max-width:100%;height:auto">output_dist sequence diagram</object>
+  </div>
+</div>
+
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/sharding/rw_sequence_sharding.py#L56" target="_blank">rw_sequence_sharding.py:56 — RwSequenceEmbeddingDist</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/dist_data.py#L1496" target="_blank">dist_data.py — SequenceEmbeddingsAllToAll</a></div>
+<div class="src-link"><a href="https://github.com/pytorch/torchrec/blob/0a08dd559c1c72245e8aedd283a7782fe1907a3a/torchrec/distributed/comm_ops.py#L736" target="_blank">comm_ops.py — alltoall_sequence() / All2All_Seq_Req</a></div>
+
 <div class="callout callout-info">
-  <div class="zh"><strong>output_dist — ReduceScatterV（1 次 NCCL 通信）：</strong>在 TorchRec 的 <code>compute_and_output_dist</code> 阶段中，DynamicEmb 的 embedding lookup 完成后，还需要通过一次 <strong>ReduceScatterV</strong>（对于 pooled embeddings / <code>EmbeddingBagCollection</code>）将各 rank 的部分 pooled 结果归约回请求方。这是因为 RW sharding 将 embedding table 按行切分到各 rank，每个 rank 只持有部分行，lookup 后需要跨 rank 求和。此 NCCL 通信由 TorchRec 的 <code>RwPooledEmbeddingDist</code> 发起，不在上方 DynamicEmb 序列图的范围内。对于 sequence embeddings（非 pooled），则使用 <strong>AllToAll</strong> 替代 ReduceScatter，同样是 1 次 NCCL 通信。</div>
-  <div class="en"><strong>output_dist — ReduceScatterV (1 NCCL communication):</strong> In TorchRec's <code>compute_and_output_dist</code> stage, after DynamicEmb's embedding lookup completes, a <strong>ReduceScatterV</strong> (for pooled embeddings / <code>EmbeddingBagCollection</code>) is needed to reduce partial pooled results from each rank back to the requesting rank. This is because RW sharding partitions the embedding table by rows across ranks — each rank holds only a subset of rows, and a cross-rank sum is required after lookup. This NCCL communication is initiated by TorchRec's <code>RwPooledEmbeddingDist</code> and is outside the scope of the DynamicEmb sequence diagram above. For sequence embeddings (non-pooled), an <strong>AllToAll</strong> is used instead of ReduceScatter — still 1 NCCL communication.</div>
+  <div class="zh">
+  <strong>调用链详解：</strong>
+  <pre style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;margin:6px 0;font-size:11px;line-height:1.6">RwSequenceEmbeddingDist.forward(local_embs, sharding_ctx)
+  → SequenceEmbeddingsAllToAll.forward(local_embs, lengths, input_splits, output_splits, ...)
+    → alltoall_sequence(...)                          # comm_ops.py
+      → All2All_Seq_Req.forward(pg, myreq, a2ai, embs)
+        1. fbgemm.permute_2D_sparse_data(recat, ...)  # GPU kernel: 按 rank 重排 embeddings
+        2. dist.all_to_all_single(output, input,       # ★ NCCL AllToAll (async_op=True)
+             output_split_sizes, input_split_sizes, pg, async_op=True)
+      → return Request (async handle)
+  → SequenceEmbeddingsAwaitable(tensor_awaitable, unbucketize_permute_tensor, D)
+
+# .wait() 时触发：
+SequenceEmbeddingsAwaitable._wait_impl()
+  → All2All_Seq_Req_Wait.forward(pg, myreq)
+    1. myreq.req.wait()                               # ★ NCCL sync point (阻塞等待 AllToAll 完成)
+    2. return sharded_output_embeddings.view(-1, D)
+  → torch.index_select(ret, 0, unbucketize_permute_tensor)  # GPU kernel: 恢复原始行序</pre>
+  </div>
+  <div class="en">
+  <strong>Detailed call chain:</strong>
+  <pre style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;margin:6px 0;font-size:11px;line-height:1.6">RwSequenceEmbeddingDist.forward(local_embs, sharding_ctx)
+  → SequenceEmbeddingsAllToAll.forward(local_embs, lengths, input_splits, output_splits, ...)
+    → alltoall_sequence(...)                          # comm_ops.py
+      → All2All_Seq_Req.forward(pg, myreq, a2ai, embs)
+        1. fbgemm.permute_2D_sparse_data(recat, ...)  # GPU kernel: reorder embeddings by rank
+        2. dist.all_to_all_single(output, input,       # ★ NCCL AllToAll (async_op=True)
+             output_split_sizes, input_split_sizes, pg, async_op=True)
+      → return Request (async handle)
+  → SequenceEmbeddingsAwaitable(tensor_awaitable, unbucketize_permute_tensor, D)
+
+# Triggered on .wait():
+SequenceEmbeddingsAwaitable._wait_impl()
+  → All2All_Seq_Req_Wait.forward(pg, myreq)
+    1. myreq.req.wait()                               # ★ NCCL sync point (blocks until AllToAll completes)
+    2. return sharded_output_embeddings.view(-1, D)
+  → torch.index_select(ret, 0, unbucketize_permute_tensor)  # GPU kernel: restore original row order</pre>
+  </div>
+</div>
+
+<div class="callout callout-tip">
+  <div class="zh"><strong>为什么 output_dist 没有 D2H / H2D？</strong>所有 tensor（<code>recat</code>、<code>unbucketize_permute_tensor</code>、embeddings）都在 GPU 上；<code>splits</code> 是 Python <code>List[int]</code>，PyTorch NCCL backend 内部处理。相比 input_dist 的 6 次 cudaMemcpy，output_dist 的 overhead 极低。</div>
+  <div class="en"><strong>Why no D2H / H2D in output_dist?</strong> All tensors (<code>recat</code>, <code>unbucketize_permute_tensor</code>, embeddings) reside on GPU; <code>splits</code> are Python <code>List[int]</code>, handled internally by the PyTorch NCCL backend. Compared to input_dist's 6 cudaMemcpy operations, output_dist has minimal overhead.</div>
 </div>
 </section>
 
 <!-- ==================== BACKWARD ==================== -->
 <section id="backward">
-<h3><span class="tag tag-bwd">Phase 5</span> backward — <span class="zh">梯度更新与融合优化器</span><span class="en">Gradient Update &amp; Fused Optimizer</span> <span style="font-size:11px;color:#D97706;font-weight:400"><span class="zh">（图中 alt 帧：CACHE/HBM_DIRECT Path + DEFAULT Path）</span><span class="en">(alt frames: CACHE/HBM_DIRECT Path + DEFAULT Path)</span></span></h3>
+<h3><span class="tag tag-bwd">Phase 6</span> backward — <span class="zh">梯度更新与融合优化器</span><span class="en">Gradient Update &amp; Fused Optimizer</span> <span style="font-size:11px;color:#D97706;font-weight:400"><span class="zh">（图中 alt 帧：CACHE/HBM_DIRECT Path + DEFAULT Path）</span><span class="en">(alt frames: CACHE/HBM_DIRECT Path + DEFAULT Path)</span></span></h3>
 
 <div class="desc">
   <div class="zh">
@@ -685,10 +792,10 @@ else:
   </div>
   <div class="svg-container" style="max-height:900px">
     <div class="sticky-ptcp"><svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 800 52"><defs><style>text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}</style></defs><rect width="800" height="52" fill="#FAFBFF"/>
-      <rect x="15" y="2" width="130" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="80" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbedding</text><text x="80" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">Function</text><text x="80" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text>
-      <rect x="175" y="2" width="130" height="48" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="240" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="240" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">Storage</text><text x="240" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
-      <rect x="335" y="2" width="130" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="400" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">DynamicEmb</text><text x="400" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">Cache</text><text x="400" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text>
-      <rect x="495" y="2" width="130" height="48" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="560" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">BaseDynamicEmb</text><text x="560" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Optimizer</text><text x="560" y="45" text-anchor="middle" font-size="9" fill="#6B7280">optimizer.py</text>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L893" target="_blank"><rect x="15" y="2" width="130" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/><text x="80" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">DynamicEmbedding</text><text x="80" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">Function</text><text x="80" y="45" text-anchor="middle" font-size="9" fill="#6B7280">batched_dynamicemb_function.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L1063" target="_blank"><rect x="175" y="2" width="130" height="48" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/><text x="240" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">DynamicEmb</text><text x="240" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#991B1B">Storage</text><text x="240" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/key_value_table.py#L933" target="_blank"><rect x="335" y="2" width="130" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/><text x="400" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">DynamicEmb</text><text x="400" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">Cache</text><text x="400" y="45" text-anchor="middle" font-size="9" fill="#6B7280">key_value_table.py</text></a>
+      <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/optimizer.py#L120" target="_blank"><rect x="495" y="2" width="130" height="48" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/><text x="560" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">BaseDynamicEmb</text><text x="560" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Optimizer</text><text x="560" y="45" text-anchor="middle" font-size="9" fill="#6B7280">optimizer.py</text></a>
       <rect x="660" y="2" width="120" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/><text x="720" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="#0F766E">CUDA Kernels</text><text x="720" y="38" text-anchor="middle" font-size="9" fill="#6B7280">(dynamicemb_ext)</text>
     </svg></div>
     <object type="image/svg+xml" data="dynamicemb_backward.svg" style="max-width:100%;height:auto">backward sequence diagram</object>
@@ -752,7 +859,8 @@ else:
       <li><a href="#wait-sparse"><span class="toc-tag" style="background:#0d9488">P2</span>wait_sparse</a></li>
       <li><a href="#prefetch"><span class="toc-tag" style="background:#059669">P3</span>prefetch</a></li>
       <li><a href="#forward"><span class="toc-tag" style="background:#6366f1">P4</span>forward</a></li>
-      <li><a href="#backward"><span class="toc-tag" style="background:#dc2626">P5</span>backward</a></li>
+      <li><a href="#output-dist"><span class="toc-tag" style="background:#0891b2">P5</span>output_dist</a></li>
+      <li><a href="#backward"><span class="toc-tag" style="background:#dc2626">P6</span>backward</a></li>
     </ul>
   </div>
   <button class="ftoc-toggle" onclick="this.parentElement.classList.remove('collapsed')" title="Expand TOC">☰</button>

@@ -93,20 +93,26 @@
 
   <!-- PARTICIPANTS: x=100, 300, 500, 700 -->
   <g filter="url(#sh)">
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/shard/embedding.py#L73" target="_blank">
     <rect x="25" y="56" width="150" height="48" rx="6" fill="#EEF2FF" stroke="#6366F1" stroke-width="1.5"/>
     <text x="100" y="72" text-anchor="middle" class="ptcp" fill="#4338CA">ShardedDynamic</text>
     <text x="100" y="86" text-anchor="middle" class="ptcp" fill="#4338CA">EmbeddingCollection</text>
     <text x="100" y="99" text-anchor="middle" class="psub">shard/embedding.py</text>
+    </a>
 
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_tables.py#L365" target="_blank">
     <rect x="225" y="56" width="150" height="48" rx="6" fill="#F0FDFA" stroke="#0D9488" stroke-width="1.5"/>
     <text x="300" y="72" text-anchor="middle" class="ptcp" fill="#0F766E">BatchedDynamic</text>
     <text x="300" y="86" text-anchor="middle" class="ptcp" fill="#0F766E">EmbeddingTablesV2</text>
     <text x="300" y="99" text-anchor="middle" class="psub">batched_dynamicemb_tables.py</text>
+    </a>
 
+    <a href="https://github.com/shijieliu/recsys-examples/blob/47cffb400c7e8d70dd82d7e61c290ede576d4501/corelib/dynamicemb/dynamicemb/batched_dynamicemb_function.py#L893" target="_blank">
     <rect x="415" y="56" width="170" height="48" rx="6" fill="#ECFDF5" stroke="#059669" stroke-width="1.5"/>
     <text x="500" y="72" text-anchor="middle" class="ptcp" fill="#065F46">DynamicEmbeddingFunction</text>
     <text x="500" y="86" text-anchor="middle" class="ptcp" fill="#065F46">(autograd Function)</text>
     <text x="500" y="99" text-anchor="middle" class="psub">batched_dynamicemb_function.py</text>
+    </a>
 
     <rect x="640" y="56" width="120" height="48" rx="6" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
     <text x="700" y="76" text-anchor="middle" class="ptcp" fill="#92400E">CUDA Kernels</text>

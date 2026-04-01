@@ -248,6 +248,26 @@
       gap: 1.5mm;
       padding: 0.3mm 0;
       line-height: 1.2;
+      border-radius: 3px;
+      cursor: default;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .main-grid .row {
+      scroll-margin-top: 5.5rem;
+    }
+    .row.search-highlight {
+      background: linear-gradient(90deg, rgba(251, 191, 36, 0.42) 0%, rgba(254, 243, 199, 0.55) 55%, transparent 100%);
+      box-shadow: inset 3px 0 0 #d97706;
+      margin: 0 -2mm;
+      padding: 0.4mm 2mm 0.4mm calc(2mm + 3px);
+    }
+    .row.search-highlight .key,
+    .row.search-highlight .desc {
+      color: #78350f;
+    }
+    .row.search-highlight .keycap {
+      border-color: #b45309;
+      color: #78350f;
     }
 
     .key {
@@ -475,6 +495,21 @@
 
       .row {
         padding: 0.15mm 0;
+      }
+
+      .row.search-highlight {
+        background: transparent !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0.15mm 0 !important;
+      }
+      .row.search-highlight .key,
+      .row.search-highlight .desc {
+        color: inherit !important;
+      }
+      .row.search-highlight .keycap {
+        border-color: #9ca3af !important;
+        color: #374151 !important;
       }
 
       .sub-header {
@@ -748,6 +783,11 @@
       border-color: #bfdbfe;
       outline: none;
     }
+    .result-row.is-active {
+      background: #fef3c7 !important;
+      border-color: #f59e0b !important;
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.45);
+    }
     .result-row .r-meta {
       font-size: 0.65rem;
       color: #9ca3af;
@@ -763,20 +803,6 @@
       color: #6b7280;
       margin-top: 0.2mm;
     }
-    .row.flash {
-      animation: ccFlash 1s ease-out;
-    }
-    @keyframes ccFlash {
-      0% {
-        box-shadow: inset 0 0 0 2px #2563eb;
-        background: rgba(37, 99, 235, 0.08);
-      }
-      100% {
-        box-shadow: none;
-        background: transparent;
-      }
-    }
-
     .results-panel .empty-state {
       text-align: center;
       padding: 1rem;

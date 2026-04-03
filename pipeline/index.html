@@ -199,10 +199,10 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
     <div class="card-body">
       <ul>
         <li>完整数据类：<code>IterContext</code>, <code>DeclaredIO</code>, <code>PipelineTask</code>, <code>TaskSchedule</code>, <code>PipelinePlan</code></li>
-        <li><code>deps</code> 同步机制：决策矩阵、两阶段协议、常见陷阱</li>
+        <li><code>intra_iter_deps</code> / <code>inter_iter_deps</code> 同步机制与调度算法</li>
         <li><code>period / iter / stage</code> 关系公式</li>
         <li>SWPipeline 所有公开方法参考</li>
-        <li>端到端 Pipeline 构建示例</li>
+        <li>FusedSparseDist 端到端示例</li>
       </ul>
     </div>
     <div class="card-footer">
@@ -218,7 +218,7 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
     <div class="card-body">
       <ul>
         <li>7 种 TorchRec Pipeline 的 <code>PipelinePlan</code> 定义</li>
-        <li>每个 Pipeline 的 <code>deps</code>, <code>stage</code>, stream 分配</li>
+        <li>每个 Pipeline 的 <code>intra_iter_deps</code>, <code>stage</code>, stream 分配</li>
         <li>CPU 提交顺序与 stage-descending 入队</li>
         <li>SparseDist, FusedSparseDist, SemiSync, Prefetch 等完整解析</li>
         <li>SVG 流水线可视化</li>
@@ -300,8 +300,8 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
       <span>Context Lifecycle → §字段详解</span>
     </a>
     <a class="xref-link" href="sw_pipeline_api.html#deps-sync">
-      <strong>deps 同步机制详解</strong>
-      <span>SWPipeline API → §deps 同步</span>
+      <strong>依赖同步机制详解</strong>
+      <span>SWPipeline API → §同步与调度</span>
     </a>
     <a class="xref-link" href="sw_pipeline_api.html#period-iter-stage">
       <strong>period/iter/stage 公式</strong>
@@ -309,7 +309,7 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
     </a>
     <a class="xref-link" href="torchrec_schedules.html">
       <strong>TorchRec Pipeline Plans</strong>
-      <span>7 种 Pipeline 的 deps + stage 定义</span>
+      <span>7 种 Pipeline 的 intra_iter_deps + stage 定义</span>
     </a>
   </div>
 </div>

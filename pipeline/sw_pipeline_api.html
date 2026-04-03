@@ -322,10 +322,10 @@ pre code {
 <div class="site-nav">
   <a class="home" href="index.html">Pipeline Docs</a>
   <a href="pipeline_init.html">Pipeline Init</a>
-  <a href="forward_hijack.html">Forward Hijack</a>
-  <a href="context_lifecycle.html">Context Lifecycle</a>
-  <a href="runtime_timeline.html">Runtime Timeline</a>
-  <a href="sw_pipeline_overview.html">SWPipeline</a>
+  <a href="pipeline_forward_split.html">Forward Hijack</a>
+  <a href="pipeline_context.html">Context Lifecycle</a>
+  <a href="pipeline_timeline.html">Runtime Timeline</a>
+  <a href="sw_pipeline.html">SWPipeline</a>
   <a class="here" href="sw_pipeline_api.html">SWPipeline API</a>
 </div>
 
@@ -343,6 +343,15 @@ pre code {
   <a href="#PipelinePlan"><code>PipelinePlan</code></a>
   <a href="#ProfileResult"><code>ProfileResult</code></a>
   <a href="#TaskRef"><code>TaskRef</code></a>
+
+  <div class="sidebar-section"><span class="zh">同步与调度</span><span class="en">Sync &amp; Scheduling</span></div>
+  <a href="#deps-two-phase" class="sub"><span class="zh">两阶段协议</span><span class="en">Two-Phase Protocol</span></a>
+  <a href="#period-iter-stage" class="sub">period / iter / stage</a>
+  <a href="#corollaries" class="sub"><span class="zh">三条推论</span><span class="en">Corollaries</span></a>
+  <a href="#stage-descending" class="sub"><span class="zh">死锁场景</span><span class="en">Deadlock Scenarios</span></a>
+  <a href="#fwd-bwd-opt-scheduling" class="sub"><span class="zh">fwd/bwd/opt 示例</span><span class="en">fwd/bwd/opt Example</span></a>
+  <a href="#deps-pitfalls" class="sub"><span class="zh">常见陷阱</span><span class="en">Pitfalls</span></a>
+  <a href="#ready-first" class="sub"><span class="zh">Ready-First 调度</span><span class="en">Ready-First Scheduling</span></a>
 
   <div class="sidebar-section"><span class="zh">核心类</span><span class="en">Core Classes</span></div>
   <a href="#SWPipeline"><code>SWPipeline</code></a>
@@ -372,16 +381,6 @@ pre code {
   <div class="sidebar-section">ProfileResult</div>
   <a href="#print_report"><code>print_report()</code></a>
 
-  <div class="sidebar-section"><span class="zh">同步与调度</span><span class="en">Sync &amp; Scheduling</span></div>
-  <a href="#deps-sync"><span class="zh">同步与调度</span><span class="en">Sync &amp; Scheduling</span></a>
-  <a href="#deps-two-phase" class="sub"><span class="zh">两阶段协议</span><span class="en">Two-Phase Protocol</span></a>
-  <a href="#period-iter-stage" class="sub">period / iter / stage</a>
-  <a href="#corollaries" class="sub"><span class="zh">三条推论</span><span class="en">Corollaries</span></a>
-  <a href="#stage-descending" class="sub"><span class="zh">死锁场景</span><span class="en">Deadlock Scenarios</span></a>
-  <a href="#fwd-bwd-opt-scheduling" class="sub"><span class="zh">fwd/bwd/opt 示例</span><span class="en">fwd/bwd/opt Example</span></a>
-  <a href="#deps-pitfalls" class="sub"><span class="zh">常见陷阱</span><span class="en">Pitfalls</span></a>
-  <a href="#ready-first" class="sub"><span class="zh">Ready-First 调度</span><span class="en">Ready-First Scheduling</span></a>
-
   <div class="sidebar-section"><span class="zh">内部机制</span><span class="en">Internals</span></div>
   <a href="#exec-task"><code>_exec_task()</code></a>
   <a href="#cache-val"><code>_cache_val()</code></a>
@@ -390,7 +389,7 @@ pre code {
   <a href="#SubmissionSequencer"><code>_SubmissionSequencer</code></a>
 
   <div class="sidebar-section"><span class="zh">端到端示例</span><span class="en">Example</span></div>
-  <a href="#e2e-example"><span class="zh">完整 Pipeline 构建</span><span class="en">Full Pipeline Build</span></a>
+  <a href="#e2e-example"><span class="zh">FusedSparseDist 示例</span><span class="en">FusedSparseDist Example</span></a>
 </nav>
 
 <!-- ═══════════ Main ═══════════ -->
@@ -398,7 +397,7 @@ pre code {
 
 <h1>SWPipeline API Reference</h1>
 <p class="subtitle"><span class="zh">PyTorch / CUDA 通用软件流水线框架 ·</span><span class="en">General-purpose Software Pipeline for PyTorch / CUDA ·</span> <code>sw_pipeline.py</code>
-  · <a href="sw_pipeline_overview.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
+  · <a href="sw_pipeline.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
 </p>
 
 <!-- ════════════════════════════════════════════ -->
@@ -1763,92 +1762,84 @@ _cache_val(jt)         → (_CACHE_TAG, "o", JaggedTensor, {attr: _cache_val(v) 
 <hr class="divider">
 
 <!-- ════════════════════════════════════════════ -->
-<h2 id="e2e-example"><span class="zh">完整端到端示例</span><span class="en">End-to-End Example</span></h2>
+<h2 id="e2e-example"><span class="zh">端到端示例 — FusedSparseDist</span><span class="en">End-to-End Example — FusedSparseDist</span></h2>
 <!-- ════════════════════════════════════════════ -->
 
-<div class="example-label">▸ <span class="zh">从零构建 2-stage pipeline</span><span class="en">Build a 2-stage pipeline from scratch</span></div>
-<pre><code><span style="color:var(--purple)">import</span> torch
-<span style="color:var(--purple)">import</span> torch.nn <span style="color:var(--purple)">as</span> nn
+<div class="example-label">▸ <span class="zh">FusedSparseDist Pipeline（3-stage, 4 streams, 9 tasks）</span><span class="en">FusedSparseDist Pipeline (3-stage, 4 streams, 9 tasks)</span></div>
+<pre><code><span style="color:var(--text-dim)"># TrainPipelineFusedSparseDist 的 SWPipeline 等价表示</span>
+<span style="color:var(--text-dim)"># 9 个 task · 3 stages · 4 streams: memcpy, data_dist, emb_lookup, default</span>
+
+<span style="color:var(--purple)">import</span> torch
 <span style="color:var(--purple)">from</span> sw_pipeline <span style="color:var(--purple)">import</span> (
-    IterContext, PipelineTask, TaskSchedule,
-    PipelinePlan, SWPipeline, TaskProfiler,
+    PipelineTask, TaskSchedule, PipelinePlan, SWPipeline,
 )
 
-<span style="color:var(--text-dim)"># 1. Model and optimizer</span>
-model = nn.Linear(256, 256).cuda()
-opt = torch.optim.Adam(model.parameters())
-loss_fn = nn.MSELoss()
+<span style="color:var(--text-dim)"># 1. Streams</span>
+memcpy_stream     = torch.cuda.Stream()
+data_dist_stream  = torch.cuda.Stream()
+emb_lookup_stream = torch.cuda.Stream()
 
-<span style="color:var(--text-dim)"># 2. Define task functions</span>
-<span style="color:var(--purple)">def</span> <span style="color:var(--green)">h2d</span>(ctx: IterContext):
-    ctx.x = ctx.batch[<span style="color:var(--orange)">"x"</span>].cuda(non_blocking=True)
-    ctx.y = ctx.batch[<span style="color:var(--orange)">"y"</span>].cuda(non_blocking=True)
+<span style="color:var(--text-dim)"># 2. Tasks (function bodies omitted for brevity)</span>
+t_h2d        = PipelineTask(<span style="color:var(--orange)">"H2D"</span>,            h2d)
+t_dist_start = PipelineTask(<span style="color:var(--orange)">"InputDistStart"</span>, input_dist_start)
+t_dist_wait  = PipelineTask(<span style="color:var(--orange)">"InputDistWait"</span>,  input_dist_wait)
+t_emb        = PipelineTask(<span style="color:var(--orange)">"EmbLookup"</span>,      emb_lookup)
+t_zero       = PipelineTask(<span style="color:var(--orange)">"ZeroGrad"</span>,       zero_grad)
+t_wait       = PipelineTask(<span style="color:var(--orange)">"WaitBatch"</span>,      wait_batch)
+t_fwd        = PipelineTask(<span style="color:var(--orange)">"Forward"</span>,        dense_forward)
+t_bwd        = PipelineTask(<span style="color:var(--orange)">"Backward"</span>,       backward)
+t_opt        = PipelineTask(<span style="color:var(--orange)">"OptimizerStep"</span>,  optimizer_step)
 
-<span style="color:var(--purple)">def</span> <span style="color:var(--green)">fwd</span>(ctx: IterContext):
-    ctx.pred = model(ctx.x)
-    <span style="color:var(--purple)">del</span> ctx.x
-
-<span style="color:var(--purple)">def</span> <span style="color:var(--green)">bwd</span>(ctx: IterContext):
-    loss = loss_fn(ctx.pred, ctx.y)
-    <span style="color:var(--purple)">del</span> ctx.pred, ctx.y
-    loss.backward()
-
-<span style="color:var(--purple)">def</span> <span style="color:var(--green)">step</span>(ctx: IterContext):
-    opt.step()
-    opt.zero_grad()
-
-<span style="color:var(--text-dim)"># 3. Create PipelineTasks</span>
-t_h2d  = PipelineTask(<span style="color:var(--orange)">"H2D"</span>,      h2d)
-t_fwd  = PipelineTask(<span style="color:var(--orange)">"Forward"</span>,  fwd)
-t_bwd  = PipelineTask(<span style="color:var(--orange)">"Backward"</span>, bwd)
-t_step = PipelineTask(<span style="color:var(--orange)">"Optim"</span>,    step)
-
-<span style="color:var(--text-dim)"># 4. Build PipelinePlan (2-stage)</span>
-copy_stream = torch.cuda.Stream()
+<span style="color:var(--text-dim)"># 3. PipelinePlan — 3 stages, 4 streams</span>
 plan = PipelinePlan(
     schedule={
-        t_h2d:  TaskSchedule(stage=0, stream=copy_stream, thread_group=<span style="color:var(--orange)">"io"</span>),
-        t_fwd:  TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
-        t_bwd:  TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
-        t_step: TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
+        t_h2d:        TaskSchedule(stage=0, stream=memcpy_stream),
+        t_dist_start: TaskSchedule(stage=1, stream=data_dist_stream, globally_ordered=<span style="color:var(--green)">True</span>),
+        t_dist_wait:  TaskSchedule(stage=1, stream=data_dist_stream),
+        t_emb:        TaskSchedule(stage=2, stream=emb_lookup_stream),
+        t_zero:       TaskSchedule(stage=2),           <span style="color:var(--text-dim)"># default stream</span>
+        t_wait:       TaskSchedule(stage=2),
+        t_fwd:        TaskSchedule(stage=2),
+        t_bwd:        TaskSchedule(stage=2),
+        t_opt:        TaskSchedule(stage=2),
     },
-    intra_iter_deps=[(t_fwd, t_h2d), (t_bwd, t_fwd), (t_step, t_bwd)],
-    inter_iter_deps=[(t_fwd, t_step)],
-    pipeline_depth=2,
+    intra_iter_deps=[
+        (t_dist_start, t_h2d),         <span style="color:var(--text-dim)"># cross-stage: memcpy → data_dist</span>
+        (t_dist_wait,  t_dist_start),   <span style="color:var(--text-dim)"># same-stream ordering</span>
+        (t_emb,        t_dist_wait),    <span style="color:var(--text-dim)"># cross-stage: data_dist → emb_lookup</span>
+        (t_fwd,        t_emb),          <span style="color:var(--text-dim)"># cross-stream: emb_lookup → default</span>
+        (t_wait,       t_zero),         <span style="color:var(--text-dim)"># same-stream ordering</span>
+        (t_fwd,        t_wait),         <span style="color:var(--text-dim)"># same-stream ordering</span>
+        (t_bwd,        t_fwd),
+        (t_opt,        t_bwd),
+    ],
+    <span style="color:var(--text-dim)"># inter_iter_deps 不需要显式声明：</span>
+    <span style="color:var(--text-dim)"># 逻辑上 EmbLookup(i) 依赖 Backward(i-1)（TBE fused 更新），</span>
+    <span style="color:var(--text-dim)"># 但 stage-descending 入队顺序已隐含保证。</span>
 )
+<span style="color:var(--text-dim)"># pipeline_depth 自动推断: max(stage)+1 = 3</span>
 
-<span style="color:var(--text-dim)"># 5. Construct SWPipeline</span>
+<span style="color:var(--text-dim)"># 4. Construct &amp; inspect</span>
 pipe = SWPipeline(plan, device=0)
-pipe.print_stage_analysis()
-pipe.print_schedule(6)
+pipe.print_schedule(5)
 
-<span style="color:var(--text-dim)"># 6. Prepare data</span>
-batches = [
-    {<span style="color:var(--orange)">"x"</span>: torch.randn(256, 256), <span style="color:var(--orange)">"y"</span>: torch.randn(256, 256)}
-    <span style="color:var(--purple)">for</span> _ <span style="color:var(--purple)">in</span> range(100)
-]
-
-<span style="color:var(--text-dim)"># 7. Benchmark: serial vs pipelined</span>
-serial_t   = pipe.run_serial(batches, verbose=True)
-pipeline_t = pipe.run(batches, verbose=True)
-print(f<span style="color:var(--orange)">"Speedup: {serial_t / pipeline_t:.2f}x"</span>)
-
-<span style="color:var(--text-dim)"># 8. Profile exposed time per task</span>
-profiler = TaskProfiler(pipe)
-result = profiler.profile(batches[0])
-result.print_report()
-
-<span style="color:var(--text-dim)"># 9. Runtime shortcut experiment</span>
-pipe.enable_shortcut(<span style="color:var(--orange)">"Forward"</span>)
-pipe.run_one_serial_iter(batches[0], 0)  <span style="color:var(--text-dim)"># caching iteration</span>
-<span style="color:var(--purple)">for</span> i <span style="color:var(--purple)">in</span> range(1, 20):
-    pipe.run_one_serial_iter(batches[0], i)  <span style="color:var(--text-dim)"># Forward shortcutted</span>
-pipe.disable_shortcut(<span style="color:var(--orange)">"Forward"</span>)</code></pre>
+<span style="color:var(--text-dim)"># print_schedule(5) 输出:</span>
+<span style="color:var(--text-dim)">#    #  Task               Thread   Stream        | P0    P1    P2    P3    P4</span>
+<span style="color:var(--text-dim)">#   --  -----------------  -------  ------------  + ----- ----- ----- ----- -----</span>
+<span style="color:var(--text-dim)">#    0  EmbLookup          default  emb_lookup    |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    1  ZeroGrad           default  default       |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    2  WaitBatch          default  default       |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    3  Forward            default  default       |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    4  Backward           default  default       |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    5  OptimizerStep      default  default       |  --    --   i0    i1    i2</span>
+<span style="color:var(--text-dim)">#    6  InputDistStart     default  data_dist     |  --   i0    i1    i2    i3</span>
+<span style="color:var(--text-dim)">#    7  InputDistWait      default  data_dist     |  --   i0    i1    i2    i3</span>
+<span style="color:var(--text-dim)">#    8  H2D                default  memcpy        | i0    i1    i2    i3    i4</span></code></pre>
 
 <hr class="divider">
 
 <p style="text-align:center; color:var(--text-dim); font-size:0.82rem; margin-top:40px;">
-  <span class="zh">基于</span><span class="en">Based on</span> <code>sw_pipeline.py</code> · <a href="sw_pipeline_overview.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
+  <span class="zh">基于</span><span class="en">Based on</span> <code>sw_pipeline.py</code> · <a href="sw_pipeline.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
 </p>
 
 </div><!-- .main -->

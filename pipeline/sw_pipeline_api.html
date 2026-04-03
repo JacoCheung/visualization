@@ -890,8 +890,8 @@ fwd(3) <span class="zh">需要</span><span class="en">needs</span> opt(2):  fwd(
 <!-- ════════════════════════════════════════════ -->
 
 <div class="callout callout-info" style="margin-bottom:14px;">
-  <span class="zh">当前 <code>_build_enqueue_order</code> 采用简单的 stage-descending 策略。下文描述一种更精细的 <strong>ready-first</strong> 优化策略，它在保证正确性的前提下最小化 GPU stream 空转（stall）。</span>
-  <span class="en">The current <code>_build_enqueue_order</code> uses a simple stage-descending strategy. Below describes a finer-grained <strong>ready-first</strong> optimization that minimizes GPU stream stalls while preserving correctness.</span>
+  <span class="zh"><code>_build_enqueue_order</code> 采用 <strong>ready-first</strong> 策略：构建 period-local 依赖图，按 <code>(stall_cost, name)</code> 优先级做拓扑排序，在保证正确性的前提下最小化 GPU stream 空转（stall）。</span>
+  <span class="en"><code>_build_enqueue_order</code> uses a <strong>ready-first</strong> strategy: builds a period-local dependency graph and topologically sorts by <code>(stall_cost, name)</code> priority, minimizing GPU stream stalls while preserving correctness.</span>
 </div>
 
 <h4 style="margin-top:14px;"><span class="zh">问题：为什么 stage-descending 不是最优</span><span class="en">Problem: Why Stage-Descending Is Not Optimal</span></h4>
@@ -1170,6 +1170,146 @@ GPU <span class="zh">时间线</span><span class="en">timeline</span>:
 <span class="zh"><strong>Stage-descending 对比</strong>：stage-descending 会先提交 Q(stage 1)，然后 P、R、A（stage 0）。顺序为 <code>Q → P → R → A</code>。在此例中 <strong>P 被延迟了</strong>——Q 在不同 stream 上，P 不需要等 Q，但 stage-descending 强制让 Q 先提交。ready-first 让 P 和 Q 同时出现在 ready 列表中，按 name 排序 P 先出队。</span>
 <span class="en"><strong>Stage-descending comparison</strong>: Stage-descending submits Q(stage 1) first, then P, R, A (stage 0). Order: <code>Q → P → R → A</code>. Here <strong>P is delayed</strong> — Q runs on a different stream and P doesn't need Q, but stage-descending forces Q first. Ready-first places both P and Q in the ready list simultaneously; P dequeues first by name.</span>
 </div>
+</div>
+
+<h4 style="margin-top:16px;"><span class="zh">正确性保证：为什么 Ready-First 能避免死锁</span><span class="en">Correctness Guarantee: Why Ready-First Prevents Deadlock</span></h4>
+
+<div class="api-card">
+<p>
+  <span class="zh">Ready-first 不仅优化性能，还从结构上保证了<strong>无死锁</strong>。死锁的根本原因是循环等待——任务 X 等待任务 Y，而 Y 又直接或间接等待 X。Ready-first 通过以下两层保证消除循环等待：</span>
+  <span class="en">Ready-first is not merely a performance optimization — it structurally guarantees <strong>deadlock freedom</strong>. Deadlock arises from circular waits — task X waits for Y while Y (directly or indirectly) waits for X. Ready-first eliminates circular waits through two layers of guarantees:</span>
+</p>
+
+<table class="param-table" style="margin-top:10px; font-size:0.88rem;">
+<thead><tr>
+  <th style="width:140px"><span class="zh">依赖来源</span><span class="en">Dependency source</span></th>
+  <th><span class="zh">为什么不会死锁</span><span class="en">Why no deadlock</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td><strong><span class="zh">跨 period</span><span class="en">Cross-period</span></strong></td>
+  <td>
+    <span class="zh">被依赖方在<strong>更早的 period</strong> 中执行完毕：<code>threading.Event</code> 已 set、<code>cuda_event</code> 已 record。等待立即返回，零阻塞。</span>
+    <span class="en">The dependency ran in an <strong>earlier period</strong>: <code>threading.Event</code> already set, <code>cuda_event</code> already recorded. Waits return immediately — zero blocking.</span>
+  </td>
+</tr>
+<tr>
+  <td><strong><span class="zh">同 period（period-local）</span><span class="en">Same period (period-local)</span></strong></td>
+  <td>
+    <span class="zh"><strong>拓扑排序</strong>保证：若 X 依赖 Y（period-local 边 Y→X），则 Y 一定排在 X 前面入队。在 FIFO 工作队列中，Y 先被 worker 取出执行，X 等 Y 时 Y 已经在运行或已完成。</span>
+    <span class="en"><strong>Topological sort</strong> guarantees: if X depends on Y (period-local edge Y→X), Y is enqueued before X. In the FIFO work queue, Y is picked up first by the worker — when X waits for Y, Y is already running or completed.</span>
+  </td>
+</tr>
+</tbody>
+</table>
+
+<p style="margin-top:14px;">
+  <span class="zh"><strong>多线程场景</strong>：每个 thread group 有独立的 FIFO 队列。如果任务 X 排在队头但阻塞等待同 queue 中更后面的 Y → <strong>head-of-line 死锁</strong>。Ready-first 的拓扑排序确保 Y 永远排在 X 前面，消除了这种死锁模式。</span>
+  <span class="en"><strong>Multi-threaded scenario</strong>: Each thread group has its own FIFO queue. If task X is at the head but blocks waiting for Y further back in the same queue → <strong>head-of-line deadlock</strong>. Ready-first's topological sort ensures Y is always ahead of X, eliminating this deadlock pattern.</span>
+</p>
+
+<pre style="font-size:0.82rem; line-height:1.6;">
+<span class="cm"><span class="zh">❌ 可能死锁的入队顺序（未按拓扑排序）</span><span class="en">❌ Potentially deadlocking enqueue order (not topologically sorted)</span>:</span>
+  thread_queue: [X, Y]      <span class="cm">X <span class="zh">先出队，等 Y 的 CPU signal → Y 永远出不了队 → 死锁</span><span class="en">dequeued first, waits for Y's CPU signal → Y never dequeues → deadlock</span></span>
+
+<span class="cm"><span class="zh">✓ Ready-first 保证的入队顺序（拓扑排序）</span><span class="en">✓ Ready-first guaranteed enqueue order (topologically sorted)</span>:</span>
+  thread_queue: [Y, X]      <span class="cm">Y <span class="zh">先出队执行 → set CPU signal → X 出队后立即获得 signal</span><span class="en">dequeued first → set CPU signal → X dequeues and immediately gets signal</span></span>
+</pre>
+
+<p style="margin-top:10px; font-size:0.88rem;">
+  <span class="zh"><strong>形式化</strong>：period-local 依赖图是 DAG（无环有向图）——<code>_validate</code> 确保 <code>intra_iter_deps</code> 满足 <code>dep.stage ≤ task.stage</code>，<code>inter_iter_deps</code> 满足 <code>dep.stage - task.stage ≤ 1</code>（推论 1、3）。DAG 的拓扑排序一定存在且无环，因此 ready-first 产生的入队顺序<strong>必然无死锁</strong>。</span>
+  <span class="en"><strong>Formal argument</strong>: The period-local dependency graph is a DAG — <code>_validate</code> ensures <code>intra_iter_deps</code> satisfy <code>dep.stage ≤ task.stage</code> and <code>inter_iter_deps</code> satisfy <code>dep.stage - task.stage ≤ 1</code> (Corollaries 1 & 3). A DAG always admits a topological sort with no cycles, so the ready-first enqueue order is <strong>guaranteed deadlock-free</strong>.</span>
+</p>
+</div>
+
+<h4 style="margin-top:16px;"><span class="zh">完整性证明：排除的跨 stage 边不影响正确性</span><span class="en">Completeness Proof: Excluded Cross-Stage Edges Do Not Affect Correctness</span></h4>
+
+<div class="api-card">
+<p>
+  <span class="zh">Period-local 图<strong>排除</strong>了 <code>intra_iter_deps</code> 中 <code>stage<sub>dep</sub> &lt; stage<sub>task</sub></code> 的边。这是否意味着这些同 batch 的依赖得不到保证？以下定理证明不会。</span>
+  <span class="en">The period-local graph <strong>excludes</strong> <code>intra_iter_deps</code> edges where <code>stage<sub>dep</sub> &lt; stage<sub>task</sub></code>. Does this mean these same-batch dependencies are unsatisfied? The following theorem proves they are not.</span>
+</p>
+
+<p style="margin-top:12px;">
+  <span class="zh"><strong>定理</strong>：对于任意 <code>intra_iter_deps</code> 边 (T, D)（T 依赖 D，同一迭代 i），ready-first 入队顺序保证 D 的 CPU signal 和 CUDA event 在 T 执行时已可用。</span>
+  <span class="en"><strong>Theorem</strong>: For any <code>intra_iter_deps</code> edge (T, D) where T depends on D within iteration i, the ready-first enqueue order guarantees D's CPU signal and CUDA event are available when T executes.</span>
+</p>
+
+<p style="margin-top:10px;">
+  <span class="zh"><strong>证明</strong>：设 D 的 stage 为 s<sub>D</sub>，T 的 stage 为 s<sub>T</sub>。推论 1（<code>_validate</code> 强制）要求 s<sub>D</sub> ≤ s<sub>T</sub>。分三种情况：</span>
+  <span class="en"><strong>Proof</strong>: Let s<sub>D</sub> and s<sub>T</sub> be the stages of D and T. Corollary 1 (<code>_validate</code> enforced) requires s<sub>D</sub> ≤ s<sub>T</sub>. Three cases:</span>
+</p>
+
+<table class="param-table" style="margin-top:10px; font-size:0.86rem;">
+<thead><tr>
+  <th style="width:100px"><span class="zh">情况</span><span class="en">Case</span></th>
+  <th style="width:150px"><span class="zh">stage 关系</span><span class="en">Stage relation</span></th>
+  <th><span class="zh">证明</span><span class="en">Proof</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td><strong>A</strong></td>
+  <td><code>s<sub>D</sub> = s<sub>T</sub></code></td>
+  <td>
+    <span class="zh">D 和 T 在同一 period <code>P = i + s<sub>D</sub></code>。边 D→T <strong>在</strong> period-local 图中，拓扑排序保证 D 排在 T 前面入队。<br>
+    · <em>单线程</em>：D 先 CPU 提交，T 后提交。✓<br>
+    · <em>多线程同 thread group</em>：FIFO 保证 D 先被 worker 处理。✓<br>
+    · <em>多线程不同 thread group</em>：T 的 worker 调用 <code>cpu_signal(i, D).wait()</code> 阻塞。D 的依赖均来自更早 period 或同 period 更上游（topo 排序保证），D 不依赖 T → 无循环等待 → D 终将完成。✓</span>
+    <span class="en">D and T are in the same period <code>P = i + s<sub>D</sub></code>. Edge D→T <strong>is in</strong> the period-local graph; topological sort guarantees D is enqueued before T.<br>
+    · <em>Single-threaded</em>: D is CPU-submitted before T. ✓<br>
+    · <em>Multi-threaded, same thread group</em>: FIFO ensures D is picked up first. ✓<br>
+    · <em>Multi-threaded, different groups</em>: T's worker calls <code>cpu_signal(i, D).wait()</code>. D's deps are from earlier periods or upstream in the same period (topo-sorted); D does not depend on T → no circular wait → D eventually completes. ✓</span>
+  </td>
+</tr>
+<tr>
+  <td><strong>B</strong></td>
+  <td><code>s<sub>D</sub> &lt; s<sub>T</sub></code></td>
+  <td>
+    <span class="zh">D 在 period <code>P<sub>D</sub> = i + s<sub>D</sub></code>，T 在 period <code>P<sub>T</sub> = i + s<sub>T</sub></code>，<code>P<sub>D</sub> &lt; P<sub>T</sub></code>。边<strong>不在</strong> period-local 图中。<br><br>
+    <strong>关键</strong>：periods 按序处理，<code>_enqueue_period(P<sub>T</sub>)</code> 被调用时 <code>_enqueue_period(P<sub>D</sub>)</code> 早已完成。<br><br>
+    <strong>子证明</strong>（D 不被 P<sub>T</sub> 中的任务阻塞）：D 的所有依赖要么来自更早 period（&lt; P<sub>D</sub>，已完成），要么来自 P<sub>D</sub> 内的同 stage 任务（情况 A 保证）。由推论 1 的 <code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code> 约束，D 的依赖链只能指向 stage ≤ s<sub>D</sub> &lt; s<sub>T</sub> 的任务，<strong>不可能涉及</strong> period P<sub>T</sub> 中的任何任务。<br><br>
+    因此 D 终将执行完毕：<code>cpu_signal(i, D)</code> 已 set → T 的 <code>sig.wait()</code> 立即返回；<code>cuda_event(i, D)</code> 已 record → T 的 <code>stream.wait_event()</code> 保证 GPU 顺序。✓</span>
+    <span class="en">D runs in period <code>P<sub>D</sub> = i + s<sub>D</sub></code>, T in period <code>P<sub>T</sub> = i + s<sub>T</sub></code>, <code>P<sub>D</sub> &lt; P<sub>T</sub></code>. Edge is <strong>not in</strong> the period-local graph.<br><br>
+    <strong>Key</strong>: Periods are processed sequentially; <code>_enqueue_period(P<sub>T</sub>)</code> is called after <code>_enqueue_period(P<sub>D</sub>)</code> has completed.<br><br>
+    <strong>Sub-proof</strong> (D is not blocked by any task in P<sub>T</sub>): All of D's dependencies are from earlier periods (&lt; P<sub>D</sub>, already done) or same-period tasks in P<sub>D</sub> (guaranteed by Case A). By Corollary 1's <code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code> constraint, D's dependency chain can only reach tasks with stage ≤ s<sub>D</sub> &lt; s<sub>T</sub>, <strong>never involving</strong> any task in period P<sub>T</sub>.<br><br>
+    Therefore D eventually completes: <code>cpu_signal(i, D)</code> is set → T's <code>sig.wait()</code> returns immediately; <code>cuda_event(i, D)</code> is recorded → T's <code>stream.wait_event()</code> guarantees GPU ordering. ✓</span>
+  </td>
+</tr>
+<tr>
+  <td><strong>C</strong></td>
+  <td><code>s<sub>D</sub> &gt; s<sub>T</sub></code></td>
+  <td>
+    <span class="zh"><strong>被 <code>_validate</code> 禁止</strong>（推论 1）。<br>
+    此时 D 在 period <code>P<sub>D</sub> = i + s<sub>D</sub> &gt; P<sub>T</sub></code>，T 执行时 D 尚未入队 → <code>cpu_signal(i, D).wait()</code> 永远等不到 → <strong>结构性死锁</strong>。<br>
+    这就是推论 1 存在的原因。</span>
+    <span class="en"><strong>Forbidden by <code>_validate</code></strong> (Corollary 1).<br>
+    D would be in period <code>P<sub>D</sub> = i + s<sub>D</sub> &gt; P<sub>T</sub></code>; when T executes, D is not yet enqueued → <code>cpu_signal(i, D).wait()</code> blocks forever → <strong>structural deadlock</strong>.<br>
+    This is precisely why Corollary 1 exists.</span>
+  </td>
+</tr>
+</tbody>
+</table>
+
+<p style="margin-top:14px;">
+  <span class="zh"><strong>具体示例（FusedSparseDist）</strong>：<code>InputDistStart(stage=1)</code> 依赖 <code>H2D(stage=0)</code>，属于情况 B。</span>
+  <span class="en"><strong>Concrete example (FusedSparseDist)</strong>: <code>InputDistStart(stage=1)</code> depends on <code>H2D(stage=0)</code> — this is Case B.</span>
+</p>
+<pre style="font-size:0.82rem; line-height:1.6;">
+<span class="zh">迭代</span><span class="en">Iteration</span> i = 3:
+  H2D(i=3):            stage=0, period = 3+0 = <strong>3</strong>
+  InputDistStart(i=3): stage=1, period = 3+1 = <strong>4</strong>
+
+<span class="zh">时间线</span><span class="en">Timeline</span>:
+  period 3: <span class="zh">提交</span><span class="en">enqueue</span> H2D(i=3)  →  cpu_signal(3,"H2D").set()  →  cuda_event(3,"H2D").record()
+  period 4: <span class="zh">提交</span><span class="en">enqueue</span> InputDistStart(i=3)
+            → cpu_signal(3,"H2D").wait()   →  <span style="color:#16a34a"><span class="zh">已 set，立即返回</span><span class="en">already set, returns immediately</span></span>
+            → stream.wait_event(cuda_event) →  <span style="color:#16a34a"><span class="zh">已 record，GPU 保证顺序</span><span class="en">already recorded, GPU guarantees order</span></span>
+</pre>
+
+<p style="margin-top:10px; font-size:0.88rem;">
+  <span class="zh"><strong>QED</strong>：推论 1 排除情况 C；情况 A 由 period-local 拓扑排序保证；情况 B 由 period 顺序执行保证。三者合一，ready-first 对所有 <code>intra_iter_deps</code> 必然正确。对 <code>inter_iter_deps</code> 的证明类似（用推论 3 替换推论 1，证明结构相同）。</span>
+  <span class="en"><strong>QED</strong>: Corollary 1 rules out Case C; Case A is guaranteed by period-local topological sort; Case B is guaranteed by sequential period processing. Combined, ready-first is correct for all <code>intra_iter_deps</code>. The proof for <code>inter_iter_deps</code> is analogous (substitute Corollary 3 for Corollary 1; proof structure is identical).</span>
+</p>
 </div>
 
 

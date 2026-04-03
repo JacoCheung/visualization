@@ -324,7 +324,9 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,      <span class="st">"Forward"</span>),        <span class="cm"># stage=1 ordering</span>
     (<span class="st">"OptimizerStep"</span>, <span class="st">"Backward"</span>),       <span class="cm"># stage=1 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含 Backward(i-1) → H2D(i) 顺序</span>
+  inter_iter_deps = [
+    (<span class="st">"Forward"</span>, <span class="st">"OptimizerStep"</span>),       <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的权重</span>
+  ],                                          <span class="cm"># same-stream (default) → FIFO 已保证 GPU 顺序</span>
   pipeline_depth = <span class="st">2</span>,
 )</pre>
 </div>
@@ -465,9 +467,9 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,       <span class="st">"Forward"</span>),         <span class="cm"># stage=2 ordering</span>
     (<span class="st">"OptimizerStep"</span>,  <span class="st">"Backward"</span>),        <span class="cm"># stage=2 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含跨迭代顺序</span>
-  <span class="cm"># 逻辑上 H2D(i) 依赖 WaitBatch(i-2)、InputDistStart(i) 依赖 WaitBatch(i-1)，</span>
-  <span class="cm"># 但 SWPipeline 只支持 _{i-1}，且单线程下 stage 排序已保证。</span>
+  inter_iter_deps = [
+    (<span class="st">"Forward"</span>, <span class="st">"OptimizerStep"</span>),        <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的权重</span>
+  ],                                           <span class="cm"># same-stream (default) → FIFO 已保证 GPU 顺序</span>
   pipeline_depth = <span class="st">3</span>,
 )</pre>
 </div>
@@ -587,7 +589,9 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,       <span class="st">"Forward"</span>),        <span class="cm"># stage=1 ordering</span>
     (<span class="st">"OptimizerStep"</span>,  <span class="st">"Backward"</span>),       <span class="cm"># stage=1 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含 Backward(i-1) → H2D(i) 顺序</span>
+  inter_iter_deps = [
+    (<span class="st">"Forward"</span>, <span class="st">"OptimizerStep"</span>),       <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的权重</span>
+  ],                                          <span class="cm"># same-stream (default) → FIFO 已保证 GPU 顺序</span>
   pipeline_depth = <span class="st">2</span>,
 )</pre>
 </div>
@@ -665,8 +669,10 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,       <span class="st">"Forward"</span>),        <span class="cm"># stage=2 ordering</span>
     (<span class="st">"OptimizerStep"</span>,  <span class="st">"Backward"</span>),       <span class="cm"># stage=2 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含跨迭代顺序</span>
-  <span class="cm"># 逻辑上 EmbLookup(i) 依赖 Backward(i-1)（TBE fused 更新），但 stage 排序已保证。</span>
+  inter_iter_deps = [
+    (<span class="st">"EmbLookup"</span>,      <span class="st">"Backward"</span>),       <span class="cm"># EmbLookup(i) 读取 Backward(i-1) 更新的 emb 权重 (TBE fused)</span>
+    (<span class="st">"Forward"</span>,        <span class="st">"OptimizerStep"</span>), <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的 dense 权重</span>
+  ],                                          <span class="cm"># EmbLookup↔Backward 跨 stream (emb_lookup↔default)，必须显式声明</span>
   pipeline_depth = <span class="st">3</span>,
 )</pre>
 </div>
@@ -937,9 +943,10 @@ PipelinePlan(
     (<span class="st">"EmbBackward"</span>,    <span class="st">"Backward"</span>),       <span class="cm"># stage=3 ordering</span>
     (<span class="st">"OptimizerStep"</span>,  <span class="st">"EmbBackward"</span>),    <span class="cm"># stage=3 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含跨迭代顺序</span>
-  <span class="cm"># 逻辑上: InputDistStart(i) 须在 Forward(i-2) 后（4 batches deep），</span>
-  <span class="cm">#         EmbLookup(i) 须在 Backward(i-1) 后。SWPipeline 仅支持 _{i-1}。</span>
+  inter_iter_deps = [
+    (<span class="st">"EmbLookup"</span>,      <span class="st">"Backward"</span>),       <span class="cm"># EmbLookup(i) 读取 Backward(i-1) 更新的 emb 权重 (TBE fused)</span>
+  ],                                          <span class="cm"># same-stream (default) → FIFO 已保证 GPU 顺序</span>
+  <span class="cm"># 注意: Forward(i) 使用 B-2 参数 → 逻辑上依赖 OptimizerStep(i-2)，k=2 超出 SWPipeline 支持范围</span>
   pipeline_depth = <span class="st">4</span>,
 )</pre>
 </div>
@@ -1051,9 +1058,10 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,        <span class="st">"Forward"</span>),        <span class="cm"># stage=2 ordering</span>
     (<span class="st">"OptimizerStep"</span>,   <span class="st">"Backward"</span>),       <span class="cm"># stage=2 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 单线程 + stage-descending 入队已隐含跨迭代顺序</span>
-  <span class="cm"># 逻辑上: EmbPrefetch(i) 依赖 Forward(i-1)，</span>
-  <span class="cm">#         InputDistStart(i) 依赖 Backward(i-2)（但 SWPipeline 仅支持 _{i-1}）。</span>
+  inter_iter_deps = [
+    (<span class="st">"EmbPrefetch"</span>,    <span class="st">"Forward"</span>),        <span class="cm"># EmbPrefetch(i) 须在 Forward(i-1) 消费完 prefetch 结果后执行</span>
+    (<span class="st">"Forward"</span>,        <span class="st">"OptimizerStep"</span>), <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的权重</span>
+  ],                                          <span class="cm"># EmbPrefetch↔Forward 跨 stream (prefetch↔default)，必须显式声明</span>
   pipeline_depth = <span class="st">3</span>,
 )</pre>
 </div>
@@ -1267,7 +1275,9 @@ PipelinePlan(
     (<span class="st">"Backward"</span>,       <span class="st">"Forward"</span>),         <span class="cm"># stage=2 ordering</span>
     (<span class="st">"OptimizerStep"</span>,  <span class="st">"Backward"</span>),        <span class="cm"># stage=2 ordering</span>
   ],
-  <span class="cm"># inter_iter_deps: 与 SparseDist 相同，单线程 + stage-descending 入队已隐含</span>
+  inter_iter_deps = [
+    (<span class="st">"Forward"</span>, <span class="st">"OptimizerStep"</span>),        <span class="cm"># Forward(i) 读取 OptimizerStep(i-1) 更新的权重</span>
+  ],                                           <span class="cm"># same-stream (default) → FIFO 已保证 GPU 顺序</span>
   pipeline_depth = <span class="st">3</span>,
 )</pre>
 </div>

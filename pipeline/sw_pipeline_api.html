@@ -1813,9 +1813,9 @@ plan = PipelinePlan(
         (t_bwd,        t_fwd),
         (t_opt,        t_bwd),
     ],
-    <span style="color:var(--text-dim)"># inter_iter_deps 不需要显式声明：</span>
-    <span style="color:var(--text-dim)"># 逻辑上 EmbLookup(i) 依赖 Backward(i-1)（TBE fused 更新），</span>
-    <span style="color:var(--text-dim)"># 但 stage-descending 入队顺序已隐含保证。</span>
+    inter_iter_deps=[
+        (t_emb, t_bwd),               <span style="color:var(--text-dim)"># EmbLookup(i) 依赖 Backward(i-1)：TBE fused 在 backward 时更新权重</span>
+    ],
 )
 <span style="color:var(--text-dim)"># pipeline_depth 自动推断: max(stage)+1 = 3</span>
 

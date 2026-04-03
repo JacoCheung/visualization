@@ -35,10 +35,15 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
     <h2>Beam Search — Token Layout & Attention Masks</h2>
     <p>Beam search 解码过程可视化：两种 token 排列方法（Incremental Append vs Beam-Grouped）对比，可展开查看每步的 attention mask 矩阵。</p>
   </a>
-  <a class="card" href="pipeline/prefetch_pipeline_timeline.html">
+  <a class="card" href="pipeline/index.html">
+    <span class="tag tag-doc">Documentation</span>
+    <h2>Pipeline Deep Dive</h2>
+    <p>TorchRec 推荐系统 Pipeline 全流程文档：初始化、Forward Hijack、Context 生命周期、Runtime Timeline、SWPipeline 框架设计与 API 参考。</p>
+  </a>
+  <a class="card" href="pipeline/runtime_timeline.html">
     <span class="tag tag-interactive">Interactive</span>
-    <h2>Prefetch Pipeline Timeline</h2>
-    <p>预取流水线时间线可视化，展示各阶段的执行时序与依赖关系。</p>
+    <h2>Pipeline Runtime Timeline</h2>
+    <p>3 迭代展开的流水线时间线可视化（D3.js 交互），展示 4 条 CUDA Stream 上各阶段的执行时序与 wait_stream 同步依赖。</p>
   </a>
   <a class="card" href="recsys-examples/dynamicemb/index.html">
     <span class="tag tag-doc">Documentation</span>

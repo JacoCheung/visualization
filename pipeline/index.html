@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Documentation — NVIDIA recsys-examples</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7;min-height:100vh}
+a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
+code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:3px}
+
+.hero{background:linear-gradient(135deg,#0f172a 0%,#1e293b 40%,#0c4a6e 100%);color:#fff;padding:60px 24px 50px;text-align:center}
+.hero h1{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+.hero p{font-size:14px;color:rgba(255,255,255,.6);max-width:640px;margin:0 auto}
+.hero .badge{display:inline-block;margin-top:14px;padding:5px 16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:6px;font-size:12px;color:rgba(255,255,255,.8)}
+
+.container{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-bottom:48px}
+
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.1)}
+.card-banner{padding:20px 24px 16px;border-bottom:1px solid #f1f5f9}
+.card-banner h2{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px}
+.card-banner .num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
+.card-banner p{font-size:12px;color:#64748b;margin-top:4px}
+.card-body{padding:16px 24px;flex:1;font-size:13px;color:#475569}
+.card-body ul{padding-left:16px;margin:0}.card-body li{margin-bottom:4px}
+.card-footer{padding:12px 24px 16px;border-top:1px solid #f1f5f9}
+.card-footer a{display:inline-block;padding:7px 18px;border-radius:7px;font-size:12.5px;font-weight:700;color:#fff;transition:opacity .15s}
+.card-footer a:hover{opacity:.85;text-decoration:none}
+
+.c1 .num{background:#0f172a}.c1 .card-footer a{background:#0f172a}
+.c2 .num{background:#7c3aed}.c2 .card-footer a{background:#7c3aed}
+.c3 .num{background:#2563eb}.c3 .card-footer a{background:#2563eb}
+.c4 .num{background:#0891b2}.c4 .card-footer a{background:#0891b2}
+.c5 .num{background:#0891b2}.c5 .card-footer a{background:#0891b2}
+.c6 .num{background:#059669}.c6 .card-footer a{background:#059669}
+.c7 .num{background:#d97706}.c7 .card-footer a{background:#d97706}
+
+.reading-order{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px 32px;margin-bottom:36px}
+.reading-order h3{font-size:16px;font-weight:700;margin-bottom:14px;color:#0f172a}
+
+.flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center}
+.flow-item{display:flex;align-items:center;gap:0}
+.flow-box{padding:8px 18px;border-radius:8px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.flow-arrow{width:36px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:18px;flex-shrink:0}
+.fb1{background:#0f172a}.fb2{background:#7c3aed}.fb3{background:#2563eb}.fb4{background:#0891b2}
+
+.xref{margin-top:36px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:24px 28px}
+.xref h3{font-size:15px;font-weight:700;color:#1e40af;margin-bottom:12px}
+.xref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.xref-link{display:block;padding:10px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;font-size:12.5px;color:#334155;transition:all .15s}
+.xref-link:hover{border-color:#2563eb;background:#f8fafc;text-decoration:none;color:#2563eb}
+.xref-link strong{display:block;font-size:13px;color:#0f172a;margin-bottom:2px}
+.xref-link span{font-size:11px;color:#94a3b8}
+
+.source-info{margin-top:36px;padding:20px 24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;color:#64748b}
+.source-info code{font-size:11.5px}
+
+footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Pipeline Documentation</h1>
+  <p>NVIDIA recsys-examples 中 Pipeline 框架的完整技术文档。涵盖初始化、Forward 拆分、Context 生命周期和运行时 Timeline。</p>
+  <a href="https://github.com/NVIDIA/recsys-examples/tree/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline" target="_blank" class="badge" style="text-decoration:none;color:rgba(255,255,255,.8)">examples/commons/pipeline/</a>
+</div>
+
+<div class="container">
+
+<!-- ========== READING ORDER ========== -->
+<div class="reading-order">
+  <h3>推荐阅读顺序</h3>
+  <div class="flow">
+    <div class="flow-item"><a href="pipeline_init.html" class="flow-box fb1" style="text-decoration:none">1. Pipeline Init</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="forward_hijack.html" class="flow-box fb2" style="text-decoration:none">2. Forward Hijack</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="context_lifecycle.html" class="flow-box fb3" style="text-decoration:none">3. Context Lifecycle</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="runtime_timeline.html" class="flow-box fb4" style="text-decoration:none">4. Runtime Timeline</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="sw_pipeline_overview.html" class="flow-box" style="text-decoration:none;background:#0891b2">5. SWPipeline</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="sw_pipeline_api.html" class="flow-box" style="text-decoration:none;background:#059669">6. API Reference</a></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-item"><a href="torchrec_schedules.html" class="flow-box" style="text-decoration:none;background:#d97706">7. TorchRec Pipelines</a></div>
+  </div>
+</div>
+
+<!-- ========== CARDS ========== -->
+<div class="grid">
+
+  <div class="card c1">
+    <div class="card-banner">
+      <h2><span class="num">1</span>Pipeline Init</h2>
+      <p>pipeline_init.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li><code>_rewrite_model</code> 如何用 <code>torch.fx</code> 追踪并替换 ShardedModule</li>
+        <li><code>fill_pipeline</code> 预填充逻辑（Base / Prefetch 对比）</li>
+        <li><code>PipelinedForward</code> vs <code>PrefetchPipelinedForward</code></li>
+        <li>Context 对象概览与 <code>progress()</code> 稳态循环</li>
+        <li>SWSerialTrainPipeline 11-Task DAG、_ensure_initialized</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="pipeline_init.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c2">
+    <div class="card-banner">
+      <h2><span class="num">2</span>Forward Hijack</h2>
+      <p>forward_hijack.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li><code>ShardedModule.forward()</code> 如何被拆分为 <code>input_dist</code> + <code>compute_and_output_dist</code></li>
+        <li><code>ArgInfo</code> 参数追踪机制</li>
+        <li><code>BaseForward</code> → <code>PipelinedForward</code> → <code>PrefetchPipelinedForward</code> 继承链</li>
+        <li><code>torch.fx.Tracer</code> 图追踪原理</li>
+        <li><code>PipelinedPostproc</code> 包装器</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="forward_hijack.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c3">
+    <div class="card-banner">
+      <h2><span class="num">3</span>Context Lifecycle</h2>
+      <p>context_lifecycle.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li><code>TrainPipelineContext</code> 类层次图（类图 + TorchRec 类型）</li>
+        <li><code>Awaitable</code>、<code>Multistreamable</code>、<code>ShardedModule</code> 深度解析</li>
+        <li>AllToAll 两阶段模型（splits → tensors）</li>
+        <li>字段生产者/消费者映射表</li>
+        <li>Base / Prefetch Pipeline 生命周期序列图</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="context_lifecycle.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c4">
+    <div class="card-banner">
+      <h2><span class="num">4</span>Runtime Timeline</h2>
+      <p>runtime_timeline.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>3 次 <code>progress()</code> 迭代展开可视化</li>
+        <li>4 条 CUDA Stream（memcpy / data_dist / prefetch / default）</li>
+        <li>D3.js 交互式 Timeline（缩放、平移、点击详情）</li>
+        <li>stream 间 <code>wait_stream</code> 同步箭头</li>
+        <li>batch 数据流追踪</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="runtime_timeline.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c5">
+    <div class="card-banner">
+      <h2><span class="num">5</span>SWPipeline</h2>
+      <p>sw_pipeline_overview.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>声明式 Task DAG：<code>PipelineTask</code> + <code>PipelinePlan</code></li>
+        <li><code>DeclaredIO</code> 外部副作用声明与独立示例</li>
+        <li>Shortcut 缓存与 <code>_GraftGrad</code> 梯度嫁接</li>
+        <li>NCCL <code>_SubmissionSequencer</code> 多线程保序</li>
+        <li><code>TaskProfiler</code> 暴露时间测量</li>
+        <li>旧 Pipeline vs SWPipeline 对比</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="sw_pipeline_overview.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c6">
+    <div class="card-banner">
+      <h2><span class="num">6</span>SWPipeline API Reference</h2>
+      <p>sw_pipeline_api.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>完整数据类：<code>IterContext</code>, <code>DeclaredIO</code>, <code>PipelineTask</code>, <code>TaskSchedule</code>, <code>PipelinePlan</code></li>
+        <li><code>deps</code> 同步机制：决策矩阵、两阶段协议、常见陷阱</li>
+        <li><code>period / iter / stage</code> 关系公式</li>
+        <li>SWPipeline 所有公开方法参考</li>
+        <li>端到端 Pipeline 构建示例</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="sw_pipeline_api.html">阅读全文 →</a>
+    </div>
+  </div>
+
+  <div class="card c7">
+    <div class="card-banner">
+      <h2><span class="num">7</span>TorchRec Pipeline Plans</h2>
+      <p>torchrec_schedules.html</p>
+    </div>
+    <div class="card-body">
+      <ul>
+        <li>7 种 TorchRec Pipeline 的 <code>PipelinePlan</code> 定义</li>
+        <li>每个 Pipeline 的 <code>deps</code>, <code>stage</code>, stream 分配</li>
+        <li>CPU 提交顺序与 stage-descending 入队</li>
+        <li>SparseDist, FusedSparseDist, SemiSync, Prefetch 等完整解析</li>
+        <li>SVG 流水线可视化</li>
+      </ul>
+    </div>
+    <div class="card-footer">
+      <a href="torchrec_schedules.html">阅读全文 →</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========== CROSS REFERENCES ========== -->
+<div class="xref">
+  <h3>交叉引用导航</h3>
+  <div class="xref-grid">
+    <a class="xref-link" href="pipeline_init.html#rewrite">
+      <strong>_rewrite_model 概览</strong>
+      <span>Pipeline Init → §_rewrite_model</span>
+    </a>
+    <a class="xref-link" href="forward_hijack.html#split">
+      <strong>Forward 拆分原理</strong>
+      <span>Forward Hijack → §拆分三步骤</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#rewrite-detail">
+      <strong>torch.fx 追踪详解</strong>
+      <span>Pipeline Init → §FX Graph</span>
+    </a>
+    <a class="xref-link" href="context_lifecycle.html#class-diagram">
+      <strong>Context 类层次图</strong>
+      <span>Context Lifecycle → §类图</span>
+    </a>
+    <a class="xref-link" href="context_lifecycle.html#torchrec-types">
+      <strong>TorchRec 类型深度解析</strong>
+      <span>Context Lifecycle → §TorchRec Types</span>
+    </a>
+    <a class="xref-link" href="context_lifecycle.html#lifecycle-base">
+      <strong>Base Pipeline 生命周期</strong>
+      <span>Context Lifecycle → §生命周期 Base</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#fill-base">
+      <strong>fill_pipeline (Base)</strong>
+      <span>Pipeline Init → §fill_pipeline</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#fill-prefetch">
+      <strong>_fill_pipeline (Prefetch)</strong>
+      <span>Pipeline Init → §Prefetch</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#sw-overview">
+      <strong>SWPipeline 总览</strong>
+      <span>Pipeline Init → §SWPipeline</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#sw-sync">
+      <strong>Two-Phase Sync 协议</strong>
+      <span>Pipeline Init → §Two-Phase Sync</span>
+    </a>
+    <a class="xref-link" href="pipeline_init.html#progress">
+      <strong>progress() 稳态循环</strong>
+      <span>Pipeline Init → §progress</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_overview.html#declared-io">
+      <strong>DeclaredIO 设计</strong>
+      <span>SWPipeline → §DeclaredIO</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_api.html">
+      <strong>SWPipeline API 参考</strong>
+      <span>SWPipeline API → 独立页面</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_overview.html#shortcut">
+      <strong>Shortcut 缓存机制</strong>
+      <span>SWPipeline → §Shortcut</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_overview.html#profiler">
+      <strong>TaskProfiler</strong>
+      <span>SWPipeline → §Profiler</span>
+    </a>
+    <a class="xref-link" href="context_lifecycle.html#field-detail">
+      <strong>字段生产者/消费者映射</strong>
+      <span>Context Lifecycle → §字段详解</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_api.html#deps-sync">
+      <strong>deps 同步机制详解</strong>
+      <span>SWPipeline API → §deps 同步</span>
+    </a>
+    <a class="xref-link" href="sw_pipeline_api.html#period-iter-stage">
+      <strong>period/iter/stage 公式</strong>
+      <span>SWPipeline API → §period/iter/stage</span>
+    </a>
+    <a class="xref-link" href="torchrec_schedules.html">
+      <strong>TorchRec Pipeline Plans</strong>
+      <span>7 种 Pipeline 的 deps + stage 定义</span>
+    </a>
+  </div>
+</div>
+
+<!-- ========== SOURCE INFO ========== -->
+<div class="source-info">
+  <strong>源码位置</strong><br>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py" target="_blank"><code>examples/commons/pipeline/train_pipeline.py</code></a> — TrainPipelineSparseDist, PrefetchTrainPipelineSparseDist<br>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py" target="_blank"><code>examples/commons/pipeline/utils.py</code></a> — TrainPipelineContext, _rewrite_model, BaseForward, PipelinedForward<br>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_pipeline.py</code></a> — SWPipeline, PipelineTask, PipelinePlan, DeclaredIO, TaskProfiler<br>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_train_pipeline.py</code></a> — SWSerialTrainPipeline
+</div>
+
+</div>
+
+<footer>
+  NVIDIA recsys-examples · Pipeline Documentation Hub
+</footer>
+
+</body>
+</html>

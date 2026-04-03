@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWPipeline API Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f8fafc;
+  --bg-card: #fff;
+  --bg-code: #f1f5f9;
+  --bg-sidebar: #0f172a;
+  --border: #e2e8f0;
+  --border-accent: #0891b2;
+  --text: #1e293b;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+  --accent: #0891b2;
+  --accent-soft: rgba(8,145,178,0.08);
+  --green: #16a34a;
+  --green-soft: rgba(22,163,74,0.08);
+  --orange: #d97706;
+  --orange-soft: rgba(217,119,6,0.08);
+  --red: #dc2626;
+  --purple: #7c3aed;
+  --purple-soft: rgba(124,58,237,0.08);
+  --cyan: #0e7490;
+  --radius: 8px;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+  --sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --serif: 'Noto Serif SC', serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.lang-en .zh { display: none !important; }
+body.lang-zh .en { display: none !important; }
+
+/* ─── Site Nav ─── */
+.site-nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:36px;gap:0;overflow-x:auto;white-space:nowrap}
+.site-nav a{display:inline-block;padding:6px 14px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);transition:color .15s;text-decoration:none}
+.site-nav a:hover{color:#fff;text-decoration:none}
+.site-nav a.here{color:#38bdf8}
+.site-nav .home{color:rgba(255,255,255,.8);font-weight:800;margin-right:8px;font-size:12px}
+
+/* ─── Layout ─── */
+.page { display: flex; min-height: calc(100vh - 36px); }
+
+.sidebar {
+  position: fixed; top: 36px; left: 0;
+  width: 272px; height: calc(100vh - 36px);
+  background: var(--bg-sidebar);
+  border-right: 1px solid rgba(255,255,255,.08);
+  overflow-y: auto;
+  padding: 20px 0;
+  z-index: 100;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
+
+.sidebar-title {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #38bdf8;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  margin-bottom: 10px;
+}
+
+.sidebar-section {
+  padding: 10px 18px 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,.3);
+}
+
+.sidebar a {
+  display: block;
+  padding: 4px 18px 4px 26px;
+  color: rgba(255,255,255,.5);
+  text-decoration: none;
+  font-size: 0.84rem;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+.sidebar a:hover {
+  color: #fff;
+  background: rgba(56,189,248,.08);
+  border-left-color: #38bdf8;
+}
+.sidebar a code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+.sidebar a.sub {
+  padding-left: 36px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,.35);
+}
+.sidebar a.sub:hover { color: rgba(255,255,255,.75); }
+
+.main {
+  margin-left: 272px;
+  flex: 1;
+  max-width: 920px;
+  padding: 40px 48px 120px;
+}
+
+/* ─── Typography ─── */
+h1 {
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, #0891b2, #0e7490);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 36px; }
+
+h2 {
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 48px 0 18px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 32px 0 10px;
+}
+
+p { margin: 0 0 12px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ─── Inline code ─── */
+code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--cyan);
+}
+
+/* ─── Code blocks ─── */
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  overflow-x: auto;
+  margin: 0 0 16px;
+  line-height: 1.55;
+}
+pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+/* ─── API card ─── */
+.api-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin: 16px 0 24px;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.api-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+.api-card.cls::before  { background: var(--accent); }
+.api-card.meth::before { background: var(--green); }
+.api-card.data::before { background: var(--orange); }
+.api-card.func::before { background: var(--purple); }
+.api-card.internal::before { background: var(--text-dim); }
+
+.api-sig {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 10px;
+  word-break: break-all;
+  background: var(--bg-code);
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.api-sig .kw   { color: var(--purple); font-weight: 600; }
+.api-sig .name { color: var(--green); font-weight: 700; }
+.api-sig .cls-name { color: var(--accent); font-weight: 700; }
+.api-sig .param { color: var(--orange); }
+.api-sig .type  { color: var(--cyan); }
+.api-sig .punct { color: var(--text-dim); }
+
+.api-desc { color: var(--text-muted); margin-bottom: 10px; font-size: 0.93rem; }
+
+.api-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+.badge-class  { background: var(--accent-soft); color: var(--accent); }
+.badge-method { background: var(--green-soft); color: var(--green); }
+.badge-data   { background: var(--orange-soft); color: var(--orange); }
+.badge-func   { background: var(--purple-soft); color: var(--purple); }
+.badge-static { background: rgba(0,0,0,.04); color: var(--text-muted); }
+.badge-internal { background: rgba(0,0,0,.04); color: var(--text-dim); }
+
+/* ─── Param table ─── */
+.param-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 14px;
+  font-size: 0.88rem;
+}
+.param-table th {
+  text-align: left;
+  padding: 6px 12px;
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.param-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.param-table td:first-child {
+  font-family: var(--mono);
+  font-size: 0.83rem;
+  color: var(--orange);
+  white-space: nowrap;
+}
+.param-table td:nth-child(2) {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--cyan);
+  white-space: nowrap;
+}
+
+/* ─── Example block ─── */
+.example-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+
+/* ─── Misc ─── */
+.divider { border: none; border-top: 2px solid var(--border); margin: 48px 0; }
+.returns { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 6px; }
+.returns code { color: var(--cyan); }
+.callout{padding:14px 18px;border-radius:8px;font-size:13px;margin:12px 0}
+.callout-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.callout-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.callout-tip{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.src-link{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--purple);margin-top:4px}
+.src-link::before{content:'📄'}
+
+/* ─── TOC anchor offset ─── */
+[id] { scroll-margin-top: 56px; }
+
+.lang-btn{position:fixed;right:20px;bottom:20px;padding:6px 16px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:700;color:var(--text-muted);background:#fff;cursor:pointer;transition:all .15s;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.lang-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ─── Responsive ─── */
+@media (max-width: 960px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 24px 20px 80px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SITE NAV ═══════════ -->
+<div class="site-nav">
+  <a class="home" href="index.html">Pipeline Docs</a>
+  <a href="pipeline_init.html">Pipeline Init</a>
+  <a href="forward_hijack.html">Forward Hijack</a>
+  <a href="context_lifecycle.html">Context Lifecycle</a>
+  <a href="runtime_timeline.html">Runtime Timeline</a>
+  <a href="sw_pipeline_overview.html">SWPipeline</a>
+  <a class="here" href="sw_pipeline_api.html">SWPipeline API</a>
+</div>
+
+<div class="page">
+
+<!-- ═══════════ Sidebar ═══════════ -->
+<nav class="sidebar">
+  <div class="sidebar-title">SWPipeline API</div>
+
+  <div class="sidebar-section"><span class="zh">数据类</span><span class="en">Data Classes</span></div>
+  <a href="#IterContext"><code>IterContext</code></a>
+  <a href="#DeclaredIO"><code>DeclaredIO</code></a>
+  <a href="#PipelineTask"><code>PipelineTask</code></a>
+  <a href="#TaskSchedule"><code>TaskSchedule</code></a>
+  <a href="#PipelinePlan"><code>PipelinePlan</code></a>
+  <a href="#ProfileResult"><code>ProfileResult</code></a>
+  <a href="#TaskRef"><code>TaskRef</code></a>
+
+  <div class="sidebar-section"><span class="zh">核心类</span><span class="en">Core Classes</span></div>
+  <a href="#SWPipeline"><code>SWPipeline</code></a>
+  <a href="#TaskProfiler"><code>TaskProfiler</code></a>
+
+  <div class="sidebar-section"><span class="zh">执行时序</span><span class="en">Sequence Diagram</span></div>
+  <a href="#sequence-diagram"><span class="zh">progress() 时序图</span><span class="en">progress() Sequence</span></a>
+
+  <div class="sidebar-section">SWPipeline <span class="zh">方法</span><span class="en">Methods</span></div>
+  <a href="#fill_pipeline"><code>fill_pipeline()</code></a>
+  <a href="#progress"><code>progress()</code></a>
+  <a href="#run"><code>run()</code></a>
+  <a href="#run_serial"><code>run_serial()</code></a>
+  <a href="#run_one_serial_iter"><code>run_one_serial_iter()</code></a>
+  <a href="#enable_shortcut"><code>enable_shortcut()</code></a>
+  <a href="#disable_shortcut"><code>disable_shortcut()</code></a>
+  <a href="#drain"><code>drain()</code></a>
+  <a href="#print_schedule"><code>print_schedule()</code></a>
+  <a href="#format_schedule"><code>format_schedule()</code></a>
+  <a href="#print_stage_analysis"><code>print_stage_analysis()</code></a>
+  <a href="#repr"><code>__repr__()</code></a>
+
+  <div class="sidebar-section">TaskProfiler <span class="zh">方法</span><span class="en">Methods</span></div>
+  <a href="#profiler-profile"><code>profile()</code></a>
+  <a href="#profiler-profile_many"><code>profile_many()</code></a>
+
+  <div class="sidebar-section">ProfileResult</div>
+  <a href="#print_report"><code>print_report()</code></a>
+
+  <div class="sidebar-section"><span class="zh">同步与调度</span><span class="en">Sync &amp; Scheduling</span></div>
+  <a href="#deps-sync"><span class="zh">同步与调度</span><span class="en">Sync &amp; Scheduling</span></a>
+  <a href="#deps-two-phase" class="sub"><span class="zh">两阶段协议</span><span class="en">Two-Phase Protocol</span></a>
+  <a href="#period-iter-stage" class="sub">period / iter / stage</a>
+  <a href="#corollaries" class="sub"><span class="zh">三条推论</span><span class="en">Corollaries</span></a>
+  <a href="#stage-descending" class="sub"><span class="zh">死锁场景</span><span class="en">Deadlock Scenarios</span></a>
+  <a href="#fwd-bwd-opt-scheduling" class="sub"><span class="zh">fwd/bwd/opt 示例</span><span class="en">fwd/bwd/opt Example</span></a>
+  <a href="#deps-pitfalls" class="sub"><span class="zh">常见陷阱</span><span class="en">Pitfalls</span></a>
+  <a href="#ready-first" class="sub"><span class="zh">Ready-First 调度</span><span class="en">Ready-First Scheduling</span></a>
+
+  <div class="sidebar-section"><span class="zh">内部机制</span><span class="en">Internals</span></div>
+  <a href="#exec-task"><code>_exec_task()</code></a>
+  <a href="#cache-val"><code>_cache_val()</code></a>
+  <a href="#restore-val"><code>_restore_val()</code></a>
+  <a href="#GraftGrad"><code>_GraftGrad</code></a>
+  <a href="#SubmissionSequencer"><code>_SubmissionSequencer</code></a>
+
+  <div class="sidebar-section"><span class="zh">端到端示例</span><span class="en">Example</span></div>
+  <a href="#e2e-example"><span class="zh">完整 Pipeline 构建</span><span class="en">Full Pipeline Build</span></a>
+</nav>
+
+<!-- ═══════════ Main ═══════════ -->
+<div class="main">
+
+<h1>SWPipeline API Reference</h1>
+<p class="subtitle"><span class="zh">PyTorch / CUDA 通用软件流水线框架 ·</span><span class="en">General-purpose Software Pipeline for PyTorch / CUDA ·</span> <code>sw_pipeline.py</code>
+  · <a href="sw_pipeline_overview.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
+</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="data-classes"><span class="zh">数据类</span><span class="en">Data Classes</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<!-- ── IterContext ── -->
+<div class="api-card cls" id="IterContext">
+  <span class="badge-class api-badge">Class</span>
+  <div class="api-sig">
+    <span class="kw">class</span> <span class="cls-name">IterContext</span><span class="punct">(</span><span class="param">batch</span><span class="punct">:</span> <span class="type">Any</span><span class="punct">,</span> <span class="param">iter_idx</span><span class="punct">:</span> <span class="type">int</span><span class="punct">)</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">每次迭代的上下文对象，传递给所有 task 函数。<code>batch</code> 是 <code>next(data_iter)</code> 的原始数据，task 通过 <code>ctx.xxx = ...</code> 传递中间结果，通过 <code>del ctx.xxx</code> 提前释放显存。每个 in-flight 迭代拥有独立的 <code>IterContext</code>，避免跨迭代数据竞争。</span>
+    <span class="en">Per-iteration context passed to every task function. <code>batch</code> is raw data from <code>next(data_iter)</code>. Tasks pass intermediate results via <code>ctx.xxx = ...</code> and free memory via <code>del ctx.xxx</code>. Each in-flight iteration gets its own <code>IterContext</code> to avoid cross-iteration data hazards.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">属性</span><span class="en">Attr</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>batch</td><td>Any</td><td><span class="zh">数据迭代器产出的原始 batch</span><span class="en">Raw batch from data iterator</span></td></tr>
+    <tr><td>iter_idx</td><td>int</td><td><span class="zh">0-based 迭代编号</span><span class="en">0-based iteration index</span></td></tr>
+    <tr><td><em><span class="zh">任意</span><span class="en">arbitrary</span></em></td><td>Any</td><td><span class="zh">Task 动态附加：<code>ctx.X = ...</code></span><span class="en">Dynamically attached by tasks: <code>ctx.X = ...</code></span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">示例</span><span class="en">Example</span></div>
+<pre><code><span style="color:var(--purple)">def</span> <span style="color:var(--green)">copy_batch</span>(ctx: IterContext) -> None:
+    ctx.x_gpu = ctx.batch["x"].to("cuda", non_blocking=True)
+    ctx.y_gpu = ctx.batch["y"].to("cuda", non_blocking=True)
+
+<span style="color:var(--purple)">def</span> <span style="color:var(--green)">forward</span>(ctx: IterContext) -> None:
+    ctx.logits = model(ctx.x_gpu)
+    <span style="color:var(--purple)">del</span> ctx.x_gpu  <span style="color:var(--text-dim)"># free GPU memory early</span></code></pre>
+</div>
+
+<!-- ── DeclaredIO ── -->
+<div class="api-card data" id="DeclaredIO">
+  <span class="badge-data api-badge">Dataclass</span>
+  <div class="api-sig">
+    <span class="kw">@dataclass</span><br>
+    <span class="kw">class</span> <span class="cls-name">DeclaredIO</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">声明 Task 对 <code>IterContext</code> 以外共享状态（外部副作用）的读写合约。框架自动在缓存时调用 <code>capture</code>、在 shortcut 回放时调用 <code>restore</code>。返回值经 <code>_cache_val</code> 递归 detach+clone 所有 Tensor。</span>
+    <span class="en">Declares a Task's read/write contract with shared state outside <code>IterContext</code> (external side effects). The framework calls <code>capture</code> during caching and <code>restore</code> during shortcut replay. Return values go through <code>_cache_val</code> (recursive tensor detach+clone).</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">字段</span><span class="en">Field</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>capture</td><td>Callable[[], Any]</td><td><span class="zh">Task 执行<strong>后</strong>调用。快照外部状态，返回可缓存值</span><span class="en">Called <strong>after</strong> Task runs. Snapshots external state, returns cacheable value</span></td></tr>
+    <tr><td>restore</td><td>Callable[[Any], None]</td><td><span class="zh">Shortcut 时调用。接收 <code>_restore_val</code> 后的值，写回外部状态</span><span class="en">Called during shortcut. Receives <code>_restore_val</code> output, writes back external state</span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">示例</span><span class="en">Example</span></div>
+<pre><code>shared_buffer = {}
+
+PipelineTask("encode", encode_fn, io=[
+    DeclaredIO(
+        capture=<span style="color:var(--purple)">lambda</span>: dict(shared_buffer),
+        restore=<span style="color:var(--purple)">lambda</span> s: shared_buffer.update(s),
+    ),
+])</code></pre>
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L91-L111">sw_pipeline.py:91–111</a></p>
+</div>
+
+<!-- ── PipelineTask ── -->
+<div class="api-card cls" id="PipelineTask">
+  <span class="badge-class api-badge">Dataclass</span>
+  <div class="api-sig">
+    <span class="kw">@dataclass</span>(eq=False)<br>
+    <span class="kw">class</span> <span class="cls-name">PipelineTask</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">一个可调度的计算单元。只声明<strong>计算身份</strong>（name + fn + io），不包含调度属性。调度配置通过 <code>PipelinePlan</code> 的 <code>schedule</code> 字典声明。<code>__hash__</code> 和 <code>__eq__</code> 基于 <code>name</code>，允许直接作为 <code>schedule</code> 的 key。</span>
+    <span class="en">One schedulable computation unit. Declares only <strong>computation identity</strong> (name + fn + io), not scheduling. Scheduling is in <code>PipelinePlan.schedule</code>. <code>__hash__</code> and <code>__eq__</code> are based on <code>name</code>, so tasks can serve as <code>schedule</code> keys.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">字段</span><span class="en">Field</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>name</td><td>str</td><td><span class="zh">全局唯一标识（也用于 NVTX tag）</span><span class="en">Globally unique identifier (also NVTX tag)</span></td></tr>
+    <tr><td>fn</td><td>Callable[[IterContext], None]</td><td><span class="zh">计算函数，读写 <code>ctx</code> 属性</span><span class="en">Compute function, reads/writes <code>ctx</code> attrs</span></td></tr>
+    <tr><td>io</td><td>List[DeclaredIO]</td><td><span class="zh">外部副作用声明（默认 <code>[]</code>）</span><span class="en">Side effect declarations (default <code>[]</code>)</span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">示例</span><span class="en">Example</span></div>
+<pre><code>h2d = PipelineTask("CopyBatch", copy_batch_fn)
+fwd = PipelineTask("Forward", forward_fn)
+bwd = PipelineTask("Backward", backward_fn)
+
+<span style="color:var(--text-dim)"># with DeclaredIO for tasks with external side effects</span>
+emb = PipelineTask("EmbLookup", emb_fn, io=[
+    DeclaredIO(capture=capture_emb, restore=restore_emb),
+])</code></pre>
+</div>
+
+<!-- ── TaskSchedule ── -->
+<div class="api-card data" id="TaskSchedule">
+  <span class="badge-data api-badge">Dataclass</span>
+  <div class="api-sig">
+    <span class="kw">@dataclass</span><br>
+    <span class="kw">class</span> <span class="cls-name">TaskSchedule</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">每个 Task 在 <code>PipelinePlan</code> 中的调度配置。所有属性有默认值——最简使用只需设 <code>stage</code>。</span>
+    <span class="en">Per-task scheduling configuration in a <code>PipelinePlan</code>. All fields have defaults — simplest usage only needs <code>stage</code>.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">字段</span><span class="en">Field</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">默认</span><span class="en">Default</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>stage</td><td>int</td><td>0</td><td><span class="zh">Pipeline stage（stage k → 处理 iter i-k 的数据）</span><span class="en">Pipeline stage (stage k → processes iter i-k data)</span></td></tr>
+    <tr><td>stream</td><td>Optional[Stream]</td><td>None</td><td><span class="zh"><code>None</code> = default stream</span><span class="en"><code>None</code> = default stream</span></td></tr>
+    <tr><td>thread_group</td><td>str</td><td>"default"</td><td><span class="zh">所属线程组。同组 Task 串行执行</span><span class="en">Thread group. Same-group tasks execute serially</span></td></tr>
+    <tr><td>globally_ordered</td><td>bool</td><td>False</td><td><span class="zh"><code>True</code> → <code>_SubmissionSequencer</code> 保证跨 rank 顺序（防 NCCL 死锁）</span><span class="en"><code>True</code> → <code>_SubmissionSequencer</code> ensures cross-rank order (prevents NCCL deadlocks)</span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">示例</span><span class="en">Example</span></div>
+<pre><code>TaskSchedule(stage=0, stream=memcpy_stream, thread_group="io")
+TaskSchedule(stage=1, globally_ordered=True)  <span style="color:var(--text-dim)"># NCCL task</span>
+TaskSchedule(stage=2)  <span style="color:var(--text-dim)"># default stream, default thread</span></code></pre>
+</div>
+
+<!-- ── PipelinePlan ── -->
+<div class="api-card data" id="PipelinePlan">
+  <span class="badge-data api-badge">Dataclass</span>
+  <div class="api-sig">
+    <span class="kw">@dataclass</span><br>
+    <span class="kw">class</span> <span class="cls-name">PipelinePlan</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">完整调度方案。类似 TorchRec <code>ShardingPlan</code>——将"做什么"和"怎么调度"分离。<code>schedule</code> 的 key 即 task 集合——无需单独传 task 列表。<code>intra_iter_deps</code> 声明迭代内依赖，<code>inter_iter_deps</code> 声明跨迭代依赖。</span>
+    <span class="en">Complete scheduling plan. Analogous to TorchRec <code>ShardingPlan</code> — separates "what" from "how". <code>schedule</code> keys define the task set. <code>intra_iter_deps</code> declares intra-iteration deps, <code>inter_iter_deps</code> declares cross-iteration deps.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">字段</span><span class="en">Field</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>schedule</td><td>Dict[TaskRef, TaskSchedule]</td><td><span class="zh">Task → 调度配置映射。key 定义任务集合</span><span class="en">Task → scheduling config. Keys define task set</span></td></tr>
+    <tr><td>intra_iter_deps</td><td>List[Tuple[TaskRef, TaskRef]]</td><td><span class="zh">迭代内依赖 <code>(task, depends_on)</code></span><span class="en">Intra-iteration deps <code>(task, depends_on)</code></span></td></tr>
+    <tr><td>inter_iter_deps</td><td>List[Tuple[…]]</td><td><span class="zh">跨迭代依赖 <code>(task_i, task_i-1)</code>（默认 <code>[]</code>）</span><span class="en">Cross-iteration deps <code>(task_i, task_i-1)</code> (default <code>[]</code>)</span></td></tr>
+    <tr><td>pipeline_depth</td><td>int</td><td><span class="zh">流水线深度，等于 <code>max(stage) + 1</code>。<code>1</code> = serial，<code>2+</code> = pipelined（默认 <code>2</code>）</span><span class="en">Pipeline depth, equals <code>max(stage) + 1</code>. <code>1</code> = serial, <code>2+</code> = pipelined (default <code>2</code>)</span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">完整示例</span><span class="en">Full Example</span></div>
+<pre><code>copy  = PipelineTask("H2D", h2d_fn)
+fwd   = PipelineTask("Forward", fwd_fn)
+bwd   = PipelineTask("Backward", bwd_fn)
+optim = PipelineTask("Optim", optim_fn)
+
+plan = PipelinePlan(
+    schedule={
+        copy:  TaskSchedule(stage=0, stream=copy_stream, thread_group="io"),
+        fwd:   TaskSchedule(stage=1, thread_group="compute"),
+        bwd:   TaskSchedule(stage=1, thread_group="compute"),
+        optim: TaskSchedule(stage=1, thread_group="compute"),
+    },
+    intra_iter_deps=[(fwd, copy), (bwd, fwd), (optim, bwd)],
+    inter_iter_deps=[(fwd, optim)],  <span style="color:var(--text-dim)"># Fwd(i) waits for Optim(i-1)</span>
+    pipeline_depth=2,
+)</code></pre>
+</div>
+
+<!-- ── ProfileResult ── -->
+<div class="api-card data" id="ProfileResult">
+  <span class="badge-data api-badge">Dataclass</span>
+  <div class="api-sig">
+    <span class="kw">@dataclass</span><br>
+    <span class="kw">class</span> <span class="cls-name">ProfileResult</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh"><code>TaskProfiler.profile()</code> 返回结果，包含基线时间和每个 task 的 exposed time。</span>
+    <span class="en">Return type of <code>TaskProfiler.profile()</code>, containing baseline time and per-task exposed time.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">字段</span><span class="en">Field</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>baseline_s</td><td>float</td><td><span class="zh">一次 serial 迭代的中位 wall-clock（秒）</span><span class="en">Median wall-clock of one serial iteration (seconds)</span></td></tr>
+    <tr><td>exposed_s</td><td>Dict[str, float]</td><td><span class="zh"><code>{task_name: exposed_seconds}</code></span><span class="en"><code>{task_name: exposed_seconds}</code></span></td></tr>
+  </table>
+</div>
+
+<!-- ── TaskRef ── -->
+<div class="api-card func" id="TaskRef">
+  <span class="badge-func api-badge">Type Alias</span>
+  <div class="api-sig">
+    <span class="cls-name">TaskRef</span> <span class="punct">=</span> <span class="type">Union[str, PipelineTask]</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh"><code>PipelinePlan</code> 的 <code>schedule</code>、<code>intra_iter_deps</code>、<code>inter_iter_deps</code> 中，可用 <code>PipelineTask</code> 对象或 name 字符串引用 task。推荐使用对象以获得更好的类型检查。</span>
+    <span class="en">In <code>PipelinePlan</code> fields, tasks can be referenced by <code>PipelineTask</code> objects or name strings. Objects are recommended for better type checking.</span>
+  </div>
+</div>
+
+<hr class="divider">
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="deps-sync"><span class="zh">同步与调度</span><span class="en">Synchronization &amp; Scheduling</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+
+<h3 id="deps-two-phase"><span class="zh">两阶段同步协议</span><span class="en">Two-Phase Synchronization Protocol</span></h3>
+
+<div class="api-card">
+<p style="margin-bottom:8px;">
+  <span class="zh">SWPipeline 通过两层依赖声明描述任务间的数据关系：</span>
+  <span class="en">SWPipeline uses two layers of dependency declarations to describe data relationships between tasks:</span>
+</p>
+<ul style="margin:4px 0 10px 18px; font-size:0.9rem;">
+  <li><span class="zh"><strong><code>intra_iter_deps</code></strong>：同一 batch（同一 iter）内的数据依赖。如果任务 B 消费任务 A 的输出，写 <code>intra_iter_deps=[(B, A)]</code>。</span>
+      <span class="en"><strong><code>intra_iter_deps</code></strong>: Data dependency within the same batch (same iter). If task B consumes A's output, write <code>intra_iter_deps=[(B, A)]</code>.</span></li>
+  <li><span class="zh"><strong><code>inter_iter_deps</code></strong>：跨迭代数据依赖。任务 A(iter i) 依赖 B(iter i-1) 的输出，写 <code>inter_iter_deps=[(A, B)]</code>。仅支持 <code>i-1</code>。</span>
+      <span class="en"><strong><code>inter_iter_deps</code></strong>: Cross-iteration data dependency. Task A(iter i) depends on B(iter i-1), write <code>inter_iter_deps=[(A, B)]</code>. Only <code>i-1</code> is supported.</span></li>
+</ul>
+<p style="margin-bottom:8px;">
+  <span class="zh">两者都纯粹描述<strong>数据依赖语义</strong>，与 stream、stage 无关。stream 和 stage 带来的约束在<a href="#corollaries">推论</a>部分讨论。运行时，每条依赖通过两阶段协议执行：</span>
+  <span class="en">Both purely describe <strong>data dependency semantics</strong>, independent of stream or stage. Constraints arising from stream and stage are discussed in the <a href="#corollaries">Corollaries</a> section. At runtime, each dependency is enforced via a two-phase protocol:</span>
+</p>
+<pre><span class="cm"># Phase 1: CPU synchronization — threading.Event</span>
+sig = self._cpu_signal(iter_idx, dep_name)
+sig.wait(timeout=30)                         <span class="cm"># CPU blocks until dep's CPU work is done</span>
+
+<span class="cm"># Phase 2: GPU synchronization — torch.cuda.Event</span>
+stream.wait_event(self._cuda_event(iter_idx, dep_name))  <span class="cm"># GPU waits for dep's kernels</span>
+
+<span class="cm"># Signal sender (after task completes):</span>
+self._cuda_event(iter_idx, task_def.name).record(stream)
+self._cpu_signal(iter_idx, task_def.name).set()</pre>
+</div>
+
+<div class="api-card">
+<h4><span class="zh">多线程分发与 CPU 同步</span><span class="en">Multi-Thread Dispatch &amp; CPU Synchronization</span></h4>
+<p>
+  <span class="zh">SWPipeline 支持多线程提交 kernel。每个任务通过 <code>thread_group</code> 属性指定所属的工作线程。运行时，<code>_enqueue_period</code> 按 <code>_enqueue_order</code> 顺序将任务分发到各线程的 <code>work_queue</code>：</span>
+  <span class="en">SWPipeline supports multi-threaded kernel submission. Each task specifies its worker thread via the <code>thread_group</code> attribute. At runtime, <code>_enqueue_period</code> dispatches tasks to each thread's <code>work_queue</code> following <code>_enqueue_order</code>:</span>
+</p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm"><span class="zh">_enqueue_period 分发流程</span><span class="en">_enqueue_period dispatch flow</span>:</span>
+for task_def in self._enqueue_order:           <span class="cm"># stage-descending</span>
+    self._work_queues[task_def.thread_group].put((iter_idx, task_def))
+                      ↓                 ↓
+            ┌─────────────────┐  ┌─────────────────┐
+            │  Thread "memcpy" │  │  Thread "default" │
+            │  work_queue:     │  │  work_queue:      │
+            │   H2D            │  │   WaitBatch       │
+            │                  │  │   Forward          │
+            │                  │  │   Backward         │
+            └────────┬─────────┘  └────────┬──────────┘
+                     │                     │
+              _submit_task()          _submit_task()
+</pre>
+<p style="margin-top:8px;">
+  <span class="zh"><strong>CPU 依赖不是独立的依赖层——它是两阶段协议的 Phase 1 自动处理的</strong>。当 Thread B 上的 WaitBatch 声明 <code>intra_iter_deps=[H2D]</code> 时：</span>
+  <span class="en"><strong>CPU dependency is not a separate layer — it is automatically handled by Phase 1 of the two-phase protocol</strong>. When WaitBatch on Thread B declares <code>intra_iter_deps=[H2D]</code>:</span>
+</p>
+<ol style="font-size:0.88rem; margin:6px 0 0 18px;">
+  <li><span class="zh">Thread B 在 <code>_submit_task</code> 开头执行 <code>cpu_signal("H2D").wait()</code> → <strong>CPU 阻塞</strong>，直到 Thread A 完成 H2D 并调用 <code>.set()</code></span>
+      <span class="en">Thread B calls <code>cpu_signal("H2D").wait()</code> at the start of <code>_submit_task</code> → <strong>CPU blocks</strong> until Thread A finishes H2D and calls <code>.set()</code></span></li>
+  <li><span class="zh">解除阻塞后，Thread B 执行 <code>stream.wait_event(cuda_event("H2D"))</code> → GPU 也同步</span>
+      <span class="en">Once unblocked, Thread B calls <code>stream.wait_event(cuda_event("H2D"))</code> → GPU also synchronized</span></li>
+</ol>
+<p style="margin-top:8px; font-size:0.88rem;">
+  <span class="zh">即使两个任务在同一线程上，Phase 1 的 <code>wait()</code> 也一样执行——如果 dep 已完成则 <code>wait()</code> 立即返回，零开销。因此<strong>用户只需声明数据依赖（intra_iter_deps / inter_iter_deps），CPU 线程同步由 Phase 1 自动保证</strong>。</span>
+  <span class="en">Even for tasks on the same thread, Phase 1's <code>wait()</code> still executes — if the dep is already done, <code>wait()</code> returns immediately with zero overhead. So <strong>users only need to declare data dependencies (intra_iter_deps / inter_iter_deps); CPU thread synchronization is automatically guaranteed by Phase 1</strong>.</span>
+</p>
+</div>
+
+<div class="api-card">
+<h4><span class="zh">示例：跨线程依赖</span><span class="en">Example: Cross-Thread Dependency</span></h4>
+<pre style="font-size:0.78rem; line-height:1.5; overflow-x:auto;">
+<span class="cm">Thread "memcpy" (H2D)                    Thread "default" (WaitBatch)</span>
+═══════════════════════════════          ═══════════════════════════════════
+  ├─ run H2D on memcpy_stream              ├─ cpu_signal("H2D").wait()  ← <span class="kw">Phase 1: CPU blocks</span>
+  ├─ cuda_event("H2D").record(memcpy)      │   ... Thread B blocked ...
+  ├─ cpu_signal("H2D").set()  ─────────────┤   <span class="st">unblocked!</span>
+  ▼ (done, process next in queue)          ├─ stream.wait_event(cuda_event("H2D"))  ← <span class="kw">Phase 2: GPU waits</span>
+                                           ├─ run WaitBatch on default_stream
+                                           ▼ (done)
+</pre>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ -->
+<h3 id="period-iter-stage"><span class="zh">period / iter / stage</span><span class="en">period / iter / stage</span></h3>
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="api-card">
+<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+<thead>
+<tr style="background:var(--bg-code);">
+  <th style="padding:8px 12px; text-align:left; border-bottom:2px solid var(--border);"><span class="zh">概念</span><span class="en">Concept</span></th>
+  <th style="padding:8px 12px; text-align:left; border-bottom:2px solid var(--border);"><span class="zh">含义</span><span class="en">Meaning</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td style="padding:8px 12px; border-bottom:1px solid var(--border);"><code>period</code></td>
+  <td style="padding:8px 12px; border-bottom:1px solid var(--border);"><span class="zh">全局时钟周期，每次 <code>progress()</code> 递增 1</span><span class="en">Global clock, incremented by 1 on each <code>progress()</code></span></td>
+</tr>
+<tr>
+  <td style="padding:8px 12px; border-bottom:1px solid var(--border);"><code>stage</code></td>
+  <td style="padding:8px 12px; border-bottom:1px solid var(--border);"><span class="zh">流水线深度偏移（0 = 最早阶段，max = 最后阶段）</span><span class="en">Pipeline depth offset (0 = earliest, max = final stage)</span></td>
+</tr>
+<tr>
+  <td style="padding:8px 12px;"><code>iter_idx</code></td>
+  <td style="padding:8px 12px;"><span class="zh">任务处理的实际数据迭代编号</span><span class="en">Actual data iteration index</span></td>
+</tr>
+</tbody>
+</table>
+
+<pre style="font-size:1.1rem; text-align:center; padding:14px; margin-top:10px; background:var(--accent-soft); border-radius:var(--radius);">
+<strong>iter_idx = period − stage</strong>
+<span style="font-size:0.8rem; color:var(--text-muted);">pipeline_depth = max(stage) + 1</span>
+</pre>
+
+<pre style="font-size:0.82rem; line-height:1.5; margin-top:8px;">
+<span class="cm"><span class="zh">示例</span><span class="en">Example</span>: pipeline_depth=3 (SparseDist)</span>
+              stage=0(H2D)  stage=1(InputDist)  stage=2(Fwd/Bwd/Opt)
+period=2:     iter <span class="st">2</span>        iter <span class="st">1</span>              iter <span class="st">0</span>
+period=3:     iter <span class="st">3</span>        iter <span class="st">2</span>              iter <span class="st">1</span>
+period=4:     iter <span class="st">4</span>        iter <span class="st">3</span>              iter <span class="st">2</span>
+</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<h3 id="corollaries"><span class="zh">三条推论与死锁分析</span><span class="en">Three Corollaries &amp; Deadlock Analysis</span></h3>
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div id="corollary-1" class="callout" style="background:var(--purple-soft); border-color:var(--purple);">
+  <span class="zh"><strong>推论 1：intra_iter_deps 的 stage 约束</strong>。<code>intra_iter_deps</code> 中被依赖方的 stage 必须 ≤ 依赖方的 stage：<strong><code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code></strong>。否则 dep 在更晚 period 执行，task 永远等不到——死锁。</span>
+  <span class="en"><strong>Corollary 1: Stage constraint for intra_iter_deps</strong>. <strong><code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code></strong>. Otherwise dep executes in a later period — deadlock.</span>
+</div>
+
+<div class="callout" style="background:var(--accent-soft); border-color:var(--accent);">
+  <span class="zh"><strong>推论 2：stage-descending 提交</strong>。同一 period 内 stage 越高 → batch 越老。<code>_build_enqueue_order</code> 采用 stage-descending 策略：</span>
+  <span class="en"><strong>Corollary 2: Stage-descending submission</strong>. Higher stage → older batch within same period. <code>_build_enqueue_order</code> uses stage-descending:</span>
+  <ul style="margin:4px 0 0 18px; font-size:0.88rem;">
+    <li><span class="zh"><strong>正确性</strong>：<code>inter_iter_deps</code>(k=1) 使供给者（高 stage）与消费者（低 stage）同 period，必须先提交供给者</span>
+        <span class="en"><strong>Correctness</strong>: k=1 <code>inter_iter_deps</code> place supplier (high stage) and consumer (low stage) in same period; supplier first</span></li>
+    <li><span class="zh"><strong>吞吐</strong>：优先老 batch 减少 head-of-line blocking</span>
+        <span class="en"><strong>Throughput</strong>: Prioritize older batch to reduce head-of-line blocking</span></li>
+  </ul>
+</div>
+
+<div id="cross-iter-stage-gap" class="callout" style="background:var(--purple-soft); border-color:var(--purple);">
+  <span class="zh"><strong>推论 3：<code>inter_iter_deps</code> 的 stage 差约束</strong>。被依赖方与依赖方的 stage 差不能大于 1：<strong><code>stage<sub>dep</sub> − stage<sub>task</sub> ≤ 1</code></strong>。否则 dep 落在未来 period，构成结构性死锁。</span>
+  <span class="en"><strong>Corollary 3: Stage gap for <code>inter_iter_deps</code></strong>. <strong><code>stage<sub>dep</sub> − stage<sub>task</sub> ≤ 1</code></strong>. Otherwise dep falls in a future period — structural deadlock.</span>
+</div>
+
+<table class="param-table" style="margin-top:8px; font-size:0.85rem;">
+<thead><tr>
+  <th style="width:70px;">k</th><th style="width:80px;">Δperiod</th>
+  <th><span class="zh">结果</span><span class="en">Result</span></th>
+  <th><span class="zh">示例</span><span class="en">Example</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td><code>≤ 0</code></td><td><code>≤ −1</code></td>
+  <td><span class="zh">✅ dep 在更早 period，零阻塞</span><span class="en">✅ dep in earlier period, zero blocking</span></td>
+  <td><span class="zh">同 stage 内跨 iter：dep 在上一 period 已完成</span><span class="en">Same stage cross-iter: dep completed in prev period</span></td>
+</tr>
+<tr style="background:var(--accent-soft);">
+  <td><strong><code>1</code></strong></td><td><code>0</code></td>
+  <td><span class="zh">⚠️ 同 period，需 stage-descending</span><span class="en">⚠️ Same period, needs stage-descending</span></td>
+  <td><span class="zh">A(s=0) 依赖 B(s=1)：B 先提交则安全</span><span class="en">A(s=0) depends on B(s=1): safe if B submitted first</span></td>
+</tr>
+<tr style="background:#fef2f2;">
+  <td><strong><code>≥ 2</code></strong></td><td><code>≥ 1</code></td>
+  <td><span class="zh">❌ 结构性死锁</span><span class="en">❌ Structural deadlock</span></td>
+  <td><span class="zh">fwd(s=0) 依赖 opt(s=2)：opt 在未来 period</span><span class="en">fwd(s=0) depends on opt(s=2): opt in future period</span></td>
+</tr>
+</tbody>
+</table>
+
+<h4 id="stage-descending" style="margin-top:16px;"><span class="zh">死锁场景</span><span class="en">Deadlock Scenarios</span></h4>
+
+<div class="api-card">
+<p><strong><span class="zh">场景 1：单线程 k=1 升序死锁</span><span class="en">Scenario 1: Single-thread k=1 ascending deadlock</span></strong></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm">A(s=0, T1), B(s=1, T1), A.inter_iter_deps=[B]  →  <span class="zh">同 period</span><span class="en">same period</span></span>
+</pre>
+<pre style="font-size:0.82rem; line-height:1.6; background:#fef2f2; border-color:#fecaca;">
+<span class="zh">升序</span><span class="en">Ascending</span> ❌:  T1: A(s=0) → wait B → <span style="color:#dc2626"><strong>BLOCKED</strong></span> → B <span class="zh">永远不提交</span><span class="en">never submitted</span> 💀
+</pre>
+<pre style="font-size:0.82rem; line-height:1.6; background:#f0fdf4; border-color:#bbf7d0;">
+<span class="zh">降序</span><span class="en">Descending</span> ✅:  T1: B(s=1) → <span style="color:#16a34a">set ✓</span> → A(s=0) → <span style="color:#16a34a"><span class="zh">已 set</span><span class="en">set</span> ✓</span>
+</pre>
+
+<p style="margin-top:14px;"><strong><span class="zh">场景 2：多线程交叉死锁</span><span class="en">Scenario 2: Multi-thread cross deadlock</span></strong></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm">T1: A(s=0), D(s=1)  A.cross_iter_dep→B(T2)   T2: C(s=0), B(s=1)  C.cross_iter_dep→D(T1)</span>
+</pre>
+<pre style="font-size:0.82rem; line-height:1.6; background:#fef2f2; border-color:#fecaca;">
+<span class="zh">升序</span><span class="en">Ascending</span> ❌:  T1: A→wait B→<span style="color:#dc2626">BLOCKED</span>  T2: C→wait D→<span style="color:#dc2626">BLOCKED</span>  → <span style="color:#dc2626"><span class="zh">互锁</span><span class="en">mutual</span> 💀</span>
+</pre>
+<pre style="font-size:0.82rem; line-height:1.6; background:#f0fdf4; border-color:#bbf7d0;">
+<span class="zh">降序</span><span class="en">Descending</span> ✅:  T1: D(s=1)→<span style="color:#16a34a">✓</span>  T2: B(s=1)→<span style="color:#16a34a">✓</span>  T1: A(s=0)→<span style="color:#16a34a">✓</span>  T2: C(s=0)→<span style="color:#16a34a">✓</span>
+</pre>
+
+<p style="margin-top:14px;"><strong><span class="zh">场景 3：k ≥ 2 结构性死锁</span><span class="en">Scenario 3: k ≥ 2 structural deadlock</span></strong></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm">fwd(s=0), bwd(s=1), opt(s=2), fwd.inter_iter_deps=[opt]  →  k=2</span>
+           stage=2(opt)   stage=1(bwd)   stage=0(fwd)
+period 3:   opt(<span class="st">1</span>)        bwd(<span class="st">2</span>)        fwd(<span class="st">3</span>)
+period 4:   opt(<span class="st">2</span>)        bwd(<span class="st">3</span>)        fwd(<span class="st">4</span>)
+</pre>
+<pre style="font-size:0.82rem; line-height:1.6; background:#fef2f2; border-color:#fecaca;">
+fwd(3) <span class="zh">需要</span><span class="en">needs</span> opt(2):  fwd(3) @ period <strong>3</strong>,  opt(2) @ period <strong>4</strong>  ← <span style="color:#dc2626"><span class="zh">未来 period，任何顺序都死锁</span><span class="en">future period, deadlock regardless</span> 💀</span>
+</pre>
+
+<div class="callout callout-tip" style="margin-top:10px;">
+<span class="zh"><strong>实际训练</strong>：3-stage pipeline 中 fwd(I) 与 opt(I-2) 自然共存于同 period。同 stream 上 stage-descending 保证 opt 先入队——<strong>无需 inter_iter_deps</strong>。代价是 weight staleness = pipeline_depth − 1。</span>
+<span class="en"><strong>In practice</strong>: In a 3-stage pipeline, fwd(I) coexists with opt(I-2) in the same period. Stage-descending on the same stream ensures opt is queued first — <strong>no inter_iter_deps needed</strong>. Cost: weight staleness = pipeline_depth − 1.</span>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<h3 id="fwd-bwd-opt-scheduling"><span class="zh">综合示例：fwd / bwd / opt 的 stage 安排</span><span class="en">Example: fwd / bwd / opt Stage Arrangements</span></h3>
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="api-card">
+<p style="font-size:0.88rem;">
+  <span class="zh">基本设定：<code>intra_iter_deps = [(bwd, fwd), (opt, bwd)]</code>。分析有/无 <code>fwd.inter_iter_deps = [opt]</code>。</span>
+  <span class="en">Base: <code>intra_iter_deps = [(bwd, fwd), (opt, bwd)]</code>. With/without <code>fwd.inter_iter_deps = [opt]</code>.</span>
+</p>
+
+<h4 style="margin-top:10px; color:var(--accent);"><span class="zh">无 inter_iter_deps（接受 weight staleness）</span><span class="en">Without inter_iter_deps (accept staleness)</span></h4>
+<table class="param-table" style="font-size:0.85rem;">
+<thead><tr><th><span class="zh">模式</span><span class="en">Mode</span></th><th>fwd</th><th>bwd</th><th>opt</th><th>depth</th><th><span class="zh">加速</span><span class="en">Speedup</span></th><th><span class="zh">说明</span><span class="en">Notes</span></th></tr></thead>
+<tbody>
+<tr><td>A</td><td>0</td><td>0</td><td>0</td><td>1</td><td>❌</td><td><span class="zh">纯串行</span><span class="en">Serial</span></td></tr>
+<tr style="background:#f0fdf4;"><td><strong>B</strong></td><td>0</td><td>0</td><td>1</td><td>2</td><td><strong>✅</strong></td><td>opt(i-1) ‖ fwd(i)+bwd(i)</td></tr>
+<tr style="background:#f0fdf4;"><td><strong>C</strong></td><td>0</td><td>1</td><td>1</td><td>2</td><td><strong>✅</strong></td><td>bwd(i-1)+opt(i-1) ‖ fwd(i)</td></tr>
+<tr><td>D</td><td>0</td><td>1</td><td>2</td><td>3</td><td>✅</td><td><span class="zh">三路，staleness=2</span><span class="en">Three-way, staleness=2</span></td></tr>
+</tbody>
+</table>
+
+<h4 style="margin-top:14px; color:#dc2626;"><span class="zh">有 inter_iter_deps → 无 GPU 加速</span><span class="en">With inter_iter_deps → no GPU speedup</span></h4>
+<p style="font-size:0.88rem;">
+  <span class="zh">推论 1 + 推论 3 → 仅 3 种合法安排（A/B/C），<strong>均因 <code>wait_event</code> 强制串行</strong>：</span>
+  <span class="en">Corollary 1 + 3 → only 3 legal arrangements (A/B/C), <strong>all forced serial by <code>wait_event</code></strong>:</span>
+</p>
+<table class="param-table" style="font-size:0.85rem;">
+<thead><tr><th><span class="zh">模式</span><span class="en">Mode</span></th><th>fwd</th><th>bwd</th><th>opt</th><th>k</th><th><span class="zh">加速</span><span class="en">Speedup</span></th></tr></thead>
+<tbody>
+<tr><td>A</td><td>0</td><td>0</td><td>0</td><td>0</td><td>❌</td></tr>
+<tr><td>B</td><td>0</td><td>0</td><td>1</td><td>1</td><td>❌ fwd wait_event opt</td></tr>
+<tr><td>C</td><td>0</td><td>1</td><td>1</td><td>1</td><td>❌ fwd wait_event opt</td></tr>
+</tbody>
+</table>
+
+<div class="callout" style="margin-top:10px; background:var(--accent-soft); border-color:var(--accent);">
+<span class="zh"><strong>核心洞察</strong>：Pipeline 加速<strong>恰恰因为放弃了 <code>inter_iter_deps</code></strong>。不声明时不同 stage 真正并行；声明后全局串行。实践建议：对 fwd/bwd/opt <strong>不要声明 <code>inter_iter_deps</code></strong>，依靠 stream FIFO + stage-descending 保证权重可见性。</span>
+<span class="en"><strong>Key insight</strong>: Pipelining works <strong>precisely by not declaring <code>inter_iter_deps</code></strong>. Without: true parallelism. With: forced serial. Advice: <strong>don't declare <code>inter_iter_deps</code></strong> for fwd/bwd/opt; rely on stream FIFO + stage-descending.</span>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<h3 id="deps-pitfalls"><span class="zh">常见陷阱</span><span class="en">Common Pitfalls</span></h3>
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="api-card">
+<table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+<thead>
+<tr style="background:var(--bg-code);">
+  <th style="padding:6px 10px; text-align:left; border-bottom:2px solid var(--border);"><span class="zh">陷阱</span><span class="en">Pitfall</span></th>
+  <th style="padding:6px 10px; text-align:left; border-bottom:2px solid var(--border);"><span class="zh">后果</span><span class="en">Consequence</span></th>
+  <th style="padding:6px 10px; text-align:left; border-bottom:2px solid var(--border);"><span class="zh">修复</span><span class="en">Fix</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">遗漏跨 stream dep</span><span class="en">Missing cross-stream dep</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">GPU 数据竞争</span><span class="en">GPU data race</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">加 dep</span><span class="en">Add dep</span></td>
+</tr>
+<tr>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">遗漏同 stage intra-dep</span><span class="en">Missing intra-stage dep</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh"><code>_topo_sort</code> 字母序，顺序错</span><span class="en"><code>_topo_sort</code> alphabetical, wrong order</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">加 dep</span><span class="en">Add dep</span></td>
+</tr>
+<tr>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">dep 循环</span><span class="en">Circular deps</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">死锁</span><span class="en">Deadlock</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">确保 DAG</span><span class="en">Ensure DAG</span></td>
+</tr>
+<tr>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">intra_iter_deps 中 <code>dep.stage > task.stage</code></span><span class="en"><code>dep.stage > task.stage</code> in intra_iter_deps</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">死锁（<a href="#corollary-1">推论 1</a>）</span><span class="en">Deadlock (<a href="#corollary-1">Cor. 1</a>)</span></td>
+  <td style="padding:6px 10px; border-bottom:1px solid var(--border);"><span class="zh">改用 <code>inter_iter_deps</code></span><span class="en">Use <code>inter_iter_deps</code></span></td>
+</tr>
+<tr>
+  <td style="padding:6px 10px;">inter_iter_deps k ≥ 2</td>
+  <td style="padding:6px 10px;"><span class="zh">结构性死锁（<a href="#cross-iter-stage-gap">推论 3</a>）</span><span class="en">Structural deadlock (<a href="#cross-iter-stage-gap">Cor. 3</a>)</span></td>
+  <td style="padding:6px 10px;"><span class="zh">缩减 stage 差至 ≤ 1</span><span class="en">Reduce stage gap to ≤ 1</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+<!-- ════════════════════════════════════════════ -->
+<h3 id="ready-first"><span class="zh">Ready-First 调度算法</span><span class="en">Ready-First Scheduling Algorithm</span></h3>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="callout callout-info" style="margin-bottom:14px;">
+  <span class="zh">当前 <code>_build_enqueue_order</code> 采用简单的 stage-descending 策略。下文描述一种更精细的 <strong>ready-first</strong> 优化策略，它在保证正确性的前提下最小化 GPU stream 空转（stall）。</span>
+  <span class="en">The current <code>_build_enqueue_order</code> uses a simple stage-descending strategy. Below describes a finer-grained <strong>ready-first</strong> optimization that minimizes GPU stream stalls while preserving correctness.</span>
+</div>
+
+<h4 style="margin-top:14px;"><span class="zh">问题：为什么 stage-descending 不是最优</span><span class="en">Problem: Why Stage-Descending Is Not Optimal</span></h4>
+
+<div class="api-card">
+<p>
+  <span class="zh">GPU stream 是 FIFO 队列。考虑以下配置：</span>
+  <span class="en">GPU streams are FIFO queues. Consider this setup:</span>
+</p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm"><span class="zh">任务</span><span class="en">Task</span>   stage   stream   intra_iter_deps</span>
+────────────────────────────────────
+P      0      X        —              <span class="cm"><span class="zh">无依赖</span><span class="en">none</span></span>
+Q      1      Y        [P]            <span class="cm"><span class="zh">跨 stage(0→1)，不在 period-local 图中</span><span class="en">cross-stage(0→1), not in period-local graph</span></span>
+R      0      X        [Q]            <span class="cm"><span class="zh">跨 stage(1→0)，不在 period-local 图中，但 GPU 仍有 wait_event</span><span class="en">cross-stage(1→0), not in period-local graph, but GPU still has wait_event</span></span>
+</pre>
+<p style="margin-top:8px;">
+  <span class="zh">P 和 R 都在 stage 0、stream X 上。<strong>stage-descending</strong> 先提交 Q(stage 1)，再提交 P、R(stage 0)。问题是 R 依赖 Q（跨 stream Y→X），提交时会插入 <code>stream_X.wait_event(Q)</code>。如果 R 被排在 P <strong>前面</strong>（如按字母序），P 就被堵在 R 的 <code>wait_event</code> 后面白白空转：</span>
+  <span class="en">P and R are both at stage 0 on stream X. <strong>Stage-descending</strong> submits Q(stage 1) first, then P and R(stage 0). The problem: R depends on Q (cross-stream Y→X), inserting <code>stream_X.wait_event(Q)</code>. If R is queued <strong>before</strong> P (e.g., alphabetical), P idles behind R's <code>wait_event</code>:</span>
+</p>
+<pre style="font-size:0.82rem; line-height:1.6;">
+<span class="cm"><span class="zh">不优顺序（R 先于 P）</span><span class="en">Suboptimal (R before P)</span>:</span>  stream_X: [R.wait_event(Q)] → [R kernels] → [P kernels]
+                                                       <span style="color:#dc2626">↑ P <span class="zh">白等</span><span class="en">idles</span></span>
+
+<span class="cm"><span class="zh">优化顺序（P 先于 R）</span><span class="en">Optimal (P before R)</span>:</span>     stream_X: [P kernels] → [R.wait_event(Q)] → [R kernels]
+                                         <span style="color:#16a34a">↑ P <span class="zh">立即执行</span><span class="en">runs immediately</span></span>
+</pre>
+<p>
+  <span class="zh"><strong>GPU stall</strong> 定义：<code>stream.wait_event(event)</code> 使 GPU stream 暂停直到 event 被 record。如果 event 来自同 period 内尚在执行的另一个 stream 上的任务，stream 会空转。这段空转时间就是 stall。</span>
+  <span class="en"><strong>GPU stall</strong> defined: <code>stream.wait_event(event)</code> pauses the GPU stream until the event is recorded. If the event comes from another stream's task still executing within the same period, the stream idles. This idle time is the stall.</span>
+</p>
+<p style="margin-top:6px;">
+  <span class="zh"><strong>Stage-descending 的局限</strong>：它只按 stage 排序，同 stage 内的任务顺序不考虑 stall_cost。ready-first 算法解决这个问题——优先提交无跨 stream 依赖（stall_cost=0）的任务。</span>
+  <span class="en"><strong>Stage-descending limitation</strong>: It only sorts by stage; within the same stage, task order ignores stall_cost. Ready-first fixes this — it prioritizes tasks with no cross-stream deps (stall_cost=0).</span>
+</p>
+</div>
+
+<h4 style="margin-top:14px;"><span class="zh">核心思路：Period-Local 依赖图 + Stall Cost 优先级</span><span class="en">Core Idea: Period-Local Dependency Graph + Stall Cost Priority</span></h4>
+
+<div class="api-card">
+<p><span class="zh">算法分两步：</span><span class="en">The algorithm has two steps:</span></p>
+
+<p style="margin-top:10px;"><strong><span class="zh">步骤 1：构建 period-local 依赖图</span><span class="en">Step 1: Build the period-local dependency graph</span></strong></p>
+<p>
+  <span class="zh">只纳入同一 period 内实际发生交互的依赖边（参见推论 3 的分类）：</span>
+  <span class="en">Include only dependency edges that interact within the same period (see Corollary 3 classification):</span>
+</p>
+<table class="param-table" style="margin-top:6px; font-size:0.88rem;">
+<thead><tr><th><span class="zh">边类型</span><span class="en">Edge type</span></th><th><span class="zh">条件</span><span class="en">Condition</span></th><th><span class="zh">图中方向</span><span class="en">Edge direction</span></th></tr></thead>
+<tbody>
+<tr>
+  <td><code>intra_iter_deps</code></td>
+  <td><code>stage<sub>dep</sub> = stage<sub>task</sub></code></td>
+  <td>dep → task</td>
+</tr>
+<tr>
+  <td><code>inter_iter_deps</code></td>
+  <td><code>stage<sub>dep</sub> = stage<sub>task</sub> + 1</code></td>
+  <td>dep → task</td>
+</tr>
+</tbody>
+</table>
+<p style="margin-top:8px; font-size:0.88rem;">
+  <span class="zh">不纳入的边：<code>intra_iter_deps</code> 中 <code>stage<sub>dep</sub> &lt; stage<sub>task</sub></code>（dep 在更早 period 完成）；<code>inter_iter_deps</code> 中 <code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code>（dep 在更早 period 完成）。这些依赖的 <code>threading.Event</code> 已 set、<code>cuda_event</code> 已 record，不会造成任何阻塞。</span>
+  <span class="en">Excluded edges: <code>intra_iter_deps</code> where <code>stage<sub>dep</sub> &lt; stage<sub>task</sub></code> (dep completed in earlier period); <code>inter_iter_deps</code> where <code>stage<sub>dep</sub> ≤ stage<sub>task</sub></code> (dep completed in earlier period). These dependencies have <code>threading.Event</code> set and <code>cuda_event</code> recorded — zero blocking.</span>
+</p>
+
+<p style="margin-top:14px;"><strong><span class="zh">步骤 2：Stall-Cost 感知的拓扑排序</span><span class="en">Step 2: Stall-cost-aware topological sort</span></strong></p>
+<p>
+  <span class="zh">对 period-local 图做拓扑排序。当多个任务同时 ready（入度 = 0）时，按 <strong>stall_cost 升序</strong>选取：</span>
+  <span class="en">Topologically sort the period-local graph. When multiple tasks are ready (in-degree = 0), pick by <strong>ascending stall_cost</strong>:</span>
+</p>
+
+<pre style="font-size:0.85rem; line-height:1.6; padding:14px; background:var(--accent-soft); border-radius:var(--radius);">
+stall_cost(task) = <span class="zh">该任务在 period-local 图中，有多少个<strong>跨 stream</strong> 的入边（dep 与 task 不在同一 stream 上）</span><span class="en">number of <strong>cross-stream</strong> in-edges for this task in the period-local graph (dep and task on different streams)</span>
+
+<span class="zh">排序 key</span><span class="en">Sort key</span>: <strong>(stall_cost, task_name)</strong>
+  → stall_cost = 0 <span class="zh">的任务优先：不插入 <code>wait_event</code>，不堵同 stream 后续任务</span><span class="en">tasks first: no <code>wait_event</code> inserted, won't block subsequent tasks on same stream</span>
+  → task_name <span class="zh">做 tie-breaker，保证确定性（跨 rank 一致）</span><span class="en">as tie-breaker for determinism (consistent across ranks)</span>
+</pre>
+</div>
+
+<h4 style="margin-top:14px;"><span class="zh">伪代码</span><span class="en">Pseudocode</span></h4>
+
+<div class="api-card">
+<pre><code><span style="color:var(--purple)">def</span> <span style="color:var(--accent)">_build_enqueue_order_ready_first</span>(self) -> List[PipelineTask]:
+    <span style="color:var(--text-dim)"># --- Step 1: build period-local graph ---</span>
+    adj:       Dict[str, List[str]] = defaultdict(list)   <span style="color:var(--text-dim)"># dep → [tasks]</span>
+    in_degree: Dict[str, int]       = {t.name: <span class="st">0</span> <span style="color:var(--purple)">for</span> t <span style="color:var(--purple)">in</span> self._defs.values()}
+
+    <span style="color:var(--purple)">for</span> task_name, dep_list <span style="color:var(--purple)">in</span> self._intra_iter_deps.items():
+        task_stage = self._stage_map[task_name]
+        <span style="color:var(--purple)">for</span> dep_name <span style="color:var(--purple)">in</span> dep_list:
+            <span style="color:var(--purple)">if</span> self._stage_map[dep_name] == task_stage:   <span style="color:var(--text-dim)"># same stage → same period</span>
+                adj[dep_name].append(task_name)
+                in_degree[task_name] += <span class="st">1</span>
+
+    <span style="color:var(--purple)">for</span> task_name, dep_list <span style="color:var(--purple)">in</span> self._inter_iter_deps.items():
+        task_stage = self._stage_map[task_name]
+        <span style="color:var(--purple)">for</span> dep_name <span style="color:var(--purple)">in</span> dep_list:
+            <span style="color:var(--purple)">if</span> self._stage_map[dep_name] == task_stage + <span class="st">1</span>:  <span style="color:var(--text-dim)"># k=1 → same period</span>
+                adj[dep_name].append(task_name)
+                in_degree[task_name] += <span class="st">1</span>
+
+    <span style="color:var(--text-dim)"># --- Step 2: compute stall_cost ---</span>
+    stall_cost: Dict[str, int] = {t.name: <span class="st">0</span> <span style="color:var(--purple)">for</span> t <span style="color:var(--purple)">in</span> self._defs.values()}
+    <span style="color:var(--purple)">for</span> task_name, dep_list <span style="color:var(--purple)">in</span> self._intra_iter_deps.items():
+        task_stream = self._stream_map[task_name]
+        task_stage  = self._stage_map[task_name]
+        <span style="color:var(--purple)">for</span> dep_name <span style="color:var(--purple)">in</span> dep_list:
+            <span style="color:var(--purple)">if</span> self._stage_map[dep_name] == task_stage \
+               <span style="color:var(--purple)">and</span> self._stream_map[dep_name] != task_stream:
+                stall_cost[task_name] += <span class="st">1</span>        <span style="color:var(--text-dim)"># in-period cross-stream dep</span>
+
+    <span style="color:var(--purple)">for</span> task_name, dep_list <span style="color:var(--purple)">in</span> self._inter_iter_deps.items():
+        task_stream = self._stream_map[task_name]
+        task_stage  = self._stage_map[task_name]
+        <span style="color:var(--purple)">for</span> dep_name <span style="color:var(--purple)">in</span> dep_list:
+            <span style="color:var(--purple)">if</span> self._stage_map[dep_name] == task_stage + <span class="st">1</span> \
+               <span style="color:var(--purple)">and</span> self._stream_map[dep_name] != task_stream:
+                stall_cost[task_name] += <span class="st">1</span>        <span style="color:var(--text-dim)"># in-period cross-stream dep</span>
+
+    <span style="color:var(--text-dim)"># --- Step 3: topo sort with stall_cost priority ---</span>
+    ready = sorted(
+        [n <span style="color:var(--purple)">for</span> n, d <span style="color:var(--purple)">in</span> in_degree.items() <span style="color:var(--purple)">if</span> d == <span class="st">0</span>],
+        key=<span style="color:var(--purple)">lambda</span> n: (stall_cost[n], n)
+    )
+    order: List[str] = []
+    <span style="color:var(--purple)">while</span> ready:
+        name = ready.pop(<span class="st">0</span>)
+        order.append(name)
+        <span style="color:var(--purple)">for</span> succ <span style="color:var(--purple)">in</span> adj[name]:
+            in_degree[succ] -= <span class="st">1</span>
+            <span style="color:var(--purple)">if</span> in_degree[succ] == <span class="st">0</span>:
+                ready.append(succ)
+                ready.sort(key=<span style="color:var(--purple)">lambda</span> n: (stall_cost[n], n))
+
+    <span style="color:var(--purple)">return</span> [self._defs[n] <span style="color:var(--purple)">for</span> n <span style="color:var(--purple)">in</span> order]</code></pre>
+</div>
+
+<h4 style="margin-top:16px;"><span class="zh">实例推演：TrainPipelineSparseDist（3-stage）</span><span class="en">Worked Example: TrainPipelineSparseDist (3-stage)</span></h4>
+
+<div class="api-card">
+<p><span class="zh">配置回顾（共 8 个任务，3 个 stream，3 个 stage）：</span><span class="en">Configuration recap (8 tasks, 3 streams, 3 stages):</span></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm"><span class="zh">任务</span><span class="en">Task</span>            stage   stream        intra_iter_deps            inter_iter_deps</span>
+─────────────────────────────────────────────────────────────────────────
+H2D              0      memcpy        —                             —
+InputDistStart   1      data_dist     H2D <span class="cm">(stage 0→1, cross-stage)</span>   —
+InputDistWait    1      data_dist     InputDistStart                —
+ZeroGrad         2      default       —                             —
+WaitBatch        2      default       InputDistWait <span class="cm">(stage 1→2)</span>,    —
+                                      ZeroGrad
+Forward          2      default       InputDistWait <span class="cm">(stage 1→2)</span>,    —
+                                      WaitBatch
+Backward         2      default       Forward                       —
+OptimizerStep    2      default       Backward                      —
+</pre>
+
+<p style="margin-top:14px;"><strong><span class="zh">步骤 1：Period-Local 图</span><span class="en">Step 1: Period-Local Graph</span></strong></p>
+<p><span class="zh">只保留 <code>stage<sub>dep</sub> = stage<sub>task</sub></code> 的 <code>intra_iter_deps</code> 边（无 <code>inter_iter_deps</code>）：</span><span class="en">Keep only <code>intra_iter_deps</code> edges where <code>stage<sub>dep</sub> = stage<sub>task</sub></code> (no <code>inter_iter_deps</code>):</span></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm"><span class="zh">保留的边（同 stage = 同 period）</span><span class="en">Retained edges (same stage = same period)</span>:</span>
+  InputDistStart → InputDistWait        <span class="cm">(stage 1 → 1) ✓</span>
+  ZeroGrad       → WaitBatch            <span class="cm">(stage 2 → 2) ✓</span>
+  WaitBatch      → Forward              <span class="cm">(stage 2 → 2) ✓</span>
+  Forward        → Backward             <span class="cm">(stage 2 → 2) ✓</span>
+  Backward       → OptimizerStep        <span class="cm">(stage 2 → 2) ✓</span>
+
+<span class="cm"><span class="zh">排除的边（跨 stage = 跨 period，dep 在更早 period 已完成）</span><span class="en">Excluded edges (cross-stage = cross-period, dep completed in earlier period)</span>:</span>
+  H2D → InputDistStart                  <span class="cm">(stage 0 → 1) ✗</span>
+  InputDistWait → WaitBatch             <span class="cm">(stage 1 → 2) ✗</span>
+  InputDistWait → Forward               <span class="cm">(stage 1 → 2) ✗</span>
+</pre>
+
+<p style="margin-top:14px;"><strong><span class="zh">步骤 2：计算 stall_cost</span><span class="en">Step 2: Compute stall_cost</span></strong></p>
+<p><span class="zh">stall_cost = period-local 图中跨 stream 的入边数。所有保留的边都是同 stream 内部的：</span><span class="en">stall_cost = number of cross-stream in-edges in the period-local graph. All retained edges are within the same stream:</span></p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+<span class="cm"><span class="zh">任务</span><span class="en">Task</span>              <span class="zh">period-local 入边</span><span class="en">period-local in-edges</span>          <span class="zh">跨 stream?</span><span class="en">cross-stream?</span>   stall_cost</span>
+──────────────────────────────────────────────────────────────────────
+H2D              <span class="zh">无</span><span class="en">none</span>                              —            <strong>0</strong>
+InputDistStart   <span class="zh">无</span><span class="en">none</span>                              —            <strong>0</strong>
+InputDistWait    InputDistStart(data_dist)   <span class="zh">同 stream</span><span class="en">same</span>     <strong>0</strong>
+ZeroGrad         <span class="zh">无</span><span class="en">none</span>                              —            <strong>0</strong>
+WaitBatch        ZeroGrad(default)           <span class="zh">同 stream</span><span class="en">same</span>     <strong>0</strong>
+Forward          WaitBatch(default)          <span class="zh">同 stream</span><span class="en">same</span>     <strong>0</strong>
+Backward         Forward(default)            <span class="zh">同 stream</span><span class="en">same</span>     <strong>0</strong>
+OptimizerStep    Backward(default)           <span class="zh">同 stream</span><span class="en">same</span>     <strong>0</strong>
+</pre>
+<p style="font-size:0.88rem;">
+<span class="zh">所有 stall_cost = 0，因为跨 stage（跨 stream）的 dep 被排除了——它们来自更早 period，GPU event 早已 record。</span>
+<span class="en">All stall_cost = 0 because cross-stage (cross-stream) deps are excluded — they come from earlier periods with GPU events already recorded.</span>
+</p>
+
+<p style="margin-top:14px;"><strong><span class="zh">步骤 3：拓扑排序</span><span class="en">Step 3: Topological Sort</span></strong></p>
+<pre style="font-size:0.82rem; line-height:1.7;">
+<span class="cm"><span class="zh">初始 ready（入度=0，按 (stall_cost, name) 排序）</span><span class="en">Initial ready (in-degree=0, sorted by (stall_cost, name))</span>:</span>
+  [(0,"H2D"), (0,"InputDistStart"), (0,"ZeroGrad")]
+
+<span class="cm"><span class="zh">出队过程</span><span class="en">Dequeue process</span>:</span>
+  1. <strong>H2D</strong>           → <span class="zh">无后继在 period-local 图中</span><span class="en">no successors in period-local graph</span>
+  2. <strong>InputDistStart</strong> → <span class="zh">释放</span><span class="en">releases</span> InputDistWait
+  3. <strong>ZeroGrad</strong>       → <span class="zh">释放</span><span class="en">releases</span> WaitBatch
+  4. <strong>InputDistWait</strong>  → <span class="zh">无 period-local 后继</span><span class="en">no period-local successors</span>
+  5. <strong>WaitBatch</strong>      → <span class="zh">释放</span><span class="en">releases</span> Forward
+  6. <strong>Forward</strong>        → <span class="zh">释放</span><span class="en">releases</span> Backward
+  7. <strong>Backward</strong>       → <span class="zh">释放</span><span class="en">releases</span> OptimizerStep
+  8. <strong>OptimizerStep</strong>
+</pre>
+
+<p style="margin-top:10px;"><strong><span class="zh">最终提交顺序</span><span class="en">Final submission order</span>:</strong></p>
+<pre style="font-size:0.85rem; line-height:1.5; background:#f0fdf4; border-color:#bbf7d0; padding:12px;">
+<span class="cm"> #  <span class="zh">任务</span><span class="en">Task</span>             stream       stage   stall_cost</span>
+ 1. H2D              memcpy        0       0
+ 2. InputDistStart   data_dist     1       0
+ 3. ZeroGrad         default       2       0
+ 4. InputDistWait    data_dist     1       0
+ 5. WaitBatch        default       2       0
+ 6. Forward          default       2       0
+ 7. Backward         default       2       0
+ 8. OptimizerStep    default       2       0
+</pre>
+
+<div class="callout callout-tip" style="margin-top:12px;">
+<span class="zh"><strong>与 stage-descending 对比</strong>：stage-descending 输出的是 <code>[ZeroGrad, WaitBatch, Forward, Backward, OptimizerStep, InputDistStart, InputDistWait, H2D]</code>。两者在此例中<strong>效果相同</strong>——因为跨 stage 的 dep 都来自更早 period，不产生 stall。但在有 <code>inter_iter_deps</code>（k=1）的场景下，ready-first 的优势才体现出来。</span>
+<span class="en"><strong>Comparison with stage-descending</strong>: Stage-descending produces <code>[ZeroGrad, WaitBatch, Forward, Backward, OptimizerStep, InputDistStart, InputDistWait, H2D]</code>. Both are <strong>equivalent</strong> for this example — because all cross-stage deps come from earlier periods, producing no stalls. The advantage of ready-first emerges in scenarios with <code>inter_iter_deps</code> (k=1).</span>
+</div>
+</div>
+
+<h4 style="margin-top:16px;"><span class="zh">进阶示例：同 stream 不同 stage + <code>inter_iter_deps</code></span><span class="en">Advanced Example: Same Stream, Different Stages + <code>inter_iter_deps</code></span></h4>
+
+<div class="api-card">
+<p><span class="zh">考虑一个假设的 pipeline，同一 stream 上有任务分布在不同 stage，且存在 <code>inter_iter_deps</code>（k=1）：</span><span class="en">Consider a hypothetical pipeline where the same stream has tasks at different stages, with <code>inter_iter_deps</code> (k=1):</span></p>
+<pre style="font-size:0.82rem; line-height:1.6;">
+<span class="cm"><span class="zh">配置</span><span class="en">Setup</span>:</span>
+  P: stage=0, stream=X               <span class="cm"># stall_cost = 0</span>
+  Q: stage=1, stream=Y, intra_iter_deps=[P]     <span class="cm"># <span class="zh">跨 stage：排除出 period-local 图</span><span class="en">cross-stage: excluded from period-local graph</span></span>
+  R: stage=0, stream=X, intra_iter_deps=[Q]     <span class="cm"># <span class="zh">跨 stage：排除出 period-local 图</span><span class="en">cross-stage: excluded from period-local graph</span></span>
+  A: stage=0, stream=Z, inter_iter_deps=[Q]   <span class="cm"># k=1: Q(stage 1) → <span class="zh">进入 period-local 图</span><span class="en">enters period-local graph</span></span>
+</pre>
+
+<p style="margin-top:10px;"><strong><span class="zh">Period-Local 图</span><span class="en">Period-Local Graph</span></strong><span class="zh">（只有 k=1 的 <code>inter_iter_deps</code> 边）</span><span class="en"> (only the k=1 <code>inter_iter_deps</code> edge)</span>:</p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+  Q(stage 1) ──→ A(stage 0)       <span class="cm"># cross_iter_dep, k=1, <span class="zh">同 period</span><span class="en">same period</span></span>
+  <span class="cm">P, R: <span class="zh">无 period-local 边</span><span class="en">no period-local edges</span></span>
+</pre>
+
+<p style="margin-top:8px;"><strong>stall_cost</strong>:</p>
+<pre style="font-size:0.82rem; line-height:1.5;">
+  P: 0    <span class="cm"><span class="zh">（无 period-local 入边）</span><span class="en">(no period-local in-edge)</span></span>
+  Q: 0    <span class="cm"><span class="zh">（无 period-local 入边）</span><span class="en">(no period-local in-edge)</span></span>
+  R: 0    <span class="cm"><span class="zh">（无 period-local 入边）</span><span class="en">(no period-local in-edge)</span></span>
+  A: 1    <span class="cm"><span class="zh">（Q→A 跨 stream: Y→Z）</span><span class="en">(Q→A cross-stream: Y→Z)</span></span>
+</pre>
+
+<p style="margin-top:8px;"><strong><span class="zh">拓扑排序</span><span class="en">Topological sort</span></strong>:</p>
+<pre style="font-size:0.82rem; line-height:1.7;">
+<span class="cm"><span class="zh">初始 ready</span><span class="en">Initial ready</span>:</span> [(0,"P"), (0,"Q"), (0,"R")]   <span class="cm">A <span class="zh">入度=1，不在 ready 中</span><span class="en">in-degree=1, not ready</span></span>
+
+  1. <strong>P</strong>  (stall=0, stream=X) → <span style="color:#16a34a"><span class="zh">立即执行，不等任何人</span><span class="en">runs immediately, no waits</span></span>
+  2. <strong>Q</strong>  (stall=0, stream=Y) → <span style="color:#16a34a"><span class="zh">立即执行</span><span class="en">runs immediately</span></span>  → <span class="zh">释放 A</span><span class="en">releases A</span>
+  3. <strong>R</strong>  (stall=0, stream=X) → <span style="color:#16a34a"><span class="zh">立即执行（P 已在 X 上，FIFO 保证顺序）</span><span class="en">runs immediately (P already on X, FIFO guarantees order)</span></span>
+  4. <strong>A</strong>  (stall=1, stream=Z) → <span class="zh">wait_event(Q)，但 Q 已提交，延迟最小</span><span class="en">wait_event(Q), but Q already submitted, minimal delay</span>
+</pre>
+
+<pre style="font-size:0.85rem; line-height:1.5; background:#f0fdf4; border-color:#bbf7d0; padding:12px;">
+<span class="zh">最终顺序</span><span class="en">Final order</span>:  P(X,s0) → Q(Y,s1) → R(X,s0) → A(Z,s0)
+
+GPU <span class="zh">时间线</span><span class="en">timeline</span>:
+  stream_X: ▓▓P▓▓▓▓R▓▓▓▓▓▓           <span class="cm">← P,R <span class="zh">连续执行，零空转</span><span class="en">run back-to-back, zero stall</span></span>
+  stream_Y: ▓▓Q▓▓▓▓▓▓▓▓▓▓▓
+  stream_Z: ░░░░░░▓▓A▓▓▓▓▓           <span class="cm">← A <span class="zh">等 Q 完成后执行</span><span class="en">waits for Q then runs</span></span>
+</pre>
+
+<div class="callout" style="margin-top:12px; background:#fef2f2; border-color:#fecaca;">
+<span class="zh"><strong>Stage-descending 对比</strong>：stage-descending 会先提交 Q(stage 1)，然后 P、R、A（stage 0）。顺序为 <code>Q → P → R → A</code>。在此例中 <strong>P 被延迟了</strong>——Q 在不同 stream 上，P 不需要等 Q，但 stage-descending 强制让 Q 先提交。ready-first 让 P 和 Q 同时出现在 ready 列表中，按 name 排序 P 先出队。</span>
+<span class="en"><strong>Stage-descending comparison</strong>: Stage-descending submits Q(stage 1) first, then P, R, A (stage 0). Order: <code>Q → P → R → A</code>. Here <strong>P is delayed</strong> — Q runs on a different stream and P doesn't need Q, but stage-descending forces Q first. Ready-first places both P and Q in the ready list simultaneously; P dequeues first by name.</span>
+</div>
+</div>
+
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="SWPipeline">SWPipeline</h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card cls">
+  <span class="badge-class api-badge">Class</span>
+  <div class="api-sig">
+    <span class="kw">class</span> <span class="cls-name">SWPipeline</span><span class="punct">(</span><span class="param">plan</span><span class="punct">:</span> <span class="type">PipelinePlan</span><span class="punct">,</span> <span class="param">device</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">通用软件流水线引擎。接收 <code>PipelinePlan</code> 后自动完成拓扑排序、分配同步资源、创建 <code>_SubmissionSequencer</code>。支持 pipelined / serial / single-iter 三种执行模式，以及运行时 task shortcut。构造时验证 DAG（无环、stage 单调、名称唯一）。</span>
+    <span class="en">General-purpose software pipeline engine. Parses <code>PipelinePlan</code>, performs topo sort, allocates sync resources, creates <code>_SubmissionSequencer</code>. Supports pipelined / serial / single-iter execution and runtime task shortcutting. Validates DAG at construction (acyclic, monotone stages, unique names).</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>plan</td><td>PipelinePlan</td><td><span class="zh">完整调度计划</span><span class="en">Complete scheduling plan</span></td></tr>
+    <tr><td>device</td><td>int</td><td><span class="zh">CUDA 设备号（默认 0）</span><span class="en">CUDA device (default 0)</span></td></tr>
+  </table>
+  <div class="example-label">▸ <span class="zh">三种执行模式</span><span class="en">Three Execution Modes</span></div>
+<pre><code>pipe = SWPipeline(plan, device=0)
+
+<span style="color:var(--text-dim)"># Mode 1: run() — one-shot pipelined execution</span>
+elapsed = pipe.run(dataloader, verbose=True)
+
+<span style="color:var(--text-dim)"># Mode 2: run_serial() — serial baseline</span>
+baseline = pipe.run_serial(dataloader, verbose=True)
+
+<span style="color:var(--text-dim)"># Mode 3: fill_pipeline + progress — fine-grained control</span>
+data_iter = pipe.fill_pipeline(dataloader)
+while True:
+    try:
+        idx = pipe.progress(data_iter)
+    except StopIteration:
+        break</code></pre>
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L184-L287">sw_pipeline.py:184–287</a></p>
+</div>
+
+<!-- ─── Sequence Diagram ─── -->
+<h3 id="sequence-diagram"><span class="zh">执行时序图</span><span class="en">Execution Sequence Diagram</span></h3>
+<p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:14px;">
+  <span class="zh"><code>fill_pipeline()</code> → <code>progress()</code> 循环。depth=2, 3 batches, Stage 0: <code>CopyBatch</code> (IO Worker), Stage 1: <code>Forward</code> + <code>Backward</code> (Comp Worker)。</span>
+  <span class="en"><code>fill_pipeline()</code> → <code>progress()</code> loop. depth=2, 3 batches. Stage 0: <code>CopyBatch</code> (IO Worker), Stage 1: <code>Forward</code> + <code>Backward</code> (Comp Worker).</span>
+</p>
+
+<svg viewBox="0 0 850 920" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:850px;display:block;margin:0 auto 28px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+<defs>
+  <marker id="ag" viewBox="0 0 8 6" refX="8" refY="3" markerWidth="7" markerHeight="5" orient="auto"><path d="M0,0L8,3L0,6z" fill="#94a3b8"/></marker>
+  <marker id="agreen" viewBox="0 0 8 6" refX="8" refY="3" markerWidth="7" markerHeight="5" orient="auto"><path d="M0,0L8,3L0,6z" fill="#16a34a"/></marker>
+  <marker id="ared" viewBox="0 0 8 6" refX="8" refY="3" markerWidth="7" markerHeight="5" orient="auto"><path d="M0,0L8,3L0,6z" fill="#dc2626"/></marker>
+  <pattern id="wait-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <line x1="0" y1="0" x2="0" y2="6" stroke="#e2e8f0" stroke-width="1.5"/>
+  </pattern>
+</defs>
+<rect width="850" height="920" rx="10" fill="#fafbfc"/>
+
+<!-- Column Headers -->
+<rect x="10" y="10" width="90" height="26" rx="4" fill="#f1f5f9" stroke="#d97706" stroke-width="1"/>
+<text x="55" y="27" text-anchor="middle" fill="#d97706" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">IterContext</text>
+<rect x="165" y="10" width="110" height="26" rx="4" fill="#f1f5f9" stroke="#0891b2" stroke-width="1"/>
+<text x="220" y="27" text-anchor="middle" fill="#0891b2" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">Main Thread</text>
+<rect x="375" y="10" width="110" height="26" rx="4" fill="#f1f5f9" stroke="#16a34a" stroke-width="1"/>
+<text x="430" y="27" text-anchor="middle" fill="#16a34a" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">IO Worker</text>
+<rect x="595" y="10" width="110" height="26" rx="4" fill="#f1f5f9" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="27" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">Comp Worker</text>
+
+<!-- Lifelines -->
+<line x1="220" y1="36" x2="220" y2="880" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>
+<line x1="430" y1="36" x2="430" y2="880" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>
+<line x1="650" y1="36" x2="650" y2="880" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>
+
+<!-- Phase 1: fill_pipeline() -->
+<rect x="0" y="50" width="850" height="20" rx="0" fill="rgba(8,145,178,0.06)"/>
+<text x="425" y="64" text-anchor="middle" fill="#0891b2" font-size="11" font-weight="700">fill_pipeline(data_iter)</text>
+
+<rect x="200" y="80" width="40" height="85" rx="3" fill="rgba(8,145,178,0.08)" stroke="#0891b2" stroke-width="0.8"/>
+<circle cx="220" cy="90" r="2.5" fill="#0891b2"/>
+<text x="190" y="93" text-anchor="end" fill="#1e293b" font-size="9">create ctx₀</text>
+<line x1="240" y1="100" x2="398" y2="100" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="318" y="96" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">CopyBatch(0)</text>
+<circle cx="220" cy="118" r="2.5" fill="#0891b2"/>
+<text x="190" y="121" text-anchor="end" fill="#1e293b" font-size="9">create ctx₁</text>
+<line x1="240" y1="130" x2="618" y2="130" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="425" y="126" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">Fwd(0), Bwd(0)</text>
+<line x1="240" y1="142" x2="398" y2="142" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="318" y="138" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">CopyBatch(1)</text>
+<circle cx="220" cy="155" r="2.5" fill="#0891b2"/>
+<text x="190" y="158" text-anchor="end" fill="#94a3b8" font-size="8">return</text>
+
+<!-- IO Worker: CopyBatch(0) -->
+<rect x="400" y="95" width="60" height="58" rx="4" fill="rgba(22,163,74,0.08)" stroke="#16a34a" stroke-width="1"/>
+<text x="430" y="117" text-anchor="middle" fill="#16a34a" font-size="8.5" font-weight="500">Copy</text>
+<text x="430" y="129" text-anchor="middle" fill="#16a34a" font-size="8.5" font-weight="500">Batch(0)</text>
+<text x="430" y="143" text-anchor="middle" fill="#16a34a" font-size="7" font-style="italic">H2D</text>
+<line x1="460" y1="153" x2="618" y2="173" stroke="#16a34a" stroke-width="1" marker-end="url(#agreen)"/>
+<text x="540" y="158" text-anchor="middle" fill="#16a34a" font-size="7.5">cpu_sig + cuda_evt</text>
+
+<!-- IO Worker: CopyBatch(1) -->
+<rect x="400" y="163" width="60" height="58" rx="4" fill="rgba(22,163,74,0.08)" stroke="#16a34a" stroke-width="1"/>
+<text x="430" y="185" text-anchor="middle" fill="#16a34a" font-size="8.5" font-weight="500">Copy</text>
+<text x="430" y="197" text-anchor="middle" fill="#16a34a" font-size="8.5" font-weight="500">Batch(1)</text>
+
+<!-- Comp Worker: wait + Forward(0) + Backward(0) -->
+<rect x="620" y="135" width="60" height="40" rx="4" fill="url(#wait-hatch)" stroke="#e2e8f0" stroke-width="0.8" stroke-dasharray="3,2"/>
+<text x="650" y="158" text-anchor="middle" fill="#94a3b8" font-size="8">wait…</text>
+<rect x="620" y="178" width="60" height="70" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="207" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Fwd(0)</text>
+<text x="650" y="220" text-anchor="middle" fill="#7c3aed" font-size="7" font-style="italic">compute</text>
+<rect x="620" y="255" width="60" height="60" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="280" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Bwd(0)</text>
+
+<!-- iter_complete[0] -->
+<line x1="620" y1="320" x2="242" y2="355" stroke="#dc2626" stroke-width="1.2" marker-end="url(#ared)"/>
+<text x="430" y="330" text-anchor="middle" fill="#dc2626" font-size="8" font-weight="600">iter_complete[0].set()</text>
+
+<!-- Overlap highlight -->
+<rect x="395" y="178" width="290" height="43" rx="0" fill="rgba(217,119,6,0.06)" stroke="#d97706" stroke-width="0.8" stroke-dasharray="3,2"/>
+<text x="780" y="198" fill="#d97706" font-size="8" font-weight="600">Pipeline</text>
+<text x="780" y="209" fill="#d97706" font-size="8" font-weight="600">Overlap</text>
+
+<!-- Phase 2: progress() → 0 -->
+<rect x="0" y="360" width="850" height="20" rx="0" fill="rgba(8,145,178,0.06)"/>
+<text x="425" y="374" text-anchor="middle" fill="#0891b2" font-size="11" font-weight="700">progress(data_iter) → returns 0</text>
+<rect x="200" y="390" width="40" height="105" rx="3" fill="rgba(8,145,178,0.08)" stroke="#0891b2" stroke-width="0.8"/>
+<circle cx="220" cy="400" r="2.5" fill="#0891b2"/>
+<text x="190" y="403" text-anchor="end" fill="#1e293b" font-size="9">wait(complete[0]) ✓</text>
+<circle cx="220" cy="418" r="2.5" fill="#0891b2"/>
+<text x="190" y="421" text-anchor="end" fill="#1e293b" font-size="9">stream.wait_event()</text>
+<circle cx="220" cy="436" r="2.5" fill="#dc2626"/>
+<text x="190" y="439" text-anchor="end" fill="#dc2626" font-size="9" font-weight="600">del ctx₀</text>
+<circle cx="220" cy="456" r="2.5" fill="#0891b2"/>
+<text x="190" y="459" text-anchor="end" fill="#1e293b" font-size="9">create ctx₂</text>
+<line x1="240" y1="466" x2="398" y2="466" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="318" y="462" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">CopyBatch(2)</text>
+<line x1="240" y1="478" x2="618" y2="478" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="425" y="474" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">Fwd(1), Bwd(1)</text>
+<circle cx="220" cy="490" r="2.5" fill="#0891b2"/>
+<text x="190" y="493" text-anchor="end" fill="#94a3b8" font-size="8">return 0</text>
+
+<!-- Workers iter 1-2 (simplified) -->
+<rect x="400" y="472" width="60" height="58" rx="4" fill="rgba(22,163,74,0.08)" stroke="#16a34a" stroke-width="1"/>
+<text x="430" y="502" text-anchor="middle" fill="#16a34a" font-size="8.5" font-weight="500">CB(2)</text>
+<rect x="620" y="485" width="60" height="68" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="520" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Fwd(1)</text>
+<rect x="620" y="560" width="60" height="55" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="590" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Bwd(1)</text>
+<line x1="620" y1="620" x2="242" y2="648" stroke="#dc2626" stroke-width="1.2" marker-end="url(#ared)"/>
+<text x="430" y="632" text-anchor="middle" fill="#dc2626" font-size="8" font-weight="600">iter_complete[1].set()</text>
+<rect x="395" y="485" width="290" height="45" rx="0" fill="rgba(217,119,6,0.06)" stroke="#d97706" stroke-width="0.8" stroke-dasharray="3,2"/>
+<text x="780" y="510" fill="#d97706" font-size="8" font-weight="600">Overlap</text>
+
+<!-- Phase 3: progress() → 1 -->
+<rect x="0" y="645" width="850" height="20" rx="0" fill="rgba(8,145,178,0.06)"/>
+<text x="425" y="659" text-anchor="middle" fill="#0891b2" font-size="11" font-weight="700">progress(data_iter) → returns 1</text>
+<rect x="200" y="675" width="40" height="60" rx="3" fill="rgba(8,145,178,0.08)" stroke="#0891b2" stroke-width="0.8"/>
+<circle cx="220" cy="685" r="2.5" fill="#0891b2"/>
+<text x="190" y="688" text-anchor="end" fill="#1e293b" font-size="9">wait(complete[1]) ✓</text>
+<circle cx="220" cy="700" r="2.5" fill="#dc2626"/>
+<text x="190" y="703" text-anchor="end" fill="#dc2626" font-size="9" font-weight="600">del ctx₁</text>
+<line x1="240" y1="724" x2="618" y2="724" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="425" y="720" text-anchor="middle" fill="#64748b" font-size="8" font-style="italic">Fwd(2), Bwd(2)</text>
+<rect x="620" y="730" width="60" height="55" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="758" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Fwd(2)</text>
+<rect x="620" y="790" width="60" height="45" rx="4" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="1"/>
+<text x="650" y="815" text-anchor="middle" fill="#7c3aed" font-size="9" font-weight="500">Bwd(2)</text>
+<line x1="620" y1="838" x2="242" y2="856" stroke="#dc2626" stroke-width="1.2" marker-end="url(#ared)"/>
+<text x="430" y="845" text-anchor="middle" fill="#dc2626" font-size="8" font-weight="600">iter_complete[2].set()</text>
+
+<!-- Phase 4: drain -->
+<rect x="0" y="860" width="850" height="20" rx="0" fill="rgba(220,38,38,0.06)"/>
+<text x="425" y="874" text-anchor="middle" fill="#dc2626" font-size="11" font-weight="700">progress() → del ctx₂, stop_workers(), StopIteration</text>
+
+<!-- IterContext lifetime bars -->
+<rect x="20" y="85" width="30" height="351" rx="3" fill="rgba(8,145,178,0.08)" stroke="#0891b2" stroke-width="1"/>
+<text x="35" y="100" text-anchor="middle" fill="#0891b2" font-size="9" font-weight="600">ctx₀</text>
+<line x1="20" y1="436" x2="50" y2="436" stroke="#dc2626" stroke-width="1.5"/>
+<text x="55" y="439" fill="#dc2626" font-size="7">✕ del</text>
+<rect x="55" y="115" width="30" height="585" rx="3" fill="rgba(22,163,74,0.08)" stroke="#16a34a" stroke-width="1"/>
+<text x="70" y="130" text-anchor="middle" fill="#16a34a" font-size="9" font-weight="600">ctx₁</text>
+<line x1="55" y1="700" x2="85" y2="700" stroke="#dc2626" stroke-width="1.5"/>
+<text x="90" y="703" fill="#dc2626" font-size="7">✕ del</text>
+<rect x="90" y="455" width="30" height="420" rx="3" fill="rgba(217,119,6,0.08)" stroke="#d97706" stroke-width="1"/>
+<text x="105" y="470" text-anchor="middle" fill="#d97706" font-size="9" font-weight="600">ctx₂</text>
+<line x1="90" y1="875" x2="120" y2="875" stroke="#dc2626" stroke-width="1.5"/>
+
+<!-- Legend -->
+<rect x="0" y="890" width="850" height="30" rx="0" fill="rgba(0,0,0,.02)"/>
+<rect x="30" y="900" width="24" height="10" rx="2" fill="rgba(22,163,74,0.08)" stroke="#16a34a" stroke-width="0.8"/>
+<text x="60" y="909" fill="#64748b" font-size="8">Stage 0</text>
+<rect x="120" y="900" width="24" height="10" rx="2" fill="rgba(124,58,237,0.08)" stroke="#7c3aed" stroke-width="0.8"/>
+<text x="150" y="909" fill="#64748b" font-size="8">Stage 1</text>
+<rect x="210" y="900" width="24" height="10" rx="2" fill="url(#wait-hatch)" stroke="#e2e8f0" stroke-width="0.8"/>
+<text x="240" y="909" fill="#64748b" font-size="8">idle</text>
+<rect x="290" y="900" width="24" height="10" rx="2" fill="rgba(217,119,6,0.06)" stroke="#d97706" stroke-width="0.8" stroke-dasharray="2,1"/>
+<text x="320" y="909" fill="#64748b" font-size="8">overlap</text>
+<line x1="400" y1="905" x2="425" y2="905" stroke="#dc2626" stroke-width="1.2" marker-end="url(#ared)"/>
+<text x="432" y="909" fill="#64748b" font-size="8">iter_complete</text>
+<line x1="540" y1="905" x2="565" y2="905" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+<text x="572" y="909" fill="#64748b" font-size="8">dispatch</text>
+</svg>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="swpipeline-methods">SWPipeline <span class="zh">方法</span><span class="en">Methods</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<!-- fill_pipeline -->
+<h3 id="fill_pipeline">fill_pipeline</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">fill_pipeline</span><span class="punct">(</span><span class="param">data_iter</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">Iterator</span></div>
+  <div class="api-desc">
+    <span class="zh">预填充流水线：预取 <code>depth</code> 个 batch，启动 worker 线程，提交前 <code>depth</code> 个 period。必须在首次 <code>progress()</code> 前调用。接受任何可迭代对象。</span>
+    <span class="en">Prefetch <code>depth</code> batches, start worker threads, submit first <code>depth</code> periods. Must be called before first <code>progress()</code>. Accepts any iterable.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>data_iter</td><td>Iterable</td><td><span class="zh">数据源</span><span class="en">Data source</span></td></tr>
+  </table>
+  <p class="returns"><span class="zh">返回</span><span class="en">Returns</span> → <code>Iterator</code></p>
+  <p class="returns"><span class="zh">异常</span><span class="en">Raises</span> → <code>RuntimeError</code> <span class="zh">（重复调用）</span><span class="en">(called twice without drain)</span></p>
+<pre><code>data_iter = pipe.fill_pipeline(train_loader)
+<span style="color:var(--text-dim)"># Now ready for pipe.progress(data_iter)</span></code></pre>
+</div>
+
+<!-- progress -->
+<h3 id="progress">progress</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">progress</span><span class="punct">(</span><span class="param">data_iter</span><span class="punct">:</span> <span class="type">Optional[Iterator]</span> <span class="punct">=</span> None<span class="punct">)</span> <span class="punct">→</span> <span class="type">int</span></div>
+  <div class="api-desc">
+    <span class="zh">推进一步：(1) 等待最老 in-flight 迭代完成 (2) 提交下一个 period (3) 返回已完成的 <code>iter_idx</code>。传 <code>data_iter=None</code> 只 retire 不入队新数据。超时 60 秒抛 <code>RuntimeError</code>。</span>
+    <span class="en">Advance one step: (1) wait for oldest in-flight iteration (2) enqueue next period (3) return completed <code>iter_idx</code>. Pass <code>None</code> to retire without enqueuing. 60s timeout raises <code>RuntimeError</code>.</span>
+  </div>
+  <p class="returns"><span class="zh">返回</span><span class="en">Returns</span> → <code>int</code> · <span class="zh">异常</span><span class="en">Raises</span> → <code>StopIteration</code>, <code>RuntimeError</code></p>
+<pre><code>data_iter = pipe.fill_pipeline(dataloader)
+while True:
+    try:
+        idx = pipe.progress(data_iter)
+    except StopIteration:
+        break</code></pre>
+</div>
+
+<!-- run -->
+<h3 id="run">run</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">run</span><span class="punct">(</span><span class="param">data_iter</span><span class="punct">:</span> <span class="type">Iterator</span><span class="punct">,</span> <span class="param">verbose</span><span class="punct">:</span> <span class="type">bool</span> <span class="punct">=</span> False<span class="punct">,</span> <span class="param">emit_nvtx</span><span class="punct">:</span> <span class="type">bool</span> <span class="punct">=</span> False<span class="punct">)</span> <span class="punct">→</span> <span class="type">float</span></div>
+  <div class="api-desc">
+    <span class="zh">一站式 pipelined 执行：消费整个 <code>data_iter</code>，返回 wall-clock 秒数。内部 = <code>fill_pipeline</code> + <code>progress</code> 循环。NVTX 前缀 <code>SWP/{TaskName}/iter{N}</code>。<code>emit_nvtx=True</code> 启用 <code>torch.autograd.profiler.emit_nvtx()</code> 让 backward kernel 在 nsys 中可见。</span>
+    <span class="en">One-shot pipelined execution consuming entire <code>data_iter</code>. Returns wall-clock seconds. Internally = <code>fill_pipeline</code> + <code>progress</code> loop. NVTX prefix <code>SWP/{TaskName}/iter{N}</code>. <code>emit_nvtx=True</code> enables <code>torch.autograd.profiler.emit_nvtx()</code> for nsys backward-kernel visibility.</span>
+  </div>
+  <p class="returns"><span class="zh">返回</span><span class="en">Returns</span> → <code>float</code> <span class="zh">（秒，含 cuda.synchronize）</span><span class="en">(seconds, includes cuda.synchronize)</span></p>
+<pre><code>elapsed = pipe.run(batches, verbose=True, emit_nvtx=True)
+print(f"Pipeline: {elapsed*1000:.1f} ms")</code></pre>
+</div>
+
+<!-- run_serial -->
+<h3 id="run_serial">run_serial</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">run_serial</span><span class="punct">(</span><span class="param">data_iter</span><span class="punct">:</span> <span class="type">Iterator</span><span class="punct">,</span> <span class="param">verbose</span><span class="punct">:</span> <span class="type">bool</span> <span class="punct">=</span> False<span class="punct">,</span> <span class="param">emit_nvtx</span><span class="punct">:</span> <span class="type">bool</span> <span class="punct">=</span> False<span class="punct">)</span> <span class="punct">→</span> <span class="type">float</span></div>
+  <div class="api-desc">
+    <span class="zh">在 default stream 上串行执行所有迭代（无流水线、无多线程），用作性能基线。NVTX 前缀 <code>SWP_serial/{TaskName}/iter{N}</code>。Shortcut task 自动追加 <code>[skip]</code> 后缀。</span>
+    <span class="en">Run all iterations serially on default stream (no pipeline, no threads) as a performance baseline. NVTX prefix <code>SWP_serial/{TaskName}/iter{N}</code>. Shortcut tasks get <code>[skip]</code> suffix.</span>
+  </div>
+  <p class="returns"><span class="zh">返回</span><span class="en">Returns</span> → <code>float</code></p>
+<pre><code>serial   = pipe.run_serial(make_data(100), verbose=True)
+pipeline = pipe.run(make_data(100), verbose=True)
+print(f"Speedup: {serial / pipeline:.2f}x")</code></pre>
+</div>
+
+<!-- run_one_serial_iter -->
+<h3 id="run_one_serial_iter">run_one_serial_iter</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">run_one_serial_iter</span><span class="punct">(</span><span class="param">batch</span><span class="punct">:</span> <span class="type">Any</span><span class="punct">,</span> <span class="param">iter_idx</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">在 default stream 上执行单次迭代。按拓扑序依次执行所有 Task。尊重 shortcut 状态——被 shortcut 的 Task 跳过 <code>fn(ctx)</code> 并回放缓存。不需要 <code>fill_pipeline()</code>，不涉及 worker 线程。原子操作，无 in-flight 状态。</span>
+    <span class="en">Single serial iteration on default stream. Executes tasks in topo order. Respects shortcut state — shortcutted tasks skip <code>fn(ctx)</code> and replay cache. No <code>fill_pipeline()</code> needed, no workers. Atomic, leaves no in-flight state.</span>
+  </div>
+<pre><code>batch = next(iter(train_loader))
+pipe.run_one_serial_iter(batch, iter_idx=0)
+
+<span style="color:var(--text-dim)"># With shortcut</span>
+pipe.enable_shortcut("Forward")
+pipe.run_one_serial_iter(batch, iter_idx=1)  <span style="color:var(--text-dim)"># caching</span>
+pipe.run_one_serial_iter(batch, iter_idx=2)  <span style="color:var(--text-dim)"># shortcut (Forward skipped)</span></code></pre>
+</div>
+
+<!-- enable_shortcut -->
+<h3 id="enable_shortcut">enable_shortcut</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">enable_shortcut</span><span class="punct">(</span><span class="param">*task_names</span><span class="punct">:</span> <span class="type">str</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">启用 shortcut 模式。首次执行 = <strong>caching</strong>（正常跑 fn + 快照输出 + 调用 <code>DeclaredIO.capture()</code>），后续执行 = <strong>shortcut</strong>（跳过 fn，回放 cache + 调用 <code>DeclaredIO.restore()</code>）。<code>globally_ordered</code> Task 仍执行 <code>_SubmissionSequencer</code> 保序。<strong>所有 rank 必须同步 enable/disable 相同 Task。</strong></span>
+    <span class="en">Enable shortcut mode. First execution = <strong>caching</strong> (run fn + snapshot + call <code>DeclaredIO.capture()</code>), subsequent = <strong>shortcut</strong> (skip fn, replay cache + call <code>DeclaredIO.restore()</code>). <code>globally_ordered</code> tasks still run <code>_SubmissionSequencer</code>. <strong>All ranks must enable/disable same tasks.</strong></span>
+  </div>
+  <p class="returns"><span class="zh">异常</span><span class="en">Raises</span> → <code>ValueError</code> <span class="zh">（未知 task 名称）</span><span class="en">(unknown task name)</span></p>
+<pre><code>pipe.enable_shortcut("EmbLookup")
+pipe.enable_shortcut("EmbLookup", "Prefetch", "MPEmbForward")</code></pre>
+</div>
+
+<!-- disable_shortcut -->
+<h3 id="disable_shortcut">disable_shortcut</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">disable_shortcut</span><span class="punct">(</span><span class="param">*task_names</span><span class="punct">:</span> <span class="type">str</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">关闭 shortcut 并清除缓存。后续 Task 恢复正常执行，无额外开销。</span>
+    <span class="en">Disable shortcut and clear cache. Tasks resume normal execution, zero overhead.</span>
+  </div>
+<pre><code>pipe.disable_shortcut("EmbLookup")</code></pre>
+</div>
+
+<!-- drain -->
+<h3 id="drain">drain</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">drain</span><span class="punct">()</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh"><strong>Pipelined 模式</strong>：依次 retire 所有 in-flight 迭代 → 停止 worker → 同步 CUDA → <code>_reset_state()</code>。之后可重新 <code>fill_pipeline()</code>。<br><strong>Serial 模式</strong>（<code>run_one_serial_iter</code>）：仅 <code>cuda.synchronize</code>——串行迭代是原子操作，无 in-flight 状态。<br>Shortcut 配置和缓存<strong>保留</strong>，需显式 <code>disable_shortcut()</code> 清除。</span>
+    <span class="en"><strong>Pipelined mode</strong>: retires all in-flight iterations → stops workers → syncs CUDA → <code>_reset_state()</code>. Then <code>fill_pipeline()</code> again.<br><strong>Serial mode</strong> (<code>run_one_serial_iter</code>): just <code>cuda.synchronize</code> — serial iterations are atomic.<br>Shortcut config and cache are <strong>preserved</strong>; call <code>disable_shortcut()</code> to clear.</span>
+  </div>
+<pre><code><span style="color:var(--text-dim)"># Switch data iterator in pipelined mode</span>
+pipe.drain()
+data_iter = pipe.fill_pipeline(new_loader)
+
+<span style="color:var(--text-dim)"># Change shortcut config mid-pipeline</span>
+pipe.drain()
+pipe.enable_shortcut("Forward")
+data_iter = pipe.fill_pipeline(loader)</code></pre>
+</div>
+
+<!-- print_schedule -->
+<h3 id="print_schedule">print_schedule</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">print_schedule</span><span class="punct">(</span><span class="param">num_iterations</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">打印 period × task 调度表。每行一个 Task，列含 Thread、Stream、各 period 上的迭代分配。被 shortcut 的 Task 名后缀 <code>[skip]</code>。</span>
+    <span class="en">Print period × task schedule table. One task/row. Columns: Thread, Stream, iteration per period. Shortcutted tasks have <code>[skip]</code> suffix.</span>
+  </div>
+<pre><code>pipe.print_schedule(3)
+<span style="color:var(--text-dim)">#    #  Task                      Thread   Stream   | P0   P1   P2
+#   --  ------------------------  -------  -------  + ---- ---- ----
+#    0  H2DAndShuffle             default  default  | i0   i1   i2
+#    1  EmbInputDistStart [skip]  default  default  |  .    .    .
+#    2  EmbInputDistWait          default  default  | i0   i1   i2</span></code></pre>
+</div>
+
+<!-- format_schedule -->
+<h3 id="format_schedule">format_schedule</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">format_schedule</span><span class="punct">(</span><span class="param">num_iterations</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">)</span> <span class="punct">→</span> <span class="type">str</span></div>
+  <div class="api-desc">
+    <span class="zh">同 <code>print_schedule</code>，但返回字符串不打印。可用于日志或进一步处理。</span>
+    <span class="en">Same as <code>print_schedule</code> but returns string instead of printing. Useful for logging.</span>
+  </div>
+<pre><code>logger.info(pipe.format_schedule(5))</code></pre>
+</div>
+
+<!-- print_stage_analysis -->
+<h3 id="print_stage_analysis">print_stage_analysis</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">print_stage_analysis</span><span class="punct">()</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">打印拓扑排序、stage 分配、Dilworth 最长递减子序列 (LDS)、以及 LDS == depth 时的最优性验证。</span>
+    <span class="en">Print topo order, stage assignment, Dilworth LDS, and optimality check (LDS == depth).</span>
+  </div>
+<pre><code>pipe.print_stage_analysis()
+<span style="color:var(--text-dim)"># Task schedule (topological order):
+#   Pos  Task              Idx  Stage  Type
+#   --------------------------------------------------
+#     0  CopyBatch           0      0  stream
+#     1  Forward             1      1  stream
+#     ...
+# LDS = 2  (example: (1, 0))
+# Pipeline depth = 2
+#   ✓  LDS == depth (Dilworth-optimal)</span></code></pre>
+</div>
+
+<!-- __repr__ -->
+<h3 id="repr">__repr__</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">__repr__</span><span class="punct">()</span> <span class="punct">→</span> <span class="type">str</span></div>
+  <div class="api-desc">
+    <span class="zh">返回可读摘要：设备、深度、任务列表、当前 shortcut、完整调度表。</span>
+    <span class="en">Readable summary: device, depth, task list, active shortcuts, and full schedule table.</span>
+  </div>
+<pre><code>print(pipe)
+<span style="color:var(--text-dim)"># SWPipeline(device=0, depth=1, tasks=[...], shortcuts=['MPEmbForward'])
+#
+#    #  Task                      Thread   Stream   | P0
+#   --  ------------------------  -------  -------  + ---
+#    0  H2DAndShuffle             default  default  | i0</span></code></pre>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="TaskProfiler">TaskProfiler</h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card cls">
+  <span class="badge-class api-badge">Class</span>
+  <div class="api-sig">
+    <span class="kw">class</span> <span class="cls-name">TaskProfiler</span><span class="punct">(</span><span class="param">pipeline</span><span class="punct">:</span> <span class="type">SWPipeline</span><span class="punct">)</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">Per-task <strong>exposed time</strong> 测量工具。基于 <code>SWPipeline</code> shortcut 机制：逐一 shortcut 每个 task，测量 <code>exposed(T) = baseline − serial_with_T_shortcut</code>。结果驱动 auto-scheduling 决策。</span>
+    <span class="en">Per-task <strong>exposed time</strong> measurement. Uses <code>SWPipeline</code> shortcut: shortcut each task one by one, measure <code>exposed(T) = baseline − serial_with_T_shortcut</code>. Results drive auto-scheduling decisions.</span>
+  </div>
+<pre><code>profiler = TaskProfiler(pipe)
+result = profiler.profile(batch, num_warmup=5, num_measure=20)
+result.print_report()</code></pre>
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L1247-L1368">sw_pipeline.py:1247–1368</a></p>
+</div>
+
+<!-- profile -->
+<h3 id="profiler-profile">profile</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">profile</span><span class="punct">(</span><span class="param">batch</span><span class="punct">:</span> <span class="type">Any</span><span class="punct">,</span> <span class="param">num_warmup</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">,</span> <span class="param">num_measure</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 10<span class="punct">,</span> <span class="param">num_rounds</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">,</span> <span class="param">skip_tasks</span><span class="punct">:</span> <span class="type">Optional[set]</span> <span class="punct">=</span> None<span class="punct">)</span> <span class="punct">→</span> <span class="type">ProfileResult</span></div>
+  <div class="api-desc">
+    <span class="zh">四阶段 profiling：(1) Warmup (2) Baseline（取 num_rounds 轮中位数）(3) 逐 Task shortcut 测量 (4) <code>exposed = max(0, baseline - median_shortcut)</code>。每 round 只有两次 <code>cuda.synchronize</code>。<code>skip_tasks</code> 排除不可独立 shortcut 的 Task（如 <code>LossBackward</code>）。</span>
+    <span class="en">Four-phase profiling: (1) Warmup (2) Baseline (median of num_rounds) (3) Per-task shortcut measurement (4) <code>exposed = max(0, baseline - median_shortcut)</code>. Only two <code>cuda.synchronize</code> per round. <code>skip_tasks</code> excludes non-independently-shortcuttable tasks (e.g. <code>LossBackward</code>).</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">默认</span><span class="en">Default</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>batch</td><td>Any</td><td>—</td><td><span class="zh">代表性 batch</span><span class="en">Representative batch</span></td></tr>
+    <tr><td>num_warmup</td><td>int</td><td>3</td><td><span class="zh">预热次数</span><span class="en">Warmup iterations</span></td></tr>
+    <tr><td>num_measure</td><td>int</td><td>10</td><td><span class="zh">每 round 迭代数</span><span class="en">Iterations per round</span></td></tr>
+    <tr><td>num_rounds</td><td>int</td><td>3</td><td><span class="zh">round 数</span><span class="en">Number of rounds</span></td></tr>
+    <tr><td>skip_tasks</td><td>Optional[set]</td><td>None</td><td><span class="zh">排除的 Task 名称</span><span class="en">Task names to exclude</span></td></tr>
+  </table>
+  <p class="returns"><span class="zh">返回</span><span class="en">Returns</span> → <code>ProfileResult</code></p>
+<pre><code>result = profiler.profile(batch, num_warmup=5, num_measure=20, num_rounds=5)
+result.print_report()
+
+<span style="color:var(--text-dim)"># Access raw data</span>
+for name, t in result.exposed_s.items():
+    print(f"{name}: {t*1e3:.3f} ms")</code></pre>
+</div>
+
+<!-- profile_many -->
+<h3 id="profiler-profile_many">profile_many</h3>
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="name">profile_many</span><span class="punct">(</span><span class="param">batches</span><span class="punct">:</span> <span class="type">list</span><span class="punct">,</span> <span class="param">num_warmup</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">,</span> <span class="param">num_measure</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 10<span class="punct">,</span> <span class="param">num_rounds</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 3<span class="punct">)</span> <span class="punct">→</span> <span class="type">List[ProfileResult]</span></div>
+  <div class="api-desc">
+    <span class="zh">对多个 batch 独立 profile。用于分析 exposed time 随数据分布变化的情况。</span>
+    <span class="en">Profile each batch independently. Useful for analyzing exposed time variation across data distributions.</span>
+  </div>
+<pre><code>results = profiler.profile_many([batch_a, batch_b, batch_c])
+for i, r in enumerate(results):
+    print(f"\n--- Batch {i} ---")
+    r.print_report()</code></pre>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="print_report">ProfileResult.print_report</h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card meth">
+  <span class="badge-method api-badge">Method</span>
+  <div class="api-sig"><span class="type">ProfileResult</span><span class="punct">.</span><span class="name">print_report</span><span class="punct">()</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">格式化打印 baseline、每个 Task 的 exposed time（ms + %）、总和。SUM > 100% 表示 Task 在关键路径上有重叠。</span>
+    <span class="en">Print baseline, per-task exposed time (ms + %), and total. SUM > 100% means tasks overlap on critical path.</span>
+  </div>
+<pre><code>result.print_report()
+<span style="color:var(--text-dim)"># Baseline serial iteration: 8.503 ms
+#
+#   Task                       Exposed   % baseline
+#   ------------------------ ---------- ------------
+#   CopyBatch                  0.521ms        6.1%
+#   EmbLookup                  1.234ms       14.5%
+#   ...
+#   ------------------------ ---------- ------------
+#   SUM                        7.571ms       89.0%</span></code></pre>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="internals"><span class="zh">内部机制</span><span class="en">Internals</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="callout callout-info">
+  <span class="zh">以下为框架内部实现细节，普通用户无需直接调用。了解它们有助于调试和理解 shortcut 行为。</span>
+  <span class="en">The following are internal implementation details. Normal users don't need to call them directly. Understanding them helps with debugging and reasoning about shortcut behavior.</span>
+</div>
+
+<!-- _exec_task -->
+<h3 id="exec-task">_exec_task</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="name">_exec_task</span><span class="punct">(</span><span class="param">task_def</span><span class="punct">:</span> <span class="type">PipelineTask</span><span class="punct">,</span> <span class="param">ctx</span><span class="punct">:</span> <span class="type">IterContext</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">Task 执行的核心分发逻辑。根据 shortcut 状态切换三种模式：</span>
+    <span class="en">Core task dispatch logic. Switches between three modes based on shortcut state:</span>
+  </div>
+<pre><code><span style="color:var(--text-dim)"># Simplified logic:</span>
+<span style="color:var(--purple)">def</span> _exec_task(self, task_def, ctx):
+    name = task_def.name
+    <span style="color:var(--purple)">if</span> name <span style="color:var(--purple)">in</span> self._shortcut_tasks:
+        <span style="color:var(--purple)">if</span> name <span style="color:var(--purple)">in</span> self._shortcut_cache:
+            self._apply_shortcut(ctx, task_def)      <span style="color:var(--text-dim)"># Mode 1: replay</span>
+            <span style="color:var(--purple)">return</span>
+        before_ids = {k: id(v) <span style="color:var(--purple)">for</span> k, v <span style="color:var(--purple)">in</span> vars(ctx).items()}
+        task_def.fn(ctx)
+        self._capture_and_cache(ctx, task_def, before_ids)  <span style="color:var(--text-dim)"># Mode 2: cache</span>
+        <span style="color:var(--purple)">return</span>
+    task_def.fn(ctx)                                  <span style="color:var(--text-dim)"># Mode 3: normal</span></code></pre>
+  <div class="callout callout-tip">
+    <span class="zh"><strong>Mode 1 (Shortcut Active)</strong>: 跳过 <code>fn(ctx)</code>，从缓存恢复 ctx 属性 + <code>_GraftGrad</code> 梯度桥 + <code>DeclaredIO.restore()</code>。<br>
+    <strong>Mode 2 (Caching)</strong>: 正常执行 <code>fn(ctx)</code>，diff ctx 属性，<code>_cache_val</code> 递归 detach+clone，调用 <code>DeclaredIO.capture()</code>，存入缓存。<br>
+    <strong>Mode 3 (Normal)</strong>: 直接执行 <code>fn(ctx)</code>，零额外开销。</span>
+    <span class="en"><strong>Mode 1 (Shortcut Active)</strong>: skip <code>fn(ctx)</code>, restore ctx attrs + <code>_GraftGrad</code> gradient bridge + <code>DeclaredIO.restore()</code>.<br>
+    <strong>Mode 2 (Caching)</strong>: run <code>fn(ctx)</code> normally, diff ctx attrs, <code>_cache_val</code> recursive detach+clone, call <code>DeclaredIO.capture()</code>, store in cache.<br>
+    <strong>Mode 3 (Normal)</strong>: run <code>fn(ctx)</code> directly, zero overhead.</span>
+  </div>
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L400-L500">sw_pipeline.py:400–500</a></p>
+</div>
+
+<!-- _cache_val -->
+<h3 id="cache-val">_cache_val</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span> <span class="badge-static api-badge">Static</span>
+  <div class="api-sig"><span class="name">_cache_val</span><span class="punct">(</span><span class="param">v</span><span class="punct">:</span> <span class="type">Any</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">Any</span></div>
+  <div class="api-desc">
+    <span class="zh">递归缓存值。对每个 <code>torch.Tensor</code> 执行 <code>detach().clone()</code>，保存 <code>requires_grad</code> 状态。支持 <code>dict</code>、<code>list</code>、<code>tuple</code> 和含 Tensor 的任意对象（如 TorchRec <code>JaggedTensor</code>）。返回值用 <code>_CACHE_TAG</code> sentinel 标记，供 <code>_restore_val</code> 识别重建。</span>
+    <span class="en">Recursively cache a value. Each <code>torch.Tensor</code> gets <code>detach().clone()</code>, preserving <code>requires_grad</code>. Supports <code>dict</code>, <code>list</code>, <code>tuple</code>, and arbitrary objects with tensor attrs (e.g. <code>JaggedTensor</code>). Tagged with <code>_CACHE_TAG</code> sentinel for <code>_restore_val</code>.</span>
+  </div>
+<pre><code><span style="color:var(--text-dim)"># Tags: "t"=Tensor, "d"=dict, "l"=list, "u"=tuple, "o"=object</span>
+_cache_val(tensor)     → (_CACHE_TAG, "t", tensor.detach().clone(), requires_grad)
+_cache_val({"a": t})   → (_CACHE_TAG, "d", {"a": _cache_val(t)})
+_cache_val(jt)         → (_CACHE_TAG, "o", JaggedTensor, {attr: _cache_val(v) ...})</code></pre>
+</div>
+
+<!-- _restore_val -->
+<h3 id="restore-val">_restore_val</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span> <span class="badge-static api-badge">Static</span>
+  <div class="api-sig"><span class="name">_restore_val</span><span class="punct">(</span><span class="param">v</span><span class="punct">:</span> <span class="type">Any</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">Any</span></div>
+  <div class="api-desc">
+    <span class="zh">从 <code>_cache_val</code> 输出递归重建值。Tensor 通过 <code>detach()</code>（零拷贝）生成新叶节点，忠实恢复 <code>requires_grad</code>。每次调用返回全新 Tensor，防止 "backward through graph a second time" 错误。</span>
+    <span class="en">Recursively restore from <code>_cache_val</code> output. Tensors get <code>detach()</code> (zero-copy) as fresh leaves, faithfully restoring <code>requires_grad</code>. Each call returns brand-new tensors, preventing "backward through graph a second time" errors.</span>
+  </div>
+</div>
+
+<!-- _GraftGrad -->
+<h3 id="GraftGrad">_GraftGrad</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="kw">class</span> <span class="cls-name">_GraftGrad</span><span class="punct">(</span><span class="type">torch.autograd.Function</span><span class="punct">)</span></div>
+  <div class="api-desc">
+    <span class="zh">自定义 autograd Function，作为 shortcut 的 "梯度桥"。<strong>Forward</strong>: identity（返回 restored tensor 不变）。<strong>Backward</strong>: 将 <code>grad_output</code> 传给 restored tensor；将预分配零张量传给 upstream inputs（触发它们的 backward 但不影响参数梯度）。确保 shortcut 后下游 <code>loss.backward()</code> 能正确传播梯度。</span>
+    <span class="en">Custom autograd Function serving as shortcut's "gradient bridge". <strong>Forward</strong>: identity (returns restored tensor unchanged). <strong>Backward</strong>: passes <code>grad_output</code> to restored; passes pre-allocated zeros to upstream inputs (triggers backward without affecting param grads). Ensures <code>loss.backward()</code> works after shortcutting.</span>
+  </div>
+</div>
+
+<!-- _SubmissionSequencer -->
+<h3 id="SubmissionSequencer">_SubmissionSequencer</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="kw">class</span> <span class="cls-name">_SubmissionSequencer</span></div>
+  <div class="api-desc">
+    <span class="zh">跨线程的确定性提交排序器。每个 <code>globally_ordered</code> Task 获得预分配的序列号。<code>execute_ordered(seq, fn)</code> 阻塞直到轮到该 Task，确保所有 rank 以相同顺序调用 NCCL 集合操作，防止死锁。超时 30 秒抛 <code>RuntimeError</code>。</span>
+    <span class="en">Deterministic cross-thread submission sequencer. Each <code>globally_ordered</code> task gets a pre-assigned sequence number. <code>execute_ordered(seq, fn)</code> blocks until it's that task's turn, ensuring all ranks call NCCL collectives in identical order (prevents deadlocks). 30s timeout raises <code>RuntimeError</code>.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">方法</span><span class="en">Method</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td><code>reset()</code></td><td><span class="zh">重置序列号为 0</span><span class="en">Reset sequence counter to 0</span></td></tr>
+    <tr><td><code>execute_ordered(seq, fn)</code></td><td><span class="zh">等待 <code>_next_seq == seq</code>，然后执行 <code>fn()</code></span><span class="en">Wait for <code>_next_seq == seq</code>, then execute <code>fn()</code></span></td></tr>
+  </table>
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L63-L88">sw_pipeline.py:63–88</a></p>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
+<h2 id="e2e-example"><span class="zh">完整端到端示例</span><span class="en">End-to-End Example</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="example-label">▸ <span class="zh">从零构建 2-stage pipeline</span><span class="en">Build a 2-stage pipeline from scratch</span></div>
+<pre><code><span style="color:var(--purple)">import</span> torch
+<span style="color:var(--purple)">import</span> torch.nn <span style="color:var(--purple)">as</span> nn
+<span style="color:var(--purple)">from</span> sw_pipeline <span style="color:var(--purple)">import</span> (
+    IterContext, PipelineTask, TaskSchedule,
+    PipelinePlan, SWPipeline, TaskProfiler,
+)
+
+<span style="color:var(--text-dim)"># 1. Model and optimizer</span>
+model = nn.Linear(256, 256).cuda()
+opt = torch.optim.Adam(model.parameters())
+loss_fn = nn.MSELoss()
+
+<span style="color:var(--text-dim)"># 2. Define task functions</span>
+<span style="color:var(--purple)">def</span> <span style="color:var(--green)">h2d</span>(ctx: IterContext):
+    ctx.x = ctx.batch[<span style="color:var(--orange)">"x"</span>].cuda(non_blocking=True)
+    ctx.y = ctx.batch[<span style="color:var(--orange)">"y"</span>].cuda(non_blocking=True)
+
+<span style="color:var(--purple)">def</span> <span style="color:var(--green)">fwd</span>(ctx: IterContext):
+    ctx.pred = model(ctx.x)
+    <span style="color:var(--purple)">del</span> ctx.x
+
+<span style="color:var(--purple)">def</span> <span style="color:var(--green)">bwd</span>(ctx: IterContext):
+    loss = loss_fn(ctx.pred, ctx.y)
+    <span style="color:var(--purple)">del</span> ctx.pred, ctx.y
+    loss.backward()
+
+<span style="color:var(--purple)">def</span> <span style="color:var(--green)">step</span>(ctx: IterContext):
+    opt.step()
+    opt.zero_grad()
+
+<span style="color:var(--text-dim)"># 3. Create PipelineTasks</span>
+t_h2d  = PipelineTask(<span style="color:var(--orange)">"H2D"</span>,      h2d)
+t_fwd  = PipelineTask(<span style="color:var(--orange)">"Forward"</span>,  fwd)
+t_bwd  = PipelineTask(<span style="color:var(--orange)">"Backward"</span>, bwd)
+t_step = PipelineTask(<span style="color:var(--orange)">"Optim"</span>,    step)
+
+<span style="color:var(--text-dim)"># 4. Build PipelinePlan (2-stage)</span>
+copy_stream = torch.cuda.Stream()
+plan = PipelinePlan(
+    schedule={
+        t_h2d:  TaskSchedule(stage=0, stream=copy_stream, thread_group=<span style="color:var(--orange)">"io"</span>),
+        t_fwd:  TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
+        t_bwd:  TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
+        t_step: TaskSchedule(stage=1, thread_group=<span style="color:var(--orange)">"compute"</span>),
+    },
+    intra_iter_deps=[(t_fwd, t_h2d), (t_bwd, t_fwd), (t_step, t_bwd)],
+    inter_iter_deps=[(t_fwd, t_step)],
+    pipeline_depth=2,
+)
+
+<span style="color:var(--text-dim)"># 5. Construct SWPipeline</span>
+pipe = SWPipeline(plan, device=0)
+pipe.print_stage_analysis()
+pipe.print_schedule(6)
+
+<span style="color:var(--text-dim)"># 6. Prepare data</span>
+batches = [
+    {<span style="color:var(--orange)">"x"</span>: torch.randn(256, 256), <span style="color:var(--orange)">"y"</span>: torch.randn(256, 256)}
+    <span style="color:var(--purple)">for</span> _ <span style="color:var(--purple)">in</span> range(100)
+]
+
+<span style="color:var(--text-dim)"># 7. Benchmark: serial vs pipelined</span>
+serial_t   = pipe.run_serial(batches, verbose=True)
+pipeline_t = pipe.run(batches, verbose=True)
+print(f<span style="color:var(--orange)">"Speedup: {serial_t / pipeline_t:.2f}x"</span>)
+
+<span style="color:var(--text-dim)"># 8. Profile exposed time per task</span>
+profiler = TaskProfiler(pipe)
+result = profiler.profile(batches[0])
+result.print_report()
+
+<span style="color:var(--text-dim)"># 9. Runtime shortcut experiment</span>
+pipe.enable_shortcut(<span style="color:var(--orange)">"Forward"</span>)
+pipe.run_one_serial_iter(batches[0], 0)  <span style="color:var(--text-dim)"># caching iteration</span>
+<span style="color:var(--purple)">for</span> i <span style="color:var(--purple)">in</span> range(1, 20):
+    pipe.run_one_serial_iter(batches[0], i)  <span style="color:var(--text-dim)"># Forward shortcutted</span>
+pipe.disable_shortcut(<span style="color:var(--orange)">"Forward"</span>)</code></pre>
+
+<hr class="divider">
+
+<p style="text-align:center; color:var(--text-dim); font-size:0.82rem; margin-top:40px;">
+  <span class="zh">基于</span><span class="en">Based on</span> <code>sw_pipeline.py</code> · <a href="sw_pipeline_overview.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
+</p>
+
+</div><!-- .main -->
+</div><!-- .page -->
+
+<button class="lang-btn" id="langBtn" onclick="toggleLang()">中文</button>
+
+<script>
+function toggleLang() {
+  const body = document.body;
+  const isZh = body.classList.contains('lang-zh');
+  body.classList.toggle('lang-zh', !isZh);
+  body.classList.toggle('lang-en', isZh);
+  document.getElementById('langBtn').textContent = isZh ? '中文' : 'EN';
+  document.documentElement.lang = isZh ? 'en' : 'zh-CN';
+  try { localStorage.setItem('swPipeApi_lang', isZh ? 'en' : 'zh'); } catch(e) {}
+}
+(function initLang() {
+  var saved = 'en';
+  try { saved = localStorage.getItem('swPipeApi_lang') || 'en'; } catch(e) {}
+  document.body.classList.add('lang-' + saved);
+  if (saved === 'zh') {
+    document.body.classList.remove('lang-en');
+    document.getElementById('langBtn').textContent = 'EN';
+    document.documentElement.lang = 'zh-CN';
+  }
+})();
+
+// Sidebar active tracking
+window.addEventListener('scroll', function() {
+  var links = document.querySelectorAll('.sidebar a[href^="#"]');
+  var cur = '';
+  document.querySelectorAll('[id]').forEach(function(el) {
+    if (el.getBoundingClientRect().top < 80) cur = el.id;
+  });
+  links.forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && href.startsWith('#')) {
+      a.style.color = (href === '#' + cur) ? '#38bdf8' : '';
+      a.style.borderLeftColor = (href === '#' + cur) ? '#38bdf8' : 'transparent';
+    }
+  });
+});
+</script>
+
+</body>
+</html>

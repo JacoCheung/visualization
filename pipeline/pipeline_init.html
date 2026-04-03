@@ -1,0 +1,2528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Deep Dive — TrainPipelineSparseDist &amp; SWPipeline</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7}
+a{color:#2563eb;text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:3px;color:#0f172a}
+
+header{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;padding:28px 0 22px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+header p{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px}
+header .gh{display:inline-block;margin-top:8px;padding:4px 14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px;color:#fff;transition:background .15s}
+header .gh:hover{background:rgba(255,255,255,.22);text-decoration:none}
+
+nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:0;z-index:50;overflow-x:auto;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;align-items:center}
+.nav-links{overflow-x:auto;white-space:nowrap;flex:1}
+.nav-links a{display:inline-block;padding:10px 16px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;transition:all .15s}
+.nav-links a:hover{color:#1e293b;text-decoration:none}
+.nav-links a.active{color:#2563eb;border-bottom-color:#2563eb}
+.lang-btn{flex-shrink:0;margin-left:auto;padding:5px 14px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer;transition:all .15s;white-space:nowrap}
+.lang-btn:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+
+body.lang-en .zh{display:none!important}
+body.lang-zh .en{display:none!important}
+
+.container{max-width:1280px;margin:0 auto;padding:0 24px 80px}
+
+.phase-banner{margin:36px 0 24px;padding:18px 24px;border-radius:10px;border-left:4px solid}
+.phase-banner h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.phase-banner p{font-size:13px;opacity:.75}
+.phase-banner.init{background:#f5f3ff;border-color:#7c3aed;color:#4c1d95}
+.phase-banner.dist{background:#eff6ff;border-color:#2563eb;color:#1e40af}
+.phase-banner.emb{background:#ecfdf5;border-color:#059669;color:#065f46}
+.phase-banner.sw{background:#ecfeff;border-color:#0891b2;color:#155e75}
+.phase-banner.sw-sync{background:#fff7ed;border-color:#ea580c;color:#9a3412}
+.phase-banner.sw-train{background:#f0fdf4;border-color:#16a34a;color:#166534}
+.phase-banner.sw-prof{background:#fefce8;border-color:#ca8a04;color:#854d0e}
+
+section{margin-bottom:40px}
+section h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;color:#fff;letter-spacing:.3px}
+.tag-init{background:#7c3aed}
+.tag-base{background:#2563eb}
+.tag-prefetch{background:#059669}
+.tag-fwd{background:#6366f1}
+.tag-compare{background:#dc2626}
+.tag-sw{background:#0891b2}
+.tag-sync{background:#ea580c}
+.tag-prof{background:#ca8a04}
+
+.desc{font-size:13.5px;color:#334155;margin-bottom:14px}
+.desc ul{padding-left:20px;margin:6px 0}
+.desc li{margin-bottom:4px}
+.desc strong{color:#0f172a}
+
+.svg-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:12px}
+.svg-wrap:has(.seq-wrap){overflow:visible}
+.svg-header{background:#f8fafc;padding:8px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.svg-header span{font-size:11px;font-weight:600;color:#64748b}
+.svg-header .hint{font-size:10px;color:#94a3b8}
+.svg-container{overflow:auto;max-height:900px;padding:12px;text-align:center;position:relative}
+.svg-container svg{display:block;margin:0 auto;max-width:100%;height:auto}
+
+/* Sequence diagram with sticky actors */
+.svg-container.seq-wrap{overflow:visible;max-height:none;padding:0}
+.seq-wrap>svg{width:100%;display:block}
+.seq-actors{position:sticky;top:48px;z-index:10;background:rgba(250,251,252,.97);backdrop-filter:blur(4px);border-bottom:1px solid #e2e8f0;height:44px;margin:0}
+.seq-actor{position:absolute;top:7px;transform:translateX(-50%);padding:6px 12px;border-radius:6px;color:#fff;font-weight:700;font-size:10.5px;text-align:center;font-family:'SF Mono',Consolas,monospace;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+
+.src-link{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#7c3aed;margin-top:4px}
+.src-link::before{content:'📄'}
+
+.callout{padding:14px 18px;border-radius:8px;font-size:13px;margin:12px 0}
+.callout-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.callout-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.callout-tip{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+
+.pipeline-flow{display:flex;align-items:center;justify-content:center;gap:0;margin:20px 0 28px;flex-wrap:wrap}
+.pipeline-step{padding:10px 18px;border-radius:8px;font-size:12px;font-weight:700;color:#fff;text-align:center;min-width:120px}
+.pipeline-arrow{font-size:20px;color:#94a3b8;padding:0 4px}
+
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0}
+.tbl th,.tbl td{padding:8px 12px;border:1px solid #e2e8f0;text-align:left}
+.tbl th{background:#f8fafc;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+.tbl td code{background:#f1f5f9;font-size:11px}
+
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+@media(max-width:800px){.compare-grid{grid-template-columns:1fr}}
+.compare-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.compare-card h4{font-size:13px;font-weight:700;padding:4px 10px;border-radius:6px;display:inline-block;margin-bottom:10px}
+.compare-card.base h4{background:#dbeafe;color:#1e40af}
+.compare-card.prefetch h4{background:#d1fae5;color:#065f46}
+.compare-card.sw h4{background:#ccfbf1;color:#0f766e}
+.compare-card pre{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.6;overflow-x:auto;white-space:pre}
+.compare-card .kw{color:#7c3aed}.compare-card .fn{color:#2563eb}.compare-card .cm{color:#94a3b8}.compare-card .ty{color:#d97706}.compare-card .st{color:#059669}
+
+footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
+
+/* Site-wide navigation */
+.site-nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:36px;gap:0;overflow-x:auto;white-space:nowrap}
+.site-nav a{display:inline-block;padding:6px 14px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);transition:color .15s;text-decoration:none}
+.site-nav a:hover{color:#fff;text-decoration:none}
+.site-nav a.here{color:#38bdf8}
+.site-nav .home{color:rgba(255,255,255,.8);font-weight:800;margin-right:8px;font-size:12px}
+.xref-bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.xref-bar a{display:inline-block;padding:5px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:11.5px;font-weight:600;color:#475569;transition:all .15s}
+.xref-bar a:hover{background:#2563eb;color:#fff;border-color:#2563eb;text-decoration:none}
+
+/* Floating TOC */
+.ftoc{position:fixed;right:20px;top:140px;z-index:100;font-size:12px;width:220px}
+.ftoc-toggle{width:36px;height:36px;border-radius:50%;background:#1e293b;color:#fff;border:none;cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .2s,background .2s;position:absolute;top:0;right:0}
+.ftoc-toggle:hover{background:#334155;transform:scale(1.08)}
+.ftoc.collapsed .ftoc-toggle{display:flex}
+.ftoc-panel{width:100%;max-height:calc(100vh - 180px);background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden;transition:transform .2s ease,opacity .15s ease;transform-origin:top right}
+.ftoc.collapsed .ftoc-panel{transform:scale(.9);opacity:0;pointer-events:none}
+.ftoc-head{background:#f8fafc;padding:8px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none}
+.ftoc-head span{font-weight:700;color:#334155;font-size:12px}
+.ftoc-list{list-style:none;overflow-y:auto;max-height:calc(100vh - 230px);padding:4px 0}
+.ftoc-list li a{display:block;padding:6px 14px;color:#475569;text-decoration:none;transition:background .1s,color .1s;border-left:3px solid transparent}
+.ftoc-list li a:hover{background:#f1f5f9;color:#1e293b;text-decoration:none}
+.ftoc-list li a.cur{color:#2563eb;border-left-color:#2563eb;background:#eff6ff;font-weight:600}
+.ftoc-list li a .toc-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;color:#fff;margin-right:5px;vertical-align:1px}
+</style>
+</head>
+<body class="lang-en">
+
+<div class="site-nav">
+  <a class="home" href="index.html">Pipeline Docs</a>
+  <a class="here" href="pipeline_init.html">Pipeline Init</a>
+  <a href="forward_hijack.html">Forward Hijack</a>
+  <a href="context_lifecycle.html">Context Lifecycle</a>
+  <a href="runtime_timeline.html">Runtime Timeline</a>
+  <a href="sw_pipeline_overview.html">SWPipeline</a>
+  <a href="sw_pipeline_api.html">SWPipeline API</a>
+</div>
+
+<header>
+  <h1>Pipeline Deep Dive — Initialization &amp; Rewrite</h1>
+  <p>NVIDIA recsys-examples · TrainPipelineSparseDist · PrefetchTrainPipelineSparseDist · SWPipeline</p>
+  <a class="gh" href="https://github.com/NVIDIA/recsys-examples">⭐ GitHub: NVIDIA/recsys-examples</a>
+</header>
+
+<nav id="nav">
+  <div class="nav-links">
+    <a href="#overview">概览 Overview</a>
+    <a href="#rewrite">_rewrite_model</a>
+    <a href="#rewrite-detail">_rewrite_model (FX)</a>
+    <a href="#fill-base">fill_pipeline (Base)</a>
+    <a href="#fill-prefetch">_fill_pipeline (Prefetch)</a>
+    <a href="#forward-cmp">Forward 对比</a>
+    <a href="#context">Context</a>
+    <a href="#ctx-detail">Context 详解</a>
+    <a href="#progress">progress() 稳态</a>
+    <a href="#sw-overview">SWPipeline</a>
+    <a href="#sw-dag">11-Task DAG</a>
+    <a href="#sw-sync">Two-Phase Sync</a>
+    <a href="#sw-init">_ensure_init</a>
+    <a href="#sw-shortcut">Shortcut</a>
+    <a href="#sw-declared-io">DeclaredIO</a>
+    <a href="#sw-profiler">Profiler</a>
+    <a href="#sw-compare">对比 Compare</a>
+  </div>
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()">中文</button>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ OVERVIEW ═══════════ -->
+<section id="overview">
+<div class="phase-banner init">
+  <h2><span class="zh">总览 — 两套 Pipeline 的初始化与 Rewrite</span><span class="en">Overview — Initialization &amp; Rewrite of Two Pipelines</span></h2>
+  <p><span class="zh">recsys-examples 通过 model rewrite 将 ShardedModule 的 forward 替换为流水线化版本</span><span class="en">recsys-examples uses model rewrite to replace ShardedModule's forward with pipelined versions</span></p>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p>recsys-examples 中有两套 TorchRec 训练 pipeline，它们在第一个 batch 到达时通过 <strong>_rewrite_model</strong> 将模型中的 <code>ShardedModule.forward</code> 替换为流水线化版本，使得 <strong>input_dist（AllToAll 通信）</strong>可以与上一批次的 <strong>forward / backward</strong> 重叠执行。</p>
+</span>
+<span class="en">
+  <p>recsys-examples provides two TorchRec training pipelines that use <strong>_rewrite_model</strong> on the first batch to replace <code>ShardedModule.forward</code> with pipelined versions, enabling <strong>input_dist (AllToAll communication)</strong> to overlap with the previous batch's <strong>forward / backward</strong>.</p>
+</span>
+</div>
+
+<div class="pipeline-flow">
+  <div class="pipeline-step" style="background:#6366f1">__init__</div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#7c3aed">_rewrite_model</div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#2563eb">fill_pipeline</div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#059669">progress() 稳态</div>
+</div>
+
+<div class="callout callout-tip">
+<span class="zh"><strong>📖 Forward 拆分机制详解</strong>：Pipeline 的核心是把 <code>ShardedModule.forward()</code> 拆成 <code>input_dist</code> + <code>compute_and_output_dist</code>，让 AllToAll 通信提前执行。详细原理、Context 数据流和 torch.fx 追踪机制请参阅 → <a href="forward_hijack.html"><strong>Forward Hijack Deep Dive</strong></a></span>
+<span class="en"><strong>📖 Forward Split Mechanism</strong>: The pipeline's core is splitting <code>ShardedModule.forward()</code> into <code>input_dist</code> + <code>compute_and_output_dist</code>, executing AllToAll communication ahead of time. For details on Context data flow and torch.fx tracing → <a href="forward_hijack.html"><strong>Forward Hijack Deep Dive</strong></a></span>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">属性</span><span class="en">Property</span></th>
+  <th>TrainPipelineSparseDist</th>
+  <th>PrefetchTrainPipelineSparseDist</th>
+</tr>
+<tr>
+  <td><strong><span class="zh">流水线阶段</span><span class="en">Pipeline Stages</span></strong></td>
+  <td>3: ① H2D → ② input_dist → ③ fwd/bwd</td>
+  <td>4: ① H2D → ② input_dist → ③ <strong>prefetch</strong> → ④ fwd/bwd</td>
+</tr>
+<tr>
+  <td><strong>CUDA Streams</strong></td>
+  <td><code>memcpy_stream</code>, <code>data_dist_stream</code></td>
+  <td><code>memcpy_stream</code>, <code>data_dist_stream</code>, <code>prefetch_stream</code>, <code>default_stream</code></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">流水线深度</span><span class="en">Pipeline Depth</span></strong></td>
+  <td>2 batches</td>
+  <td>3 batches（batch_i, batch_ip1, batch_ip2）</td>
+</tr>
+<tr>
+  <td><strong>Context</strong></td>
+  <td><code>TrainPipelineContext</code></td>
+  <td><code>PrefetchTrainPipelineContext</code></td>
+</tr>
+<tr>
+  <td><strong>Forward <span class="zh">替换类型</span><span class="en">Replacement</span></strong></td>
+  <td><code>PipelinedForward</code></td>
+  <td><code>PrefetchPipelinedForward</code></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">Forward 数据来源</span><span class="en">Forward Data Source</span></strong></td>
+  <td><code>input_dist_tensors_requests</code> → request.wait() in fwd</td>
+  <td><code>module_input_post_prefetch</code> → data already prefetched</td>
+</tr>
+<tr>
+  <td><strong><span class="zh">适用场景</span><span class="en">Use Case</span></strong></td>
+  <td><span class="zh">标准 FBGEMM 静态 Embedding</span><span class="en">Standard FBGEMM static embedding</span></td>
+  <td><span class="zh">DynamicEmb（需 prefetch cache lookup）</span><span class="en">DynamicEmb (needs prefetch for cache lookup)</span></td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════ _rewrite_model ═══════════ -->
+<section id="rewrite">
+<h3><span class="tag tag-init">INIT</span> _rewrite_model — <span class="zh">Model Rewrite 详解</span><span class="en">Model Rewrite Deep Dive</span></h3>
+
+<div class="desc">
+<span class="zh"><p><code>_rewrite_model</code> 是 pipeline 初始化的核心——它将模型中所有 <code>ShardedModule.forward</code> 替换为流水线化版本（<code>PipelinedForward</code> 或 <code>PrefetchPipelinedForward</code>）。这个过程只在第一个 batch 到达时执行一次，由 <code>_pipeline_model()</code> 调用。</p></span>
+<span class="en"><p><code>_rewrite_model</code> is the core of pipeline initialization — it replaces all <code>ShardedModule.forward</code> in the model with pipelined versions (<code>PipelinedForward</code> or <code>PrefetchPipelinedForward</code>). This runs only once when the first batch arrives, invoked by <code>_pipeline_model()</code>.</p></span>
+<div class="xref-bar">
+<a href="forward_hijack.html">详细拆分原理 → Forward Hijack</a>
+<a href="forward_hijack.html#rewrite">torch.fx 追踪详解 →</a>
+</div>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span>_pipeline_model() → _rewrite_model() → _override_input_dist_forwards()</span>
+    <span class="hint"><span class="zh">滚动查看完整时序图</span><span class="en">Scroll to view full sequence diagram</span></span>
+  </div>
+  <div class="svg-container seq-wrap">
+    <div class="seq-actors">
+      <div class="seq-actor" style="left:10.3%;background:#0891b2">TrainPipeline</div>
+      <div class="seq-actor" style="left:31.0%;background:#7c3aed">_rewrite_model</div>
+      <div class="seq-actor" style="left:51.6%;background:#ea580c">nn.Module</div>
+      <div class="seq-actor" style="left:72.3%;background:#16a34a">ShardedModule</div>
+      <div class="seq-actor" style="left:91.8%;background:#dc2626">data_dist</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 620" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <style>
+        text{font-family:inherit}
+        .actor-box{fill:#1e293b;stroke:#1e293b;rx:6}
+        .actor-text{fill:#fff;font-size:11px;font-weight:700;text-anchor:middle}
+        .actor-sub{fill:rgba(255,255,255,.55);font-size:9px;text-anchor:middle}
+        .lifeline{stroke:#cbd5e1;stroke-width:1;stroke-dasharray:6,4}
+        .msg-line{stroke:#475569;stroke-width:1.5;marker-end:url(#arrow)}
+        .msg-text{font-size:11px;fill:#1e293b}
+        .self-msg{stroke:#475569;stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+        .activation{rx:2}
+        .note{rx:6;stroke-width:1}
+        .note-text{font-size:10px}
+      </style>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+      </defs>
+
+      <!-- Actors -->
+      <rect class="actor-box" x="30" y="10" width="130" height="42" style="fill:#0891b2;stroke:#0891b2"/>
+      <text class="actor-text" x="95" y="30">TrainPipeline</text>
+      <text class="actor-sub" x="95" y="42">_pipeline_model()</text>
+
+      <rect class="actor-box" x="220" y="10" width="130" height="42" style="fill:#7c3aed;stroke:#7c3aed"/>
+      <text class="actor-text" x="285" y="30">_rewrite_model()</text>
+      <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1257" target="_blank"><text class="actor-sub" x="285" y="42" style="cursor:pointer">utils.py:1257</text></a>
+
+      <rect class="actor-box" x="410" y="10" width="130" height="42" style="fill:#ea580c;stroke:#ea580c"/>
+      <text class="actor-text" x="475" y="30">nn.Module</text>
+      <text class="actor-sub" x="475" y="42">model (unwrapped)</text>
+
+      <rect class="actor-box" x="600" y="10" width="130" height="42" style="fill:#16a34a;stroke:#16a34a"/>
+      <text class="actor-text" x="665" y="30">ShardedModule</text>
+      <text class="actor-sub" x="665" y="42">pipelined target</text>
+
+      <rect class="actor-box" x="790" y="10" width="110" height="42" style="fill:#dc2626;stroke:#dc2626"/>
+      <text class="actor-text" x="845" y="30">data_dist</text>
+      <text class="actor-sub" x="845" y="42">_stream</text>
+
+      <!-- Lifelines -->
+      <line class="lifeline" x1="95" y1="52" x2="95" y2="610"/>
+      <line class="lifeline" x1="285" y1="52" x2="285" y2="610"/>
+      <line class="lifeline" x1="475" y1="52" x2="475" y2="610"/>
+      <line class="lifeline" x1="665" y1="52" x2="665" y2="610"/>
+      <line class="lifeline" x1="845" y1="52" x2="845" y2="610"/>
+
+      <!-- Step 1: call _rewrite_model -->
+      <rect class="activation" x="89" y="72" width="12" height="530" fill="#dbeafe" stroke="#93c5fd"/>
+      <line class="msg-line" x1="95" y1="80" x2="280" y2="80"/>
+      <text class="msg-text" x="140" y="74">_rewrite_model(model, context, dist_stream, pipelined_forward)</text>
+      <rect class="activation" x="279" y="80" width="12" height="340" fill="#dbeafe" stroke="#93c5fd"/>
+
+      <!-- Step 2: unwrap -->
+      <rect class="note" x="315" y="92" width="270" height="36" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text class="note-text" x="325" y="106" fill="#4c1d95" font-weight="700">Step 1: Unwrap model layers</text>
+      <text class="note-text" x="325" y="120" fill="#6b21a8">DMP → DDP → Float16Module → nn.Module</text>
+
+      <!-- Step 3: collect ShardedModule -->
+      <line class="msg-line" x1="285" y1="142" x2="470" y2="142"/>
+      <text class="msg-text" x="320" y="136">named_modules()</text>
+      <line class="msg-line" x1="470" y1="156" x2="291" y2="156" style="stroke-dasharray:5,3"/>
+      <text class="msg-text" x="320" y="170">{name: ShardedModule} dict</text>
+
+      <rect class="note" x="315" y="180" width="270" height="24" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text class="note-text" x="325" y="196" fill="#4c1d95" font-weight="700">Step 2: Collect all ShardedModule instances</text>
+
+      <!-- Step 4: scan batch for KJT -->
+      <rect class="note" x="315" y="216" width="270" height="36" fill="#eff6ff" stroke="#93c5fd"/>
+      <text class="note-text" x="325" y="230" fill="#1e40af" font-weight="700">Step 3: Build ArgInfo (hack path)</text>
+      <text class="note-text" x="325" y="244" fill="#1e40af">Scan batch attrs → find KJT field name</text>
+
+      <!-- Step 5: replace forward (loop) -->
+      <rect x="250" y="262" width="430" height="90" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3" rx="6"/>
+      <rect x="250" y="262" width="110" height="16" fill="#7c3aed" rx="3"/>
+      <text x="258" y="274" fill="#fff" font-size="10px" font-weight="700">loop [each SM]</text>
+
+      <text class="note-text" x="270" y="292" fill="#4c1d95" font-weight="700" font-size="11px">Step 4: Replace forward</text>
+
+      <line class="msg-line" x1="285" y1="306" x2="660" y2="306"/>
+      <text class="msg-text" x="370" y="300">original_forwards.append(module.forward)</text>
+
+      <line class="msg-line" x1="285" y1="330" x2="660" y2="330"/>
+      <text class="msg-text" x="335" y="324" fill="#7c3aed" font-weight="700">module.forward = PipelinedForward(name, ArgInfo, module, ctx, stream)</text>
+
+      <!-- Return from _rewrite_model -->
+      <line class="msg-line" x1="285" y1="420" x2="101" y2="420" style="stroke-dasharray:5,3"/>
+      <text class="msg-text" x="110" y="414">(pipelined_modules, model, original_forwards, postprocs)</text>
+
+      <!-- Step 5: start_sparse_data_dist -->
+      <rect class="note" x="50" y="438" width="300" height="36" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text class="note-text" x="60" y="452" fill="#065f46" font-weight="700">Step 5: Initialize input dists</text>
+      <text class="note-text" x="60" y="466" fill="#065f46">start_sparse_data_dist(batch, context)</text>
+
+      <line class="msg-line" x1="95" y1="486" x2="840" y2="486"/>
+      <text class="msg-text" x="350" y="480">module.input_dist(ctx, kjt) on data_dist_stream → AllToAll #1</text>
+      <rect class="activation" x="839" y="480" width="12" height="30" fill="#d1fae5" stroke="#6ee7b7"/>
+
+      <!-- Step 6: override -->
+      <rect class="note" x="50" y="524" width="300" height="36" fill="#fef3c7" stroke="#fcd34d"/>
+      <text class="note-text" x="60" y="538" fill="#92400e" font-weight="700">Step 6: Override KJTAllToAll forwards</text>
+      <text class="note-text" x="60" y="552" fill="#92400e">_override_input_dist_forwards() → fusing splits</text>
+
+      <line class="msg-line" x1="95" y1="572" x2="660" y2="572"/>
+      <text class="msg-text" x="260" y="566">KJTAllToAll.forward → KJTAllToAllForward (supports fused splits)</text>
+    </svg>
+  </div>
+</div>
+
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1257" target="_blank">utils.py</a> — _rewrite_model(), _override_input_dist_forwards()</span><br>
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L309" target="_blank">train_pipeline.py</a> — _pipeline_model(), _init_pipelined_modules()</span>
+
+<div class="callout callout-info">
+<span class="zh"><strong>为什么需要两步？</strong> Step 5（<code>start_sparse_data_dist</code>）必须先执行一次 <code>module.input_dist()</code>，因为 ShardedModule 的 <code>_input_dists</code> 属性是惰性初始化的。只有执行过一次 input_dist 后，Step 6 的 <code>_override_input_dist_forwards</code> 才能找到并替换内部的 <code>KJTAllToAll</code> forward。</span>
+<span class="en"><strong>Why two steps?</strong> Step 5 (<code>start_sparse_data_dist</code>) must call <code>module.input_dist()</code> once because ShardedModule's <code>_input_dists</code> attribute is lazily initialized. Only after this first invocation can Step 6's <code>_override_input_dist_forwards</code> find and replace the internal <code>KJTAllToAll</code> forward.</span>
+</div>
+</section>
+
+<!-- ═══════════ _rewrite_model FX Detail ═══════════ -->
+<section id="rewrite-detail">
+<h3><span class="tag tag-init">FX</span> _rewrite_model — <span class="zh">torch.fx 追踪细节</span><span class="en">torch.fx Tracing Detail</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p><code>_rewrite_model</code> 有两条路径：<strong>FX 追踪路径</strong>（通过 <code>torch.fx.Tracer</code> 符号执行获取参数映射）和 <strong>hack 路径</strong>（<code>mod_directly=True</code>，直接扫描 batch 属性找到 KJT 字段）。当前生产代码走的是 <strong>hack 路径</strong>，因为它更简单、更鲁棒。下图展示完整的 FX 路径逻辑，以及 hack 路径如何跳过 FX 追踪。</p>
+</span>
+<span class="en">
+  <p><code>_rewrite_model</code> has two paths: the <strong>FX tracing path</strong> (using <code>torch.fx.Tracer</code> for symbolic execution to derive argument mappings) and the <strong>hack path</strong> (<code>mod_directly=True</code>, scanning batch attributes to find the KJT field directly). Production code currently uses the <strong>hack path</strong> as it is simpler and more robust. The diagram below shows the full FX path logic and how the hack path bypasses FX tracing.</p>
+</span>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span>_rewrite_model — FX Trace Path vs Hack Path</span>
+    <span class="hint"><span class="zh">参与者标签跟随滚动</span><span class="en">Participant labels stick on scroll</span></span>
+  </div>
+  <div class="svg-container seq-wrap">
+    <div class="seq-actors">
+      <div class="seq-actor" style="left:10.9%;background:#7c3aed">_rewrite_model</div>
+      <div class="seq-actor" style="left:31.5%;background:#0891b2">torch.fx Tracer</div>
+      <div class="seq-actor" style="left:52.2%;background:#ea580c">FX Graph</div>
+      <div class="seq-actor" style="left:71.7%;background:#16a34a">ShardedModule</div>
+      <div class="seq-actor" style="left:90.2%;background:#dc2626">PipelinedForward</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 940" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <defs>
+        <marker id="arrFx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+      </defs>
+      <style>text{font-family:inherit}</style>
+
+      <!-- Lifelines (matching actor positions) -->
+      <line x1="100" y1="10" x2="100" y2="930" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="290" y1="10" x2="290" y2="930" stroke="#0891b2" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="480" y1="10" x2="480" y2="930" stroke="#ea580c" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="660" y1="10" x2="660" y2="930" stroke="#16a34a" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="830" y1="10" x2="830" y2="930" stroke="#dc2626" stroke-width="1" stroke-dasharray="6,4"/>
+
+      <!-- Step 1: Unwrap model -->
+      <rect x="30" y="20" width="260" height="36" rx="6" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text x="40" y="36" font-size="11px" fill="#4c1d95" font-weight="700">Step 1: Unwrap model layers</text>
+      <text x="40" y="50" font-size="10px" fill="#6b21a8">DMP → DDP → Float16Module → nn.Module</text>
+
+      <!-- Step 2: Collect ShardedModules -->
+      <rect x="94" y="68" width="12" height="100" rx="2" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <line x1="106" y1="78" x2="654" y2="78" stroke="#475569" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="200" y="72" font-size="10px" fill="#1e293b">named_modules() → collect all ShardedModule instances</text>
+      <line x1="654" y1="92" x2="106" y2="92" stroke="#475569" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#arrFx)"/>
+      <text x="200" y="106" font-size="10px" fill="#64748b">{name: ShardedModule} dict</text>
+
+      <!-- Step 3: _get_leaf_module_names -->
+      <rect x="30" y="120" width="280" height="24" rx="6" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text x="40" y="136" font-size="10px" fill="#4c1d95" font-weight="700">Step 3: _get_leaf_module_names() → trace depth control</text>
+
+      <!-- ═══ FX PATH (boxed region) ═══ -->
+      <rect x="15" y="160" width="890" height="340" rx="8" fill="#ecfeff" fill-opacity=".2" stroke="#0891b2" stroke-width="2"/>
+      <rect x="15" y="160" width="200" height="18" rx="4" fill="#0891b2"/>
+      <text x="25" y="174" fill="#fff" font-size="10px" font-weight="700">FX Trace Path (mod_directly=False)</text>
+
+      <!-- Step 4: torch.fx trace -->
+      <line x1="106" y1="198" x2="284" y2="198" stroke="#0891b2" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="120" y="192" font-size="10px" fill="#0891b2" font-weight="600">Tracer.trace(model, concrete_args={batch})</text>
+      <rect x="284" y="192" width="12" height="90" rx="2" fill="#cffafe" stroke="#0891b2"/>
+
+      <!-- Step 5: is_leaf_module -->
+      <line x1="296" y1="222" x2="654" y2="222" stroke="#475569" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="340" y="216" font-size="10px" fill="#16a34a" font-weight="600">is_leaf_module(ShardedModule) → True (don't trace into)</text>
+      <rect x="340" y="236" width="320" height="24" rx="4" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="350" y="252" font-size="9px" fill="#065f46">ShardedModule / FSDP = leaf modules → opaque placeholders in FX graph</text>
+
+      <!-- Step 5b: Return graph -->
+      <line x1="290" y1="280" x2="474" y2="280" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="310" y="274" font-size="10px" fill="#ea580c" font-weight="600">→ produces FX Graph (symbolic IR)</text>
+      <rect x="474" y="274" width="12" height="40" rx="2" fill="#fff7ed" stroke="#ea580c"/>
+
+      <!-- Step 6: Iterate graph nodes -->
+      <rect x="330" y="322" width="360" height="60" rx="6" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <rect x="330" y="322" width="220" height="16" rx="3" fill="#ea580c"/>
+      <text x="338" y="334" fill="#fff" font-size="9px" font-weight="700">loop [node where op=="call_module" ∈ sharded_modules]</text>
+      <text x="345" y="358" font-size="10px" fill="#ea580c" font-weight="600">_get_node_args(node) → ArgInfo</text>
+      <text x="345" y="374" font-size="9px" fill="#9a3412">ArgInfo(input_attrs, is_getitems, name) — maps FX node inputs to KJT fields</text>
+
+      <!-- Step 7: _get_node_args detail -->
+      <line x1="480" y1="400" x2="106" y2="400" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#arrFx)"/>
+      <text x="180" y="394" font-size="10px" fill="#ea580c">returns List[ArgInfo] per ShardedModule</text>
+
+      <!-- Step 8: Replace forward (loop) -->
+      <rect x="30" y="430" width="560" height="58" rx="6" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <rect x="30" y="430" width="160" height="16" rx="3" fill="#7c3aed"/>
+      <text x="38" y="442" fill="#fff" font-size="9px" font-weight="700">loop [each ShardedModule in dict]</text>
+
+      <line x1="106" y1="462" x2="654" y2="462" stroke="#475569" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="200" y="456" font-size="10px" fill="#1e293b">save original: original_forwards[name] = module.forward</text>
+
+      <line x1="106" y1="482" x2="824" y2="482" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrFx)"/>
+      <text x="200" y="476" font-size="10px" fill="#dc2626" font-weight="700">module.forward = PipelinedForward(name, arg_info_list, module, ctx, dist_stream)</text>
+
+      <!-- ═══ HACK PATH (boxed region) ═══ -->
+      <rect x="15" y="520" width="890" height="220" rx="8" fill="#fef3c7" fill-opacity=".25" stroke="#d97706" stroke-width="2"/>
+      <rect x="15" y="520" width="260" height="18" rx="4" fill="#d97706"/>
+      <text x="25" y="534" fill="#fff" font-size="10px" font-weight="700">⚡ Hack Path (mod_directly=True) — ACTIVE PATH</text>
+
+      <rect x="40" y="550" width="850" height="56" rx="6" fill="#fff" stroke="#d97706"/>
+      <text x="55" y="566" font-size="11px" fill="#92400e" font-weight="700">Skips FX tracing entirely. For each ShardedModule:</text>
+      <text x="55" y="582" font-size="10px" fill="#92400e">1. Scan batch.__dict__.values() → find attribute whose type matches first param of input_dist()</text>
+      <text x="55" y="598" font-size="10px" fill="#92400e">2. Build ArgInfo(input_attrs=[attr_name], is_getitems=[False], name=sm_name) directly</text>
+
+      <rect x="40" y="614" width="850" height="44" rx="6" fill="#fff" stroke="#d97706"/>
+      <text x="55" y="630" font-size="10px" fill="#92400e">3. For each ShardedModule: module.forward = PipelinedForward(name, [simple_ArgInfo], module, ctx, dist_stream)</text>
+      <text x="55" y="648" font-size="10px" fill="#92400e">4. Same forward replacement, but ArgInfo is constructed by direct attribute matching, not FX symbolic execution</text>
+
+      <rect x="40" y="668" width="850" height="56" rx="6" fill="#ecfdf5" stroke="#16a34a"/>
+      <text x="55" y="684" font-size="11px" fill="#065f46" font-weight="700">Why hack path wins:</text>
+      <text x="55" y="700" font-size="10px" fill="#065f46">• No torch.fx dependency → avoids trace failures on complex models (e.g., control flow, dynamic shapes)</text>
+      <text x="55" y="716" font-size="10px" fill="#065f46">• Simpler ArgInfo (single KJT attr) covers all production use cases in recsys-examples</text>
+
+      <!-- Summary flow -->
+      <rect x="40" y="760" width="840" height="70" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+      <text x="60" y="780" font-size="12px" fill="#1e293b" font-weight="700">Summary: _rewrite_model output</text>
+      <text x="60" y="798" font-size="10px" fill="#475569">pipelined_modules: List[ShardedModule]  •  original_forwards: Dict[str, Callable]  •  postprocs: Dict[str, PipelinePostProc]</text>
+      <text x="60" y="816" font-size="10px" fill="#475569">Every ShardedModule.forward is now PipelinedForward — reads from ctx instead of taking KJT directly</text>
+
+      <rect x="40" y="850" width="840" height="56" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+      <text x="60" y="870" font-size="11px" fill="#1e40af" font-weight="700">PipelinedForward.__call__ contract:</text>
+      <text x="60" y="888" font-size="10px" fill="#1e40af">1. Pop input_dist_tensors_requests[name] from context → Awaitable</text>
+      <text x="60" y="902" font-size="10px" fill="#1e40af">2. request.wait() on dist_stream → get redistributed KJT  3. compute_and_output_dist(ctx, data)</text>
+    </svg>
+  </div>
+</div>
+
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1257" target="_blank">utils.py:1257</a> — _rewrite_model(), _get_node_args(), _get_node_args_helper()</span>
+</section>
+
+<!-- ═══════════ fill_pipeline (Base) ═══════════ -->
+<section id="fill-base">
+<h3><span class="tag tag-base">BASE</span> fill_pipeline() — <span class="zh">基础 Pipeline 初始化</span><span class="en">Base Pipeline Initialization</span></h3>
+
+<div class="desc">
+<span class="zh"><p><code>TrainPipelineSparseDist</code> 在首次 <code>progress()</code> 时填充 <strong>2 个 batch</strong>，对 batch_i 完成 rewrite + input_dist（AllToAll #1 发起 + 等待 → AllToAll #2/#3 发起）。</p></span>
+<span class="en"><p><code>TrainPipelineSparseDist</code> fills <strong>2 batches</strong> on the first <code>progress()</code> call, completing rewrite + input_dist for batch_i (AllToAll #1 initiate + wait → AllToAll #2/#3 initiate).</p></span>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span>TrainPipelineSparseDist.fill_pipeline()</span>
+    <span class="hint"><span class="zh">Pipeline depth = 2 batches</span><span class="en">Pipeline depth = 2 batches</span></span>
+  </div>
+  <div class="svg-container seq-wrap">
+    <div class="seq-actors">
+      <div class="seq-actor" style="left:8.5%;background:#0369a1">DataLoader</div>
+      <div class="seq-actor" style="left:27.3%;background:#7c3aed">TrainPipeline</div>
+      <div class="seq-actor" style="left:47.7%;background:#0891b2">memcpy stream</div>
+      <div class="seq-actor" style="left:68.2%;background:#16a34a">data_dist stream</div>
+      <div class="seq-actor" style="left:88.6%;background:#dc2626">ShardedModule</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 660" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+      </defs>
+      <style>text{font-family:inherit}</style>
+
+      <!-- Actors -->
+      <rect x="25" y="8" width="100" height="40" rx="6" fill="#0369a1"/>
+      <text x="75" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">DataLoader</text>
+
+      <rect x="180" y="8" width="120" height="40" rx="6" fill="#7c3aed"/>
+      <text x="240" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">TrainPipeline</text>
+      <text x="240" y="40" fill="rgba(255,255,255,.55)" font-size="9px" text-anchor="middle">fill_pipeline()</text>
+
+      <rect x="360" y="8" width="120" height="40" rx="6" fill="#0891b2"/>
+      <text x="420" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">memcpy</text>
+      <text x="420" y="40" fill="rgba(255,255,255,.7)" font-size="9px" text-anchor="middle">_stream</text>
+
+      <rect x="540" y="8" width="120" height="40" rx="6" fill="#16a34a"/>
+      <text x="600" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">data_dist</text>
+      <text x="600" y="40" fill="rgba(255,255,255,.7)" font-size="9px" text-anchor="middle">_stream</text>
+
+      <rect x="720" y="8" width="120" height="40" rx="6" fill="#dc2626"/>
+      <text x="780" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">ShardedModule</text>
+
+      <!-- Lifelines -->
+      <line x1="75" y1="48" x2="75" y2="650" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="240" y1="48" x2="240" y2="650" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="420" y1="48" x2="420" y2="650" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="600" y1="48" x2="600" y2="650" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="780" y1="48" x2="780" y2="650" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+
+      <!-- ── batch_i region ── -->
+      <rect x="15" y="58" width="850" height="240" rx="8" fill="#dbeafe" fill-opacity=".25" stroke="#93c5fd" stroke-width="1.5"/>
+      <text x="25" y="74" font-size="11px" font-weight="700" fill="#1e40af">batch_i</text>
+
+      <!-- enqueue_batch(batch_i) -->
+      <line x1="240" y1="88" x2="75" y2="88" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="110" y="82" font-size="10px" fill="#1e293b">next(dataloader_iter)</text>
+      <line x1="75" y1="102" x2="234" y2="102" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr2)"/>
+      <text x="110" y="116" font-size="10px" fill="#64748b">batch_i (CPU)</text>
+
+      <line x1="240" y1="128" x2="414" y2="128" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="270" y="122" font-size="10px" fill="#6366f1" font-weight="600">_to_device(batch_i) [H2D async]</text>
+      <rect x="414" y="124" width="12" height="20" rx="2" fill="#c7d2fe" stroke="#818cf8"/>
+
+      <!-- _init_pipelined_modules -->
+      <rect x="195" y="160" width="600" height="26" rx="6" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text x="205" y="177" font-size="11px" fill="#4c1d95" font-weight="700">_init_pipelined_modules → _pipeline_model → _rewrite_model (首次 / first time)</text>
+
+      <!-- start_sparse_data_dist -->
+      <line x1="240" y1="200" x2="594" y2="200" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="310" y="194" font-size="10px" fill="#059669" font-weight="600">start_sparse_data_dist(batch_i, ctx_i)</text>
+      <rect x="594" y="196" width="12" height="30" rx="2" fill="#d1fae5" stroke="#6ee7b7"/>
+      <line x1="600" y1="210" x2="774" y2="210" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="620" y="204" font-size="9px" fill="#059669">module.input_dist() → AllToAll #1</text>
+
+      <!-- wait_sparse_data_dist -->
+      <line x1="240" y1="240" x2="594" y2="240" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="310" y="234" font-size="10px" fill="#059669" font-weight="600">wait_sparse_data_dist(ctx_i)</text>
+      <rect x="594" y="236" width="12" height="40" rx="2" fill="#d1fae5" stroke="#6ee7b7"/>
+      <rect x="520" y="252" width="200" height="22" rx="4" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="530" y="266" font-size="9px" fill="#065f46">AllToAll #1 done → #2/#3 started</text>
+
+      <!-- ── batch_i+1 region ── -->
+      <rect x="15" y="310" width="850" height="130" rx="8" fill="#fef3c7" fill-opacity=".25" stroke="#fcd34d" stroke-width="1.5"/>
+      <text x="25" y="326" font-size="11px" font-weight="700" fill="#92400e">batch_i+1</text>
+
+      <line x1="240" y1="340" x2="75" y2="340" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="110" y="334" font-size="10px" fill="#1e293b">next(dataloader_iter)</text>
+      <line x1="75" y1="354" x2="234" y2="354" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr2)"/>
+      <text x="110" y="368" font-size="10px" fill="#64748b">batch_i+1 (CPU)</text>
+
+      <line x1="240" y1="384" x2="414" y2="384" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="270" y="378" font-size="10px" fill="#6366f1" font-weight="600">_to_device(batch_i+1) [H2D async]</text>
+      <rect x="414" y="380" width="12" height="20" rx="2" fill="#c7d2fe" stroke="#818cf8"/>
+
+      <!-- Summary -->
+      <rect x="50" y="460" width="780" height="60" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+      <text x="70" y="480" font-size="12px" fill="#1e293b" font-weight="700">✅ Pipeline 填充完成 / Pipeline Filled</text>
+      <text x="70" y="498" font-size="11px" fill="#64748b">batches = [batch_i, batch_i+1]  •  batch_i: input_dist ✓ (AllToAll #2/#3 in flight)  •  batch_i+1: H2D ✓</text>
+
+      <rect x="50" y="536" width="780" height="36" rx="8" fill="#fffbeb" stroke="#fcd34d"/>
+      <text x="70" y="558" font-size="11px" fill="#92400e">⚠ AllToAll #2/#3 的等待（wait_sparse sub-stage 2）被延迟到 forward 内部的 PipelinedForward.__call__() 中</text>
+    </svg>
+  </div>
+</div>
+
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L260" target="_blank">train_pipeline.py:260</a> — fill_pipeline()</span>
+</section>
+
+<!-- ═══════════ _fill_pipeline (Prefetch) ═══════════ -->
+<section id="fill-prefetch">
+<h3><span class="tag tag-prefetch">PREFETCH</span> _fill_pipeline() — <span class="zh">Prefetch Pipeline 初始化</span><span class="en">Prefetch Pipeline Initialization</span></h3>
+
+<div class="desc">
+<span class="zh"><p><code>PrefetchTrainPipelineSparseDist</code> 填充 <strong>2 个 batch</strong>，但对 batch_1 额外完成 <strong>wait_sparse + prefetch</strong>（DynamicEmb cache lookup），然后对 batch_2 启动 input_dist。比 Base Pipeline 多了一个完整的 prefetch 阶段。</p></span>
+<span class="en"><p><code>PrefetchTrainPipelineSparseDist</code> fills <strong>2 batches</strong>, but additionally completes <strong>wait_sparse + prefetch</strong> (DynamicEmb cache lookup) for batch_1, then starts input_dist for batch_2. One extra prefetch stage compared to Base Pipeline.</p></span>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span>PrefetchTrainPipelineSparseDist._fill_pipeline()</span>
+    <span class="hint"><span class="zh">注意额外的 prefetch 阶段</span><span class="en">Note the additional prefetch stage</span></span>
+  </div>
+  <div class="svg-container seq-wrap">
+    <div class="seq-actors">
+      <div class="seq-actor" style="left:6.8%;background:#0369a1">DataLoader</div>
+      <div class="seq-actor" style="left:22.4%;background:#7c3aed">PrefetchPipeline</div>
+      <div class="seq-actor" style="left:39.6%;background:#0891b2">memcpy</div>
+      <div class="seq-actor" style="left:55.7%;background:#16a34a">data_dist</div>
+      <div class="seq-actor" style="left:72.4%;background:#ea580c">prefetch</div>
+      <div class="seq-actor" style="left:89.6%;background:#dc2626">ShardedModule</div>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 820" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <defs>
+        <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+      </defs>
+      <style>text{font-family:inherit}</style>
+
+      <!-- Actors -->
+      <rect x="20" y="8" width="90" height="40" rx="6" fill="#0369a1"/>
+      <text x="65" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">DataLoader</text>
+
+      <rect x="150" y="8" width="130" height="40" rx="6" fill="#7c3aed"/>
+      <text x="215" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">PrefetchPipeline</text>
+      <text x="215" y="40" fill="rgba(255,255,255,.55)" font-size="9px" text-anchor="middle">_fill_pipeline()</text>
+
+      <rect x="330" y="8" width="100" height="40" rx="6" fill="#0891b2"/>
+      <text x="380" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">memcpy</text>
+      <text x="380" y="40" fill="rgba(255,255,255,.7)" font-size="9px" text-anchor="middle">_stream</text>
+
+      <rect x="480" y="8" width="110" height="40" rx="6" fill="#16a34a"/>
+      <text x="535" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">data_dist</text>
+      <text x="535" y="40" fill="rgba(255,255,255,.7)" font-size="9px" text-anchor="middle">_stream</text>
+
+      <rect x="640" y="8" width="110" height="40" rx="6" fill="#ea580c"/>
+      <text x="695" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">prefetch</text>
+      <text x="695" y="40" fill="rgba(255,255,255,.7)" font-size="9px" text-anchor="middle">_stream</text>
+
+      <rect x="800" y="8" width="120" height="40" rx="6" fill="#dc2626"/>
+      <text x="860" y="26" fill="#fff" font-size="11px" font-weight="700" text-anchor="middle">ShardedModule</text>
+
+      <!-- Lifelines -->
+      <line x1="65" y1="48" x2="65" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="215" y1="48" x2="215" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="380" y1="48" x2="380" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="535" y1="48" x2="535" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="695" y1="48" x2="695" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+      <line x1="860" y1="48" x2="860" y2="810" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="6,4"/>
+
+      <!-- ── batch_1 region ── -->
+      <rect x="10" y="58" width="940" height="500" rx="8" fill="#dbeafe" fill-opacity=".2" stroke="#93c5fd" stroke-width="1.5"/>
+      <text x="20" y="74" font-size="11px" font-weight="700" fill="#1e40af">batch_1 (self._batch_i)</text>
+
+      <!-- H2D -->
+      <line x1="215" y1="88" x2="65" y2="88" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="90" y="82" font-size="10px" fill="#1e293b">next(dataloader_iter)</text>
+      <line x1="65" y1="100" x2="209" y2="100" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr3)"/>
+
+      <line x1="215" y1="114" x2="374" y2="114" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="245" y="108" font-size="10px" fill="#6366f1" font-weight="600">_to_device + shuffle [H2D]</text>
+      <rect x="374" y="110" width="12" height="18" rx="2" fill="#c7d2fe" stroke="#818cf8"/>
+
+      <!-- _init_pipelined_modules -->
+      <rect x="170" y="140" width="560" height="24" rx="6" fill="#f5f3ff" stroke="#c4b5fd"/>
+      <text x="180" y="156" font-size="10px" fill="#4c1d95" font-weight="700">_init_pipelined_modules → _rewrite_model: forward = PrefetchPipelinedForward(...)</text>
+
+      <!-- _start_sparse_data_dist -->
+      <line x1="215" y1="180" x2="529" y2="180" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="270" y="174" font-size="10px" fill="#059669" font-weight="600">_start_sparse_data_dist(batch_1)</text>
+      <rect x="529" y="176" width="12" height="24" rx="2" fill="#d1fae5" stroke="#6ee7b7"/>
+      <text x="555" y="192" font-size="9px" fill="#059669">AllToAll #1 (splits)</text>
+
+      <!-- _wait_sparse_data_dist -->
+      <line x1="215" y1="216" x2="529" y2="216" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="270" y="210" font-size="10px" fill="#059669" font-weight="600">_wait_sparse_data_dist()</text>
+      <rect x="529" y="212" width="12" height="40" rx="2" fill="#d1fae5" stroke="#6ee7b7"/>
+      <rect x="460" y="228" width="180" height="20" rx="4" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="470" y="242" font-size="9px" fill="#065f46">#1 done → #2 + #3 started</text>
+
+      <!-- ── PREFETCH (the key difference!) ── -->
+      <rect x="160" y="262" width="700" height="174" rx="8" fill="#fef3c7" fill-opacity=".35" stroke="#d97706" stroke-width="2"/>
+      <rect x="160" y="262" width="200" height="18" rx="4" fill="#d97706"/>
+      <text x="170" y="276" fill="#fff" font-size="10px" font-weight="700">🔑 _prefetch(batch_1) — DynamicEmb 独有</text>
+
+      <line x1="215" y1="296" x2="689" y2="296" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="310" y="290" font-size="10px" fill="#d97706" font-weight="600">_prefetch_embeddings(batch_1, context, ...)</text>
+      <rect x="689" y="290" width="12" height="130" rx="2" fill="#fef3c7" stroke="#d97706"/>
+
+      <!-- prefetch internal: wait AllToAll -->
+      <line x1="695" y1="318" x2="541" y2="318" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="555" y="312" font-size="9px" fill="#059669">request.wait() — AllToAll #2/#3 完成</text>
+      <rect x="529" y="312" width="12" height="20" rx="2" fill="#d1fae5" stroke="#6ee7b7"/>
+      <line x1="535" y1="332" x2="689" y2="332" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr3)"/>
+
+      <!-- prefetch internal: DynamicEmb prefetch -->
+      <line x1="695" y1="356" x2="854" y2="356" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="710" y="350" font-size="9px" fill="#d97706">sharded_module.prefetch(ctx, data)</text>
+      <rect x="854" y="350" width="12" height="30" rx="2" fill="#fef3c7" stroke="#d97706"/>
+      <rect x="750" y="366" width="180" height="20" rx="4" fill="#fef3c7" stroke="#d97706"/>
+      <text x="758" y="380" font-size="8px" fill="#92400e">hash lookup → cache → slot_indices</text>
+
+      <!-- prefetch result -->
+      <rect x="220" y="398" width="400" height="20" rx="4" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="230" y="412" font-size="9px" fill="#065f46">ctx.module_input_post_prefetch[name] = data   ctx.module_contexts_post_prefetch[name] = ctx</text>
+
+      <!-- ── batch_2 region ── -->
+      <rect x="10" y="570" width="940" height="120" rx="8" fill="#fef3c7" fill-opacity=".2" stroke="#fcd34d" stroke-width="1.5"/>
+      <text x="20" y="586" font-size="11px" font-weight="700" fill="#92400e">batch_2 (self._batch_ip1)</text>
+
+      <line x1="215" y1="600" x2="65" y2="600" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="90" y="594" font-size="10px" fill="#1e293b">next(dataloader_iter)</text>
+      <line x1="65" y1="612" x2="209" y2="612" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr3)"/>
+
+      <line x1="215" y1="630" x2="374" y2="630" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="245" y="624" font-size="10px" fill="#6366f1" font-weight="600">_to_device + shuffle [H2D]</text>
+
+      <line x1="215" y1="660" x2="529" y2="660" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="270" y="654" font-size="10px" fill="#059669" font-weight="600">_start_sparse_data_dist(batch_2)</text>
+
+      <!-- Summary -->
+      <rect x="30" y="710" width="900" height="60" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+      <text x="50" y="730" font-size="12px" fill="#1e293b" font-weight="700">✅ Pipeline 填充完成 / Pipeline Filled</text>
+      <text x="50" y="748" font-size="11px" fill="#64748b">batch_1: H2D ✓ input_dist ✓ wait_sparse ✓ prefetch ✓    •    batch_2: H2D ✓ input_dist started</text>
+
+      <rect x="30" y="784" width="900" height="22" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="50" y="800" font-size="11px" fill="#065f46">✅ 首次 progress() 进 forward 时，DynamicEmb 的 slot_indices 已就绪，PrefetchPipelinedForward 零等待</text>
+    </svg>
+  </div>
+</div>
+
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L543" target="_blank">train_pipeline.py:543</a> — PrefetchTrainPipelineSparseDist._fill_pipeline()</span>
+</section>
+
+<!-- ═══════════ Forward Comparison ═══════════ -->
+<section id="forward-cmp">
+<h3><span class="tag tag-fwd">FWD</span> Forward <span class="zh">替换对比</span><span class="en">Replacement Comparison</span></h3>
+
+<div class="desc">
+<span class="zh"><p>两种 Forward 类都继承自 <code>BaseForward</code>，核心区别在于 <code>__call__</code> 中数据的来源和等待时机。</p></span>
+<span class="en"><p>Both Forward classes inherit from <code>BaseForward</code>. The key difference is where data comes from and when waiting occurs in <code>__call__</code>.</p></span>
+</div>
+
+<div class="compare-grid">
+<div class="compare-card base">
+<h4>PipelinedForward</h4>
+<pre><span class="kw">def</span> <span class="fn">__call__</span>(self, *input, **kwargs):
+    <span class="cm"># 从 context 取 awaitable</span>
+    request = self._context \
+        .input_dist_tensors_requests.pop(name)
+
+    <span class="cm"># ⚠ 在 forward 内部等待 AllToAll 完成</span>
+    <span class="kw">with</span> cuda.stream(self._stream):
+        data = request.<span class="fn">wait</span>()  <span class="cm"># blocking!</span>
+
+    <span class="cm"># 同步 stream</span>
+    current_stream.<span class="fn">wait_stream</span>(self._stream)
+    data.<span class="fn">record_stream</span>(current_stream)
+
+    <span class="kw">return</span> module.<span class="fn">compute_and_output_dist</span>(ctx, data)</pre>
+</div>
+<div class="compare-card prefetch">
+<h4>PrefetchPipelinedForward</h4>
+<pre><span class="kw">def</span> <span class="fn">__call__</span>(self, *input, **kwargs):
+    <span class="cm"># ✅ 直接取已 prefetch 的数据</span>
+    data = self._context \
+        .module_input_post_prefetch.pop(name)
+    ctx = self._context \
+        .module_contexts_post_prefetch.pop(name)
+
+    <span class="cm"># 同步 prefetch_stream → default</span>
+    current_stream.<span class="fn">wait_stream</span>(self._stream)
+    data.<span class="fn">record_stream</span>(current_stream)
+
+    <span class="kw">return</span> module.<span class="fn">compute_and_output_dist</span>(ctx, data)</pre>
+</div>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span><span class="zh">Forward 调用链对比</span><span class="en">Forward Call Chain Comparison</span></span>
+    <span class="hint"><span class="zh">左 = Base，右 = Prefetch</span><span class="en">Left = Base, Right = Prefetch</span></span>
+  </div>
+  <div class="svg-container">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 300" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <defs>
+        <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+      </defs>
+      <style>text{font-family:inherit}</style>
+
+      <!-- Left: PipelinedForward -->
+      <rect x="10" y="10" width="430" height="280" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+      <text x="20" y="30" font-size="13px" font-weight="700" fill="#1e40af">PipelinedForward.__call__()</text>
+
+      <rect x="30" y="50" width="390" height="28" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+      <text x="40" y="68" font-size="11px" fill="#1e40af">① context.input_dist_tensors_requests.pop(name)</text>
+
+      <rect x="30" y="90" width="390" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5"/>
+      <text x="40" y="108" font-size="11px" fill="#dc2626" font-weight="700">② with cuda.stream(dist_stream):</text>
+      <text x="55" y="124" font-size="11px" fill="#dc2626">data = request.wait()  ← ⚠ AllToAll #2/#3 等待</text>
+
+      <rect x="30" y="142" width="390" height="28" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+      <text x="40" y="160" font-size="11px" fill="#1e40af">③ current_stream.wait_stream(dist_stream)</text>
+
+      <rect x="30" y="182" width="390" height="28" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+      <text x="40" y="200" font-size="11px" fill="#1e40af">④ module.compute_and_output_dist(ctx, data)</text>
+
+      <rect x="30" y="230" width="390" height="40" rx="6" fill="#fffbeb" stroke="#fcd34d"/>
+      <text x="40" y="248" font-size="10px" fill="#92400e" font-weight="700">⚠ 如果 AllToAll 未完成，forward 在此阻塞</text>
+      <text x="40" y="262" font-size="10px" fill="#92400e">If AllToAll not done, forward blocks here</text>
+
+      <!-- Right: PrefetchPipelinedForward -->
+      <rect x="470" y="10" width="440" height="280" rx="10" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="480" y="30" font-size="13px" font-weight="700" fill="#065f46">PrefetchPipelinedForward.__call__()</text>
+
+      <rect x="490" y="50" width="400" height="40" rx="6" fill="#d1fae5" stroke="#6ee7b7"/>
+      <text x="500" y="68" font-size="11px" fill="#065f46">① data = context.module_input_post_prefetch.pop(name)</text>
+      <text x="500" y="84" font-size="11px" fill="#065f46">② ctx = context.module_contexts_post_prefetch.pop(name)</text>
+
+      <rect x="490" y="102" width="400" height="28" rx="6" fill="#d1fae5" stroke="#6ee7b7"/>
+      <text x="500" y="120" font-size="11px" fill="#065f46">③ current_stream.wait_stream(prefetch_stream)</text>
+
+      <rect x="490" y="142" width="400" height="28" rx="6" fill="#d1fae5" stroke="#6ee7b7"/>
+      <text x="500" y="160" font-size="11px" fill="#065f46">④ module.compute_and_output_dist(ctx, data)</text>
+
+      <rect x="490" y="190" width="400" height="50" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+      <text x="500" y="210" font-size="11px" fill="#059669" font-weight="700">✅ 零等待！数据已在 prefetch 阶段就绪</text>
+      <text x="500" y="226" font-size="10px" fill="#059669">Zero wait! Data already ready from prefetch stage</text>
+      <text x="500" y="234" font-size="9px" fill="#059669">DynamicEmb slot_indices 在 prefetch_stream 上已计算完成</text>
+    </svg>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════ Context ═══════════ -->
+<section id="context">
+<h3><span class="tag tag-compare">CTX</span> Context <span class="zh">数据结构对比</span><span class="en">Dataclass Comparison</span> <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L90" target="_blank" style="font-size:12px;color:#64748b;font-weight:400">utils.py:90</a></h3>
+<div class="xref-bar">
+<a href="context_lifecycle.html">完整类图 + TorchRec 类型深度解析 → Context Lifecycle</a>
+<a href="context_lifecycle.html#lifecycle-base">Context 生命周期序列图 →</a>
+<a href="context_lifecycle.html#field-detail">字段生产者/消费者映射 →</a>
+</div>
+
+<div class="compare-grid">
+<div class="compare-card base">
+<h4>TrainPipelineContext</h4>
+<pre><span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="ty">TrainPipelineContext</span>:
+  <span class="cm"># AllToAll #1 awaitable</span>
+  input_dist_splits_requests: Dict[str, Awaitable]
+
+  <span class="cm"># AllToAll #2+#3 awaitable</span>
+  input_dist_tensors_requests: Dict[str, Awaitable]
+
+  <span class="cm"># ShardedModule contexts</span>
+  module_contexts: Dict[str, Multistreamable]
+
+  <span class="cm"># Fused splits for batched AllToAll</span>
+  fused_splits_awaitables: List[...]
+
+  <span class="cm"># Postproc cache</span>
+  postproc_fwd_results: Dict[str, Any]
+
+  events: List[torch.Event]
+  index: Optional[int]
+  version: int  <span class="cm"># 0=legacy, 1=current</span></pre>
+</div>
+<div class="compare-card prefetch">
+<h4>PrefetchTrainPipelineContext</h4>
+<pre><span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="ty">PrefetchTrainPipelineContext</span>(
+    <span class="ty">TrainPipelineContext</span>
+):
+  <span class="cm"># ↓↓↓ NEW: prefetch 输出 ↓↓↓</span>
+
+  <span class="cm"># prefetch 后的 KJTList 数据</span>
+  module_input_post_prefetch:
+      Dict[str, Multistreamable]
+
+  <span class="cm"># prefetch 后的 module context</span>
+  module_contexts_post_prefetch:
+      Dict[str, Multistreamable]
+
+  <span class="cm"># (deprecated v0 fields)</span>
+  module_input_post_prefetch_next_batch: ...
+  module_contexts_post_prefetch_next_batch: ...</pre>
+</div>
+</div>
+
+<div class="callout callout-tip">
+<span class="zh"><strong>数据流向：</strong> Base pipeline 中，<code>input_dist_tensors_requests</code> 在 <code>PipelinedForward.__call__</code> 中被 pop 并 wait()。Prefetch pipeline 中，<code>_prefetch_embeddings()</code> 先消费 <code>input_dist_tensors_requests</code>，执行 prefetch 后将结果存入 <code>module_input_post_prefetch</code>，再由 <code>PrefetchPipelinedForward.__call__</code> 消费。</span>
+<span class="en"><strong>Data flow:</strong> In Base pipeline, <code>input_dist_tensors_requests</code> is popped and wait()ed in <code>PipelinedForward.__call__</code>. In Prefetch pipeline, <code>_prefetch_embeddings()</code> first consumes <code>input_dist_tensors_requests</code>, runs prefetch, stores results in <code>module_input_post_prefetch</code>, which is then consumed by <code>PrefetchPipelinedForward.__call__</code>.</span>
+</div>
+</section>
+
+<!-- ═══════════ Context Detail ═══════════ -->
+<section id="ctx-detail">
+<h3><span class="tag tag-compare">CTX</span> Context <span class="zh">数据流详解</span><span class="en">Data Flow Deep Dive</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p><code>TrainPipelineContext</code> 是 pipeline 各阶段之间的数据桥梁。每个 batch 拥有独立的 context 实例，数据在 pipeline 阶段之间通过 context 字典传递。下图展示 Base Pipeline 和 Prefetch Pipeline 中，context 字段在每个阶段如何被写入和消费。</p>
+</span>
+<span class="en">
+  <p><code>TrainPipelineContext</code> bridges data between pipeline stages. Each batch owns an independent context instance; data flows between stages via context dictionaries. The diagram below shows how context fields are populated and consumed at each stage in both Base and Prefetch pipelines.</p>
+</span>
+</div>
+
+<div class="svg-wrap">
+  <div class="svg-header">
+    <span><span class="zh">Context 数据流图</span><span class="en">Context Data Flow Diagram</span></span>
+    <span class="hint"><span class="zh">参与者标签跟随滚动</span><span class="en">Participant labels stick on scroll</span></span>
+  </div>
+  <div class="svg-container">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1000" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif">
+      <defs>
+        <marker id="arrCtx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+        </marker>
+        <marker id="arrCtxG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/>
+        </marker>
+      </defs>
+      <style>text{font-family:inherit}</style>
+
+      <!-- ═══ BASE PIPELINE FLOW ═══ -->
+      <rect x="10" y="10" width="940" height="420" rx="10" fill="#eff6ff" fill-opacity=".15" stroke="#2563eb" stroke-width="2"/>
+      <rect x="10" y="10" width="320" height="22" rx="6" fill="#2563eb"/>
+      <text x="22" y="26" fill="#fff" font-size="11px" font-weight="700">Base Pipeline: TrainPipelineContext 数据流</text>
+
+      <!-- Stage 1: _start_data_dist -->
+      <rect x="30" y="48" width="280" height="130" rx="8" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+      <text x="45" y="68" font-size="12px" fill="#0891b2" font-weight="700">① _start_data_dist(batch, ctx)</text>
+      <text x="45" y="86" font-size="10px" fill="#155e75">on data_dist_stream:</text>
+      <text x="45" y="102" font-size="10px" fill="#334155">for sm in sharded_modules:</text>
+      <text x="60" y="118" font-size="10px" fill="#334155">awaitable = sm.input_dist(sm_ctx, kjt)</text>
+      <rect x="45" y="128" width="250" height="40" rx="4" fill="#cffafe" stroke="#0891b2"/>
+      <text x="55" y="144" font-size="10px" fill="#0891b2" font-weight="600">WRITES to context:</text>
+      <text x="55" y="160" font-size="9px" fill="#155e75">input_dist_splits_requests[name] = awaitable</text>
+
+      <!-- Arrow from stage 1 to stage 2 -->
+      <line x1="310" y1="110" x2="340" y2="110" stroke="#475569" stroke-width="2" marker-end="url(#arrCtx)"/>
+
+      <!-- Stage 2: wait_sparse_data_dist -->
+      <rect x="340" y="48" width="290" height="170" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="355" y="68" font-size="12px" fill="#7c3aed" font-weight="700">② wait_sparse_data_dist(ctx)</text>
+      <text x="355" y="86" font-size="10px" fill="#5b21b6">READS: fused_splits_awaitables</text>
+      <text x="355" y="102" font-size="10px" fill="#334155">fused_awaitable.wait() → AllToAll #1 done</text>
+      <text x="355" y="118" font-size="10px" fill="#334155">for sm: request = input_dist(sm_ctx, data)</text>
+      <rect x="355" y="128" width="260" height="52" rx="4" fill="#ede9fe" stroke="#7c3aed"/>
+      <text x="365" y="144" font-size="10px" fill="#7c3aed" font-weight="600">WRITES to context:</text>
+      <text x="365" y="160" font-size="9px" fill="#5b21b6">input_dist_tensors_requests[name] = request</text>
+      <text x="365" y="174" font-size="9px" fill="#5b21b6">module_contexts[name] = sm_ctx (copied from _next_batch)</text>
+
+      <!-- Arrow from stage 2 to PipelinedForward -->
+      <line x1="630" y1="130" x2="660" y2="130" stroke="#475569" stroke-width="2" marker-end="url(#arrCtx)"/>
+
+      <!-- Stage 3 (Base): PipelinedForward -->
+      <rect x="660" y="48" width="280" height="170" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+      <text x="675" y="68" font-size="12px" fill="#ea580c" font-weight="700">③ PipelinedForward.__call__</text>
+      <rect x="675" y="78" width="250" height="40" rx="4" fill="#ffedd5" stroke="#ea580c"/>
+      <text x="685" y="94" font-size="10px" fill="#ea580c" font-weight="600">POPS from context:</text>
+      <text x="685" y="108" font-size="9px" fill="#9a3412">request = input_dist_tensors_requests.pop(name)</text>
+
+      <text x="675" y="134" font-size="10px" fill="#334155">with cuda.stream(dist_stream):</text>
+      <text x="690" y="150" font-size="10px" fill="#dc2626" font-weight="700">data = request.wait() ← ⚠ blocks!</text>
+
+      <text x="675" y="172" font-size="10px" fill="#334155">ctx = module_contexts.pop(name)</text>
+      <text x="675" y="188" font-size="10px" fill="#334155">→ compute_and_output_dist(ctx, data)</text>
+
+      <!-- Timing note for Base -->
+      <rect x="30" y="240" width="600" height="50" rx="6" fill="#fef2f2" stroke="#fca5a5"/>
+      <text x="45" y="258" font-size="11px" fill="#dc2626" font-weight="700">⚠ Base Pipeline 关键瓶颈 / Base Pipeline bottleneck:</text>
+      <text x="45" y="276" font-size="10px" fill="#991b1b">request.wait() in forward blocks GPU default stream until AllToAll #2/#3 completes on data_dist_stream</text>
+
+      <!-- Data flow diagram for Base -->
+      <rect x="30" y="302" width="900" height="110" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="50" y="322" font-size="11px" fill="#1e293b" font-weight="700">Base Context 完整生命周期 / Full Lifecycle:</text>
+
+      <rect x="50" y="336" width="140" height="24" rx="4" fill="#0891b2"/>
+      <text x="120" y="352" text-anchor="middle" fill="#fff" font-size="9px" font-weight="600">_start_data_dist</text>
+      <text x="200" y="352" font-size="14px" fill="#94a3b8">→</text>
+      <rect x="215" y="336" width="90" height="24" rx="4" fill="#cffafe" stroke="#0891b2"/>
+      <text x="260" y="352" text-anchor="middle" fill="#0891b2" font-size="8px" font-weight="600">splits_requests</text>
+
+      <text x="315" y="352" font-size="14px" fill="#94a3b8">→</text>
+      <rect x="330" y="336" width="165" height="24" rx="4" fill="#7c3aed"/>
+      <text x="412" y="352" text-anchor="middle" fill="#fff" font-size="9px" font-weight="600">wait_sparse_data_dist</text>
+      <text x="505" y="352" font-size="14px" fill="#94a3b8">→</text>
+      <rect x="520" y="336" width="95" height="24" rx="4" fill="#ede9fe" stroke="#7c3aed"/>
+      <text x="567" y="352" text-anchor="middle" fill="#7c3aed" font-size="8px" font-weight="600">tensors_requests</text>
+
+      <text x="625" y="352" font-size="14px" fill="#94a3b8">→</text>
+      <rect x="640" y="336" width="140" height="24" rx="4" fill="#ea580c"/>
+      <text x="710" y="352" text-anchor="middle" fill="#fff" font-size="9px" font-weight="600">PipelinedForward</text>
+      <text x="790" y="352" font-size="14px" fill="#94a3b8">→</text>
+      <rect x="806" y="336" width="110" height="24" rx="4" fill="#ffedd5" stroke="#ea580c"/>
+      <text x="861" y="352" text-anchor="middle" fill="#ea580c" font-size="8px" font-weight="600">wait() + compute</text>
+
+      <text x="50" y="400" font-size="9px" fill="#64748b">module_contexts: written by wait_sparse → popped by PipelinedForward  |  module_contexts_next_batch: temp buffer between stages</text>
+
+      <!-- ═══ PREFETCH PIPELINE FLOW ═══ -->
+      <rect x="10" y="450" width="940" height="530" rx="10" fill="#ecfdf5" fill-opacity=".15" stroke="#059669" stroke-width="2"/>
+      <rect x="10" y="450" width="380" height="22" rx="6" fill="#059669"/>
+      <text x="22" y="466" fill="#fff" font-size="11px" font-weight="700">Prefetch Pipeline: PrefetchTrainPipelineContext 数据流</text>
+
+      <!-- Stages 1+2 same (abbreviated) -->
+      <rect x="30" y="488" width="600" height="46" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+      <text x="45" y="508" font-size="10px" fill="#475569" font-weight="700">① _start_data_dist + ② wait_sparse_data_dist → 同 Base Pipeline / same as Base</text>
+      <text x="45" y="524" font-size="9px" fill="#94a3b8">populates input_dist_tensors_requests + module_contexts (AllToAll #2/#3 complete)</text>
+
+      <!-- Arrow to prefetch -->
+      <line x1="330" y1="534" x2="330" y2="548" stroke="#16a34a" stroke-width="2" marker-end="url(#arrCtxG)"/>
+
+      <!-- Stage 3 (Prefetch): _prefetch_embeddings -->
+      <rect x="30" y="550" width="440" height="200" rx="8" fill="#ecfdf5" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="45" y="570" font-size="12px" fill="#16a34a" font-weight="700">③ _prefetch_embeddings(batch, ctx, pipelined_modules)</text>
+      <text x="45" y="590" font-size="10px" fill="#166534">on prefetch_stream:</text>
+      <rect x="45" y="598" width="410" height="40" rx="4" fill="#bbf7d0" stroke="#16a34a"/>
+      <text x="55" y="614" font-size="10px" fill="#16a34a" font-weight="600">POPS from context (consumes AllToAll result):</text>
+      <text x="55" y="630" font-size="9px" fill="#166534">data = input_dist_tensors_requests[name].wait()</text>
+
+      <text x="45" y="656" font-size="10px" fill="#334155">sm.prefetch(ctx=sm_ctx, dist_input=data)</text>
+      <text x="45" y="672" font-size="9px" fill="#64748b">DynamicEmb: hash lookup → HKV cache → slot_indices</text>
+
+      <rect x="45" y="686" width="410" height="52" rx="4" fill="#bbf7d0" stroke="#16a34a"/>
+      <text x="55" y="702" font-size="10px" fill="#16a34a" font-weight="600">WRITES to context (prefetch output):</text>
+      <text x="55" y="718" font-size="9px" fill="#166534">module_input_post_prefetch[name] = data</text>
+      <text x="55" y="732" font-size="9px" fill="#166534">module_contexts_post_prefetch[name] = sm_ctx</text>
+
+      <!-- Arrow to PrefetchPipelinedForward -->
+      <line x1="470" y1="650" x2="510" y2="650" stroke="#475569" stroke-width="2" marker-end="url(#arrCtx)"/>
+
+      <!-- Stage 4 (Prefetch): PrefetchPipelinedForward -->
+      <rect x="510" y="550" width="420" height="200" rx="8" fill="#fef2f2" fill-opacity=".5" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="525" y="570" font-size="12px" fill="#dc2626" font-weight="700">④ PrefetchPipelinedForward.__call__</text>
+      <rect x="525" y="580" width="390" height="52" rx="4" fill="#fecaca" stroke="#dc2626"/>
+      <text x="535" y="596" font-size="10px" fill="#dc2626" font-weight="600">POPS from context (already prefetched!):</text>
+      <text x="535" y="612" font-size="9px" fill="#991b1b">data = module_input_post_prefetch.pop(name)</text>
+      <text x="535" y="626" font-size="9px" fill="#991b1b">ctx = module_contexts_post_prefetch.pop(name)</text>
+
+      <text x="525" y="654" font-size="10px" fill="#334155">current_stream.wait_stream(prefetch_stream)</text>
+      <text x="525" y="672" font-size="10px" fill="#334155">data.record_stream(current_stream)</text>
+
+      <rect x="525" y="686" width="390" height="44" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+      <text x="535" y="704" font-size="11px" fill="#059669" font-weight="700">✅ 零等待！/ Zero wait!</text>
+      <text x="535" y="720" font-size="9px" fill="#065f46">data and slot_indices already computed during prefetch stage</text>
+
+      <text x="525" y="742" font-size="10px" fill="#334155">→ compute_and_output_dist(ctx, data)</text>
+
+      <!-- Prefetch Data flow diagram -->
+      <rect x="30" y="770" width="900" height="80" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="50" y="790" font-size="11px" fill="#1e293b" font-weight="700">Prefetch Context 完整生命周期 / Full Lifecycle:</text>
+
+      <rect x="50" y="804" width="90" height="22" rx="4" fill="#0891b2"/>
+      <text x="95" y="818" text-anchor="middle" fill="#fff" font-size="8px" font-weight="600">start_dist</text>
+      <text x="148" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="160" y="804" width="90" height="22" rx="4" fill="#7c3aed"/>
+      <text x="205" y="818" text-anchor="middle" fill="#fff" font-size="8px" font-weight="600">wait_sparse</text>
+      <text x="258" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="268" y="804" width="70" height="22" rx="4" fill="#ede9fe" stroke="#7c3aed"/>
+      <text x="303" y="818" text-anchor="middle" fill="#7c3aed" font-size="7px" font-weight="600">tensors_req</text>
+      <text x="346" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="356" y="804" width="110" height="22" rx="4" fill="#16a34a"/>
+      <text x="411" y="818" text-anchor="middle" fill="#fff" font-size="8px" font-weight="600">prefetch_emb</text>
+      <text x="474" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="486" y="804" width="90" height="22" rx="4" fill="#bbf7d0" stroke="#16a34a"/>
+      <text x="531" y="818" text-anchor="middle" fill="#16a34a" font-size="7px" font-weight="600">post_prefetch</text>
+      <text x="584" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="596" y="804" width="130" height="22" rx="4" fill="#dc2626"/>
+      <text x="661" y="818" text-anchor="middle" fill="#fff" font-size="8px" font-weight="600">PrefetchPipelinedFwd</text>
+      <text x="734" y="818" font-size="12px" fill="#94a3b8">→</text>
+      <rect x="746" y="804" width="80" height="22" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+      <text x="786" y="818" text-anchor="middle" fill="#059669" font-size="7px" font-weight="700">0-wait!</text>
+
+      <text x="50" y="844" font-size="9px" fill="#64748b">Key insight: prefetch_embeddings moves the wait() from forward into prefetch_stream, so forward never blocks for AllToAll</text>
+
+      <!-- Comparison summary -->
+      <rect x="10" y="860" width="940" height="44" rx="6" fill="#fffbeb" stroke="#fcd34d"/>
+      <text x="30" y="878" font-size="10px" fill="#92400e" font-weight="700">对比 / Comparison:</text>
+      <text x="30" y="896" font-size="10px" fill="#92400e">Base: forward 内 wait AllToAll → GPU idle   |   Prefetch: forward 前 prefetch 阶段已完成 wait + cache lookup → forward 零等待</text>
+
+      <!-- Context field mapping table -->
+      <rect x="10" y="920" width="940" height="68" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="30" y="940" font-size="11px" fill="#1e293b" font-weight="700">Context 字段读写映射 / Field Read-Write Map:</text>
+      <text x="30" y="958" font-size="9px" fill="#475569">input_dist_splits_requests: W=_start_data_dist  R=wait_sparse  |  input_dist_tensors_requests: W=wait_sparse  R=PipelinedFwd (base) / _prefetch_emb (prefetch)</text>
+      <text x="30" y="974" font-size="9px" fill="#475569">module_contexts: W=wait_sparse  R=PipelinedFwd  |  module_input_post_prefetch: W=_prefetch_emb  R=PrefetchPipelinedFwd  |  module_contexts_post_prefetch: W=_prefetch_emb  R=PrefetchPipelinedFwd</text>
+    </svg>
+  </div>
+</div>
+
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L90" target="_blank">utils.py:90</a> — TrainPipelineContext, PrefetchTrainPipelineContext</span><br>
+<span class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1117" target="_blank">utils.py:1117</a> — _start_data_dist(), _prefetch_embeddings(), PipelinedForward, PrefetchPipelinedForward</span>
+</section>
+
+<!-- ═══════════ progress() steady state ═══════════ -->
+<section id="progress">
+<h3><span class="tag tag-compare">CMP</span> <span class="zh">稳态 progress() 对比</span><span class="en">Steady-State progress() Comparison</span></h3>
+
+<div class="desc">
+<span class="zh"><p>以 <code>JaggedMegatron*</code> 生产变体为例，展示稳态下每次 <code>progress()</code> 的执行步骤。</p></span>
+<span class="en"><p>Using <code>JaggedMegatron*</code> production variants as examples, showing the steady-state execution steps of each <code>progress()</code> call.</p></span>
+<div class="xref-bar">
+<a href="runtime_timeline.html">交互式 3 迭代 Timeline 可视化 → Runtime Timeline</a>
+<a href="context_lifecycle.html#lifecycle-base">Context 字段状态时间线 →</a>
+</div>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">步骤</span><span class="en">Step</span></th>
+  <th>JaggedMegatronTrainPipelineSparseDist</th>
+  <th>JaggedMegatronPrefetchTrainPipelineSparseDist</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td>zero_grad()</td>
+  <td>zero_grad()</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>wait_for_batch(batch_i)</td>
+  <td><strong style="color:#d97706">wait_prefetch_async(batch_i)</strong><br><span style="font-size:11px;color:#64748b">CPU 等待 background thread prefetch 完成</span></td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>start_sparse_data_dist(batch_ip1)</td>
+  <td>copy_batch_to_gpu(batch_ip2) [H2D]</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>copy_batch_to_gpu(batch_ip2) [H2D]</td>
+  <td>wait_sparse_data_dist()</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>wait_sparse_data_dist(batch_ip1)</td>
+  <td>Shuffle Phase 1 (AllGather workloads)</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>Shuffle Phase 1 (AllGather + submit KK)</td>
+  <td><strong>forward(batch_i)</strong><br><span style="font-size:11px;color:#059669">PrefetchPipelinedForward: 零等待</span></td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>forward(batch_i)</strong><br><span style="font-size:11px;color:#dc2626">PipelinedForward: wait AllToAll #2/#3</span></td>
+  <td><strong style="color:#d97706">_start_prefetch_async(batch_ip1)</strong><br><span style="font-size:11px;color:#64748b">background thread 异步 prefetch</span></td>
+</tr>
+<tr>
+  <td>8</td>
+  <td>Shuffle Phase 2 (finish_shuffle)</td>
+  <td>Shuffle Phase 2 (finish_shuffle)</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td>loss AllReduce + backward + optimizer</td>
+  <td>loss AllReduce + backward + optimizer</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td>dequeue_batch()</td>
+  <td>_start_sparse_data_dist(batch_ip2)</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td>—</td>
+  <td>batch_i ← batch_ip1, batch_ip1 ← batch_ip2</td>
+</tr>
+</table>
+
+<div class="callout callout-warn">
+<span class="zh"><strong>关键差异总结：</strong><br>
+• <strong>AllToAll 等待时机：</strong> Base 在 forward 内部（Step 7）；Prefetch 在 background thread（Step 2 wait_prefetch_async）<br>
+• <strong>Prefetch：</strong> Base 无；Prefetch 在 forward 后异步提交（Step 7），与 backward 重叠<br>
+• <strong>input_dist 启动时机：</strong> Base 在 forward 前（Step 3）；Prefetch 在 backward 后（Step 10）<br>
+• <strong>Pipeline depth：</strong> Base = 2 batches；Prefetch = 3 batches</span>
+<span class="en"><strong>Key Differences:</strong><br>
+• <strong>AllToAll wait timing:</strong> Base waits inside forward (Step 7); Prefetch waits in background thread (Step 2)<br>
+• <strong>Prefetch:</strong> None in Base; Prefetch submits async after forward (Step 7), overlaps with backward<br>
+• <strong>input_dist start timing:</strong> Base before forward (Step 3); Prefetch after backward (Step 10)<br>
+• <strong>Pipeline depth:</strong> Base = 2 batches; Prefetch = 3 batches</span>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ═══════════ PART II: SWPipeline Framework ═══════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════ SW OVERVIEW (summary — full docs at sw_pipeline_overview.html) ═══════════ -->
+<section id="sw-overview">
+<div class="phase-banner sw">
+  <h2><span class="zh">SWPipeline — 软件流水线框架</span><span class="en">SWPipeline — Software Pipeline Framework</span></h2>
+  <p><span class="zh">将训练迭代分解为声明式 Task DAG，通过 stage 划分实现跨迭代重叠</span><span class="en">Decomposes training iteration into a declarative Task DAG, overlapping across iterations via stages</span></p>
+</div>
+
+<div class="callout callout-info">
+<span class="zh"><strong>完整文档已迁移：</strong>SWPipeline 的完整文档（数据类、DeclaredIO 设计、全部 API 参考、Shortcut 机制、TaskProfiler）已独立为 <a href="sw_pipeline_overview.html"><strong>sw_pipeline_overview.html</strong></a>。此处仅保留概览和 SWSerialTrainPipeline 适配器的上下文。</span>
+<span class="en"><strong>Full docs have moved:</strong> SWPipeline's complete documentation (data classes, DeclaredIO design, full API reference, Shortcut mechanism, TaskProfiler) is now at <a href="sw_pipeline_overview.html"><strong>sw_pipeline_overview.html</strong></a>. This section retains only the overview and SWSerialTrainPipeline adapter context.</span>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p><strong>SWPipeline</strong> 是 recsys-examples 新增的通用软件流水线框架，将上面描述的硬编码阶段分解为 <strong>声明式 Task DAG</strong>。核心设计将 <em>"做什么"（PipelineTask）</em>和 <em>"怎么调度"（PipelinePlan）</em>完全分离——同一组 Task 可以用不同的 Plan 切换 serial / pipelined 模式。</p>
+  <ul>
+    <li><strong>PipelineTask</strong> — 可调度计算单元（name + fn + io）</li>
+    <li><strong>TaskSchedule</strong> — 每个 Task 的调度属性（stage, stream, thread_group, globally_ordered）</li>
+    <li><strong>PipelinePlan</strong> — 完整调度方案（schedule + deps + cross_iter_deps + depth）</li>
+    <li><strong>SWPipeline</strong> — 执行引擎：worker 线程、两阶段同步、shortcut 缓存</li>
+    <li><strong>DeclaredIO</strong> — 外部副作用声明（<a href="sw_pipeline_overview.html#declared-io">详见独立文档</a>）</li>
+  </ul>
+</span>
+<span class="en">
+  <p><strong>SWPipeline</strong> is a new general-purpose software pipeline framework in recsys-examples that decomposes the hard-coded stages described above into a <strong>declarative Task DAG</strong>. It cleanly separates <em>"what to compute" (PipelineTask)</em> from <em>"how to schedule" (PipelinePlan)</em> — the same Tasks can run with different Plans to switch between serial / pipelined modes.</p>
+  <ul>
+    <li><strong>PipelineTask</strong> — Schedulable computation unit (name + fn + io)</li>
+    <li><strong>TaskSchedule</strong> — Per-task scheduling properties (stage, stream, thread_group, globally_ordered)</li>
+    <li><strong>PipelinePlan</strong> — Complete scheduling plan (schedule + deps + cross_iter_deps + depth)</li>
+    <li><strong>SWPipeline</strong> — Execution engine: worker threads, two-phase sync, shortcut caching</li>
+    <li><strong>DeclaredIO</strong> — Side effect declaration (<a href="sw_pipeline_overview.html#declared-io">see dedicated docs</a>)</li>
+  </ul>
+</span>
+</div>
+
+<div class="pipeline-flow">
+  <div class="pipeline-step" style="background:#0891b2">PipelineTask</div>
+  <div class="pipeline-arrow">+</div>
+  <div class="pipeline-step" style="background:#a855f7">PipelinePlan</div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#ea580c">SWPipeline</div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step" style="background:#16a34a">fill + progress</div>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">类关系图</span><span class="en">Class Relationship Diagram</span></span><span class="hint"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py" target="_blank" style="color:#94a3b8">sw_pipeline.py</a> + <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py" target="_blank" style="color:#94a3b8">sw_train_pipeline.py</a></span></div>
+<div class="svg-container">
+<svg viewBox="0 0 980 520" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="12">
+  <rect width="980" height="520" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="swArrowGray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#94a3b8"/></marker>
+    <marker id="swArrowOrange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ea580c"/></marker>
+    <marker id="swArrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#16a34a"/></marker>
+  </defs>
+  <!-- PipelineTask -->
+  <rect x="30" y="30" width="200" height="120" rx="8" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <rect x="30" y="30" width="200" height="28" rx="8" fill="#0891b2"/><rect x="30" y="50" width="200" height="8" fill="#0891b2"/>
+  <text x="130" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">PipelineTask</text>
+  <text x="42" y="80" fill="#334155" font-size="11">name: str</text>
+  <text x="42" y="96" fill="#334155" font-size="11">fn: Callable[[IterContext], None]</text>
+  <line x1="42" y1="106" x2="218" y2="106" stroke="#e2e8f0"/>
+  <text x="42" y="122" fill="#64748b" font-size="10">__hash__ → hash(name)</text>
+  <text x="42" y="136" fill="#64748b" font-size="10">__eq__ → name == other.name</text>
+  <!-- TaskSchedule -->
+  <rect x="270" y="30" width="200" height="120" rx="8" fill="#fdf4ff" stroke="#a855f7" stroke-width="2"/>
+  <rect x="270" y="30" width="200" height="28" rx="8" fill="#a855f7"/><rect x="270" y="50" width="200" height="8" fill="#a855f7"/>
+  <text x="370" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">TaskSchedule</text>
+  <text x="282" y="80" fill="#334155" font-size="11">stage: int = 0</text>
+  <text x="282" y="96" fill="#334155" font-size="11">stream: Optional[Stream]</text>
+  <text x="282" y="112" fill="#334155" font-size="11">thread_group: str = "default"</text>
+  <text x="282" y="128" fill="#334155" font-size="11">globally_ordered: bool</text>
+  <!-- PipelinePlan -->
+  <rect x="510" y="30" width="220" height="120" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+  <rect x="510" y="30" width="220" height="28" rx="8" fill="#ea580c"/><rect x="510" y="50" width="220" height="8" fill="#ea580c"/>
+  <text x="620" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">PipelinePlan</text>
+  <text x="522" y="80" fill="#334155" font-size="11">schedule: Dict[Task,Sched]</text>
+  <text x="522" y="96" fill="#334155" font-size="11">deps: List[Tuple[Task,Task]]</text>
+  <text x="522" y="112" fill="#334155" font-size="11">cross_iter_deps: List[…]</text>
+  <text x="522" y="128" fill="#334155" font-size="11">pipeline_depth: int = 2</text>
+  <!-- IterContext -->
+  <rect x="770" y="30" width="180" height="100" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <rect x="770" y="30" width="180" height="28" rx="8" fill="#16a34a"/><rect x="770" y="50" width="180" height="8" fill="#16a34a"/>
+  <text x="860" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">IterContext</text>
+  <text x="782" y="80" fill="#334155" font-size="11">batch: Any</text>
+  <text x="782" y="96" fill="#334155" font-size="11">iter_idx: int</text>
+  <text x="782" y="112" fill="#64748b" font-size="10">+ arbitrary attrs via tasks</text>
+  <!-- Arrows -->
+  <line x1="230" y1="90" x2="270" y2="90" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#swArrowGray)"/>
+  <line x1="470" y1="90" x2="510" y2="90" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#swArrowGray)"/>
+  <!-- SWPipeline -->
+  <rect x="150" y="200" width="500" height="300" rx="10" fill="#fff" stroke="#0e7490" stroke-width="2.5"/>
+  <rect x="150" y="200" width="500" height="32" rx="10" fill="#0e7490"/><rect x="150" y="222" width="500" height="10" fill="#0e7490"/>
+  <text x="400" y="222" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">SWPipeline</text>
+  <text x="170" y="258" fill="#334155" font-size="11" font-weight="600">State:</text>
+  <text x="170" y="276" fill="#475569" font-size="10.5">_defs: Dict[str, PipelineTask]</text>
+  <text x="170" y="292" fill="#475569" font-size="10.5">_stage_map / _stream_map / _thread_group_map</text>
+  <text x="170" y="308" fill="#475569" font-size="10.5">_topo_order / _enqueue_order</text>
+  <text x="170" y="324" fill="#475569" font-size="10.5">_cuda_events / _cpu_signals (pre-allocated per slot)</text>
+  <text x="170" y="340" fill="#475569" font-size="10.5">_work_queues: Dict[str, Queue]</text>
+  <text x="170" y="356" fill="#475569" font-size="10.5">_sequencer: _SubmissionSequencer</text>
+  <line x1="170" y1="366" x2="630" y2="366" stroke="#e2e8f0"/>
+  <text x="170" y="384" fill="#334155" font-size="11" font-weight="600">Methods:</text>
+  <text x="170" y="402" fill="#0891b2" font-size="10.5" font-weight="600">fill_pipeline(data_iter)</text>
+  <text x="370" y="402" fill="#64748b" font-size="10">← prefetch depth batches, start workers</text>
+  <text x="170" y="420" fill="#0891b2" font-size="10.5" font-weight="600">progress(data_iter)</text>
+  <text x="370" y="420" fill="#64748b" font-size="10">← retire oldest, enqueue next period</text>
+  <text x="170" y="438" fill="#0891b2" font-size="10.5" font-weight="600">run_one_serial_iter(batch, idx)</text>
+  <text x="420" y="438" fill="#64748b" font-size="10">← single serial iteration</text>
+  <text x="170" y="456" fill="#0891b2" font-size="10.5" font-weight="600">enable_shortcut / disable_shortcut</text>
+  <text x="170" y="474" fill="#0891b2" font-size="10.5" font-weight="600">_submit_task(iter_idx, task_def)</text>
+  <text x="400" y="474" fill="#64748b" font-size="10">← core execution with two-phase sync</text>
+  <!-- PipelinePlan → SWPipeline -->
+  <path d="M620,150 L620,170 L400,170 L400,200" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#swArrowOrange)"/>
+  <text x="520" y="166" fill="#ea580c" font-size="10">plan → __init__</text>
+  <!-- IterContext → SWPipeline -->
+  <path d="M860,130 L860,270 L650,270" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#swArrowGreen)"/>
+  <text x="710" y="266" fill="#16a34a" font-size="10">per-iteration ctx</text>
+  <!-- SWSerialTrainPipeline -->
+  <rect x="700" y="280" width="260" height="180" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <rect x="700" y="280" width="260" height="28" rx="8" fill="#16a34a"/><rect x="700" y="300" width="260" height="8" fill="#16a34a"/>
+  <text x="830" y="300" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">SWSerialTrainPipeline</text>
+  <text x="712" y="330" fill="#334155" font-size="10.5">_sw_pipeline: SWPipeline</text>
+  <text x="712" y="346" fill="#334155" font-size="10.5">_pipeline_ctx: PrefetchCtx</text>
+  <text x="712" y="362" fill="#334155" font-size="10.5">_pipelined_modules: List[ShardedModule]</text>
+  <line x1="712" y1="372" x2="948" y2="372" stroke="#e2e8f0"/>
+  <text x="712" y="390" fill="#16a34a" font-size="10.5" font-weight="600">_build_pipeline() → SWPipeline</text>
+  <text x="712" y="408" fill="#16a34a" font-size="10.5" font-weight="600">_ensure_initialized(batch)</text>
+  <text x="712" y="426" fill="#16a34a" font-size="10.5" font-weight="600">progress(dataloader_iter)</text>
+  <text x="712" y="444" fill="#64748b" font-size="9">registered as "jagged_sw_serial"</text>
+  <!-- composition arrow -->
+  <line x1="650" y1="370" x2="700" y2="370" stroke="#16a34a" stroke-width="1.5"/>
+  <rect x="670" y="363" width="14" height="14" fill="#fff" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="660" y="358" fill="#16a34a" font-size="9">has-a</text>
+</svg>
+</div>
+</div>
+
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_pipeline.py</code></a> · <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_train_pipeline.py</code></a></p>
+</section>
+
+<!-- ═══════════ SW 11-TASK DAG ═══════════ -->
+<section id="sw-dag">
+<div class="phase-banner sw">
+  <h2><span class="zh">SWSerialTrainPipeline — 11-Task 依赖图</span><span class="en">SWSerialTrainPipeline — 11-Task Dependency Graph</span></h2>
+  <p><span class="zh">一次训练迭代分解为 11 个 PipelineTask，serial 模式全部 stage 0</span><span class="en">One training iteration decomposed into 11 PipelineTasks, serial mode all stage 0</span></p>
+</div>
+
+<div class="desc">
+<span class="zh"><p><code>_build_pipeline()</code> 构造 11 个 Task 及其依赖。Serial 模式 (depth=1) 全部在 <strong>stage 0 / default stream / 主线程</strong>上执行。<code>DenseForward</code>(6) 和 <code>EmbBackward</code>(9) 在 serial 模式下是 no-op，为未来 pipelined 变体预留（embedding/dense forward/backward 分离）。</p></span>
+<span class="en"><p><code>_build_pipeline()</code> constructs 11 Tasks with dependencies. Serial mode (depth=1) executes all on <strong>stage 0 / default stream / main thread</strong>. <code>DenseForward</code>(6) and <code>EmbBackward</code>(9) are no-ops in serial mode, reserved for future pipelined variants (embedding/dense forward/backward split).</p></span>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span>11-Task Dependency DAG</span><span class="hint">_build_pipeline() — all stage 0, depth 1</span></div>
+<div class="svg-container">
+<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="900" height="540" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="dagArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <linearGradient id="tg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#06b6d4"/><stop offset="100%" stop-color="#0891b2"/></linearGradient>
+    <linearGradient id="tg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+    <linearGradient id="tg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#34d399"/><stop offset="100%" stop-color="#059669"/></linearGradient>
+    <linearGradient id="tg4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#ea580c"/></linearGradient>
+    <linearGradient id="tg5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f87171"/><stop offset="100%" stop-color="#dc2626"/></linearGradient>
+    <filter id="dagSh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".1"/></filter>
+  </defs>
+  <!-- Phase labels -->
+  <text x="20" y="25" fill="#0891b2" font-size="10" font-weight="700">DATA</text>
+  <text x="20" y="145" fill="#7c3aed" font-size="10" font-weight="700">EMBEDDING</text>
+  <text x="20" y="245" fill="#059669" font-size="10" font-weight="700">COMPUTE</text>
+  <text x="20" y="365" fill="#ea580c" font-size="10" font-weight="700">GRADIENT</text>
+  <text x="20" y="485" fill="#dc2626" font-size="10" font-weight="700">UPDATE</text>
+  <!-- Tasks -->
+  <rect x="300" y="35" width="280" height="40" rx="8" fill="url(#tg1)" filter="url(#dagSh)"/>
+  <text x="316" y="55" fill="#fff" font-weight="700" font-size="11">①</text><text x="338" y="55" fill="#fff" font-weight="700">H2DAndShuffle</text>
+  <text x="316" y="68" fill="rgba(255,255,255,.7)" font-size="9">_to_device + batch_shuffler</text>
+
+  <rect x="300" y="90" width="280" height="40" rx="8" fill="url(#tg1)" filter="url(#dagSh)"/>
+  <text x="316" y="110" fill="#fff" font-weight="700" font-size="11">②</text><text x="338" y="110" fill="#fff" font-weight="700">EmbInputDistStart</text>
+  <text x="316" y="123" fill="rgba(255,255,255,.7)" font-size="9">_start_data_dist (AllToAll)</text>
+
+  <rect x="300" y="155" width="280" height="40" rx="8" fill="url(#tg2)" filter="url(#dagSh)"/>
+  <text x="316" y="175" fill="#fff" font-weight="700" font-size="11">③</text><text x="338" y="175" fill="#fff" font-weight="700">EmbInputDistWait</text>
+  <text x="316" y="188" fill="rgba(255,255,255,.7)" font-size="9">fused_splits_awaitables.wait()</text>
+
+  <rect x="300" y="210" width="280" height="40" rx="8" fill="url(#tg2)" filter="url(#dagSh)"/>
+  <text x="316" y="230" fill="#fff" font-weight="700" font-size="11">④</text><text x="338" y="230" fill="#fff" font-weight="700">EmbPrefetch</text>
+  <text x="316" y="243" fill="rgba(255,255,255,.7)" font-size="9">_prefetch_embeddings (DynamicEmb cache)</text>
+
+  <rect x="300" y="265" width="280" height="40" rx="8" fill="url(#tg3)" filter="url(#dagSh)"/>
+  <text x="316" y="285" fill="#fff" font-weight="700" font-size="11">⑤</text><text x="338" y="285" fill="#fff" font-weight="700">EmbForward</text>
+  <text x="316" y="298" fill="rgba(255,255,255,.7)" font-size="9">model(batch) + zero_grad</text>
+
+  <rect x="630" y="265" width="190" height="40" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-dasharray="4,2" filter="url(#dagSh)"/>
+  <text x="646" y="285" fill="#94a3b8" font-weight="700" font-size="11">⑥</text><text x="666" y="285" fill="#94a3b8" font-weight="700">DenseForward</text>
+  <text x="646" y="298" fill="#94a3b8" font-size="9">no-op (reserved)</text>
+
+  <rect x="300" y="320" width="280" height="40" rx="8" fill="url(#tg3)" filter="url(#dagSh)"/>
+  <text x="316" y="340" fill="#fff" font-weight="700" font-size="11">⑦</text><text x="338" y="340" fill="#fff" font-weight="700">LossPostprocess</text>
+  <text x="316" y="353" fill="rgba(255,255,255,.7)" font-size="9">loss allreduce + collective_assert</text>
+
+  <rect x="300" y="375" width="280" height="40" rx="8" fill="url(#tg4)" filter="url(#dagSh)"/>
+  <text x="316" y="395" fill="#fff" font-weight="700" font-size="11">⑧</text><text x="338" y="395" fill="#fff" font-weight="700">DenseBackward</text>
+  <text x="316" y="408" fill="rgba(255,255,255,.7)" font-size="9">loss.backward()</text>
+
+  <rect x="630" y="375" width="190" height="40" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-dasharray="4,2" filter="url(#dagSh)"/>
+  <text x="646" y="395" fill="#94a3b8" font-weight="700" font-size="11">⑨</text><text x="666" y="395" fill="#94a3b8" font-weight="700">EmbBackward</text>
+  <text x="646" y="408" fill="#94a3b8" font-size="9">no-op (reserved)</text>
+
+  <rect x="300" y="440" width="280" height="40" rx="8" fill="url(#tg4)" filter="url(#dagSh)"/>
+  <text x="316" y="460" fill="#fff" font-weight="700" font-size="11">⑩</text><text x="342" y="460" fill="#fff" font-weight="700">FinalizeGrads</text>
+  <text x="316" y="473" fill="rgba(255,255,255,.7)" font-size="9">finalize_model_grads (DDP AllReduce)</text>
+
+  <rect x="300" y="495" width="280" height="30" rx="8" fill="url(#tg5)" filter="url(#dagSh)"/>
+  <text x="316" y="514" fill="#fff" font-weight="700" font-size="11">⑪</text><text x="342" y="514" fill="#fff" font-weight="700">OptimStep</text>
+
+  <!-- Dependency arrows -->
+  <line x1="440" y1="75" x2="440" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="130" x2="440" y2="155" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="195" x2="440" y2="210" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="250" x2="440" y2="265" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="580" y1="285" x2="630" y2="285" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#dagArrow)"/>
+  <path d="M725,305 L725,340 L580,340" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="305" x2="440" y2="320" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="360" x2="440" y2="375" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="580" y1="395" x2="630" y2="395" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#dagArrow)"/>
+  <path d="M725,415 L725,460 L580,460" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="415" x2="440" y2="440" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <line x1="440" y1="480" x2="440" y2="495" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <!-- Legend -->
+  <rect x="680" y="35" width="190" height="75" rx="6" fill="#fff" stroke="#e2e8f0"/>
+  <text x="695" y="52" fill="#334155" font-size="10" font-weight="700">LEGEND</text>
+  <line x1="695" y1="66" x2="720" y2="66" stroke="#475569" stroke-width="1.5" marker-end="url(#dagArrow)"/>
+  <text x="726" y="70" fill="#475569" font-size="10">Intra-iter dep</text>
+  <rect x="695" y="80" width="24" height="12" rx="3" fill="url(#tg1)"/>
+  <text x="726" y="90" fill="#475569" font-size="10">Active task</text>
+  <rect x="695" y="96" width="24" height="12" rx="3" fill="#e2e8f0" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="726" y="106" fill="#475569" font-size="10">No-op (reserved)</text>
+</svg>
+</div>
+</div>
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py#L173-L363" target="_blank"><code>sw_train_pipeline.py:173–363</code></a></p>
+</section>
+
+<!-- ═══════════ SW TWO-PHASE SYNC ═══════════ -->
+<section id="sw-sync">
+<div class="phase-banner sw-sync">
+  <h2><span class="zh">两阶段同步协议</span><span class="en">Two-Phase Synchronization Protocol</span></h2>
+  <p><span class="zh">CPU threading.Event + CUDA Event 防止 wait-before-record 竞态</span><span class="en">CPU threading.Event + CUDA Event prevents the wait-before-record race</span></p>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p>SWPipeline 多线程执行引入经典竞态：<strong>若 Task B 在 Task A 完成 <code>event.record()</code> 前就调 <code>stream.wait_event(event)</code>，wait 立即返回（event 未 record）→ GPU 执行序被打破。</strong></p>
+  <ul>
+    <li><strong>Phase 1 (CPU)</strong>：上游 Task 完成后 set <code>threading.Event</code>；下游先 <code>cpu_signal.wait()</code> 确保 CUDA event 已 record</li>
+    <li><strong>Phase 2 (GPU)</strong>：CPU wait 返回后调 <code>stream.wait_event(cuda_event)</code>，建立正确 GPU 依赖</li>
+  </ul>
+</span>
+<span class="en">
+  <p>SWPipeline's multi-threaded execution introduces a classic race: <strong>if Task B calls <code>stream.wait_event(event)</code> before Task A completes <code>event.record()</code>, wait returns immediately (event not recorded) → GPU execution order breaks.</strong></p>
+  <ul>
+    <li><strong>Phase 1 (CPU)</strong>: Upstream Task sets <code>threading.Event</code> after completion; downstream <code>cpu_signal.wait()</code> ensures CUDA event is recorded</li>
+    <li><strong>Phase 2 (GPU)</strong>: After CPU wait returns, calls <code>stream.wait_event(cuda_event)</code> to establish correct GPU dependency</li>
+  </ul>
+</span>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">两阶段同步序列图</span><span class="en">Two-Phase Sync — Sequence Diagram</span></span><span class="hint">_submit_task() internals</span></div>
+<div class="svg-container seq-wrap">
+<div class="seq-actors">
+  <div class="seq-actor" style="left:14.5%;background:#0891b2">Worker A</div>
+  <div class="seq-actor" style="left:40.1%;background:#a855f7">Worker B</div>
+  <div class="seq-actor" style="left:65.7%;background:#ea580c">CUDA Stream X</div>
+  <div class="seq-actor" style="left:89.0%;background:#dc2626">CUDA Stream Y</div>
+</div>
+<svg viewBox="0 0 860 500" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="860" height="500" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="syncA" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <marker id="syncAR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#dc2626"/></marker>
+    <marker id="syncAC" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#0891b2"/></marker>
+    <marker id="syncAP" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#7c3aed"/></marker>
+  </defs>
+  <!-- Actors -->
+  <rect x="60" y="20" width="130" height="30" rx="6" fill="#0891b2"/>
+  <text x="125" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Worker Thread A</text>
+  <rect x="280" y="20" width="130" height="30" rx="6" fill="#a855f7"/>
+  <text x="345" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Worker Thread B</text>
+  <rect x="500" y="20" width="130" height="30" rx="6" fill="#ea580c"/>
+  <text x="565" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">CUDA Stream X</text>
+  <rect x="700" y="20" width="130" height="30" rx="6" fill="#dc2626"/>
+  <text x="765" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">CUDA Stream Y</text>
+  <!-- Lifelines -->
+  <line x1="125" y1="50" x2="125" y2="480" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="345" y1="50" x2="345" y2="480" stroke="#a855f7" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="565" y1="50" x2="565" y2="480" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="765" y1="50" x2="765" y2="480" stroke="#dc2626" stroke-width="1" stroke-dasharray="5,4"/>
+  <!-- Activations -->
+  <rect x="118" y="75" width="14" height="160" rx="2" fill="#cffafe" stroke="#0891b2" stroke-width="1"/>
+  <rect x="338" y="170" width="14" height="280" rx="2" fill="#f5f3ff" stroke="#a855f7" stroke-width="1"/>
+  <rect x="558" y="90" width="14" height="80" rx="2" fill="#fff7ed" stroke="#ea580c" stroke-width="1"/>
+  <rect x="758" y="320" width="14" height="90" rx="2" fill="#fef2f2" stroke="#dc2626" stroke-width="1"/>
+  <!-- Step 1: Task A runs -->
+  <line x1="132" y1="95" x2="558" y2="95" stroke="#0891b2" stroke-width="1.5" marker-end="url(#syncAC)"/>
+  <text x="300" y="88" fill="#0891b2" font-size="10" font-weight="600">① with cuda.stream(X): fn(ctx)</text>
+  <!-- Step 2: record event -->
+  <line x1="132" y1="150" x2="558" y2="150" stroke="#ea580c" stroke-width="1.5" marker-end="url(#syncA)"/>
+  <text x="260" y="143" fill="#ea580c" font-size="10" font-weight="600">② cuda_event[A].record(stream_X)</text>
+  <!-- Step 3: set CPU signal -->
+  <line x1="132" y1="190" x2="338" y2="190" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#syncAC)"/>
+  <text x="165" y="183" fill="#0891b2" font-size="10" font-weight="600">③ cpu_signal[A].set()</text>
+  <!-- Phase 1 box -->
+  <rect x="220" y="215" width="200" height="38" rx="6" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="320" y="232" text-anchor="middle" fill="#854d0e" font-size="10" font-weight="700">Phase 1: CPU wait</text>
+  <text x="320" y="246" text-anchor="middle" fill="#854d0e" font-size="9">cpu_signal[A].wait() → OK</text>
+  <!-- Phase 2 box -->
+  <rect x="440" y="275" width="210" height="38" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="545" y="292" text-anchor="middle" fill="#991b1b" font-size="10" font-weight="700">Phase 2: GPU wait</text>
+  <text x="545" y="306" text-anchor="middle" fill="#991b1b" font-size="9">stream_Y.wait_event(cuda_event[A])</text>
+  <line x1="352" y1="280" x2="440" y2="280" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#syncAP)"/>
+  <!-- GPU dependency -->
+  <path d="M572,170 C620,170 620,320 758,320" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#syncAR)"/>
+  <text x="630" y="252" fill="#dc2626" font-size="9" font-weight="600" transform="rotate(38,630,252)">GPU dependency</text>
+  <!-- Task B runs -->
+  <line x1="352" y1="350" x2="758" y2="350" stroke="#a855f7" stroke-width="1.5" marker-end="url(#syncAP)"/>
+  <text x="500" y="343" fill="#a855f7" font-size="10" font-weight="600">⑤ with cuda.stream(Y): fn(ctx)</text>
+  <!-- Task B records + signals -->
+  <line x1="352" y1="410" x2="758" y2="410" stroke="#ea580c" stroke-width="1.5" marker-end="url(#syncA)"/>
+  <text x="480" y="403" fill="#ea580c" font-size="10" font-weight="600">⑥ cuda_event[B].record(stream_Y)</text>
+  <text x="352" y="440" fill="#a855f7" font-size="10" font-weight="600">⑦ cpu_signal[B].set()</text>
+  <!-- Note -->
+  <rect x="30" y="458" width="800" height="32" rx="4" fill="#fff" stroke="#e2e8f0"/>
+  <text x="45" y="478" fill="#334155" font-size="10"><tspan font-weight="700" fill="#dc2626">Key:</tspan> Without Phase 1, Thread B might call stream_Y.wait_event() before Thread A records → wait becomes no-op → data race on GPU</text>
+</svg>
+</div>
+</div>
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L546-L617" target="_blank"><code>sw_pipeline.py:546–617</code></a></p>
+</section>
+
+<!-- ═══════════ SW _ensure_initialized ═══════════ -->
+<section id="sw-init">
+<div class="phase-banner sw-train">
+  <h2><span class="zh">_ensure_initialized — 首批次触发模型 Rewrite</span><span class="en">_ensure_initialized — First Batch Triggers Model Rewrite</span></h2>
+  <p><span class="zh">在 EmbInputDistStart task 内部调用，复用 _rewrite_model + PrefetchPipelinedForward</span><span class="en">Called inside EmbInputDistStart task, reuses _rewrite_model + PrefetchPipelinedForward</span></p>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">_ensure_initialized 序列图</span><span class="en">_ensure_initialized Sequence</span></span><span class="hint">first batch only</span></div>
+<div class="svg-container seq-wrap">
+<div class="seq-actors">
+  <div class="seq-actor" style="left:10.0%;background:#16a34a">progress()</div>
+  <div class="seq-actor" style="left:30.0%;background:#ea580c">SWPipeline</div>
+  <div class="seq-actor" style="left:52.9%;background:#0891b2">EmbInputDistStart</div>
+  <div class="seq-actor" style="left:76.5%;background:#7c3aed">_rewrite_model</div>
+</div>
+<svg viewBox="0 0 850 440" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="850" height="440" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="iArw" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <marker id="iRet" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#94a3b8"/></marker>
+  </defs>
+  <!-- Actors -->
+  <rect x="30" y="12" width="110" height="26" rx="6" fill="#16a34a"/>
+  <text x="85" y="30" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">progress()</text>
+  <rect x="190" y="12" width="130" height="26" rx="6" fill="#ea580c"/>
+  <text x="255" y="30" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">SWPipeline</text>
+  <rect x="375" y="12" width="150" height="26" rx="6" fill="#0891b2"/>
+  <text x="450" y="30" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">EmbInputDistStart</text>
+  <rect x="580" y="12" width="140" height="26" rx="6" fill="#7c3aed"/>
+  <text x="650" y="30" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">_rewrite_model</text>
+  <!-- Lifelines -->
+  <line x1="85" y1="38" x2="85" y2="420" stroke="#16a34a" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="255" y1="38" x2="255" y2="420" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="450" y1="38" x2="450" y2="420" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="650" y1="38" x2="650" y2="420" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
+  <!-- Activations -->
+  <rect x="79" y="55" width="12" height="350" rx="2" fill="#dcfce7" stroke="#16a34a"/>
+  <rect x="249" y="70" width="12" height="130" rx="2" fill="#fff7ed" stroke="#ea580c"/>
+  <rect x="444" y="100" width="12" height="220" rx="2" fill="#ecfeff" stroke="#0891b2"/>
+  <rect x="644" y="145" width="12" height="120" rx="2" fill="#f5f3ff" stroke="#7c3aed"/>
+  <!-- 1: progress → run_one_serial_iter -->
+  <line x1="91" y1="70" x2="249" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#iArw)"/>
+  <text x="120" y="64" fill="#475569" font-size="10">run_one_serial_iter(batch, 0)</text>
+  <!-- 2: H2DAndShuffle -->
+  <rect x="272" y="88" width="130" height="18" rx="4" fill="#cffafe"/>
+  <text x="337" y="101" text-anchor="middle" fill="#0891b2" font-size="9" font-weight="600">→ H2DAndShuffle</text>
+  <!-- 3: → EmbInputDistStart -->
+  <line x1="261" y1="118" x2="444" y2="118" stroke="#475569" stroke-width="1.5" marker-end="url(#iArw)"/>
+  <text x="310" y="112" fill="#475569" font-size="9">exec EmbInputDistStart</text>
+  <!-- 4: check -->
+  <rect x="464" y="128" width="105" height="16" rx="4" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="516" y="140" text-anchor="middle" fill="#854d0e" font-size="9">initialized?=No</text>
+  <!-- 5: → _rewrite_model -->
+  <line x1="456" y1="155" x2="644" y2="155" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#iArw)"/>
+  <text x="505" y="149" fill="#7c3aed" font-size="9">_rewrite_model()</text>
+  <!-- Rewrite steps -->
+  <rect x="665" y="168" width="140" height="14" rx="3" fill="#f5f3ff"/><text x="735" y="179" text-anchor="middle" fill="#7c3aed" font-size="8.5">collect ShardedModules</text>
+  <rect x="665" y="185" width="140" height="14" rx="3" fill="#f5f3ff"/><text x="735" y="196" text-anchor="middle" fill="#7c3aed" font-size="8.5">build ArgInfo</text>
+  <rect x="665" y="202" width="140" height="14" rx="3" fill="#f5f3ff"/><text x="735" y="213" text-anchor="middle" fill="#7c3aed" font-size="8.5">→ PrefetchPipelinedFwd</text>
+  <rect x="665" y="219" width="140" height="14" rx="3" fill="#f5f3ff"/><text x="735" y="230" text-anchor="middle" fill="#7c3aed" font-size="8.5">init input_dist</text>
+  <!-- Return -->
+  <line x1="644" y1="252" x2="456" y2="252" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#iRet)"/>
+  <!-- _start_data_dist -->
+  <rect x="464" y="268" width="160" height="18" rx="4" fill="#d1fae5"/>
+  <text x="544" y="281" text-anchor="middle" fill="#065f46" font-size="9" font-weight="600">_start_data_dist(batch_0)</text>
+  <!-- _override_input_dist_forwards -->
+  <rect x="464" y="292" width="180" height="18" rx="4" fill="#dbeafe"/>
+  <text x="554" y="305" text-anchor="middle" fill="#1e40af" font-size="9" font-weight="600">_override_input_dist_forwards</text>
+  <!-- _initialized = True -->
+  <rect x="464" y="318" width="120" height="16" rx="4" fill="#bbf7d0" stroke="#16a34a"/>
+  <text x="524" y="330" text-anchor="middle" fill="#166534" font-size="9" font-weight="700">_initialized = True</text>
+  <!-- Return to SWPipeline -->
+  <line x1="444" y1="348" x2="261" y2="348" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#iRet)"/>
+  <!-- Continue remaining -->
+  <rect x="100" y="370" width="340" height="18" rx="4" fill="#f1f5f9"/>
+  <text x="270" y="383" text-anchor="middle" fill="#64748b" font-size="9">continue: ③ EmbInputDistWait → … → ⑪ OptimStep</text>
+  <!-- Note -->
+  <rect x="30" y="402" width="790" height="28" rx="4" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="45" y="420" fill="#065f46" font-size="10">dist_stream=None (serial) → all on default stream. PrefetchPipelinedForward installed for zero-wait embedding lookup.</text>
+</svg>
+</div>
+</div>
+
+<div class="callout callout-warn">
+<span class="zh"><strong>与旧 pipeline 区别</strong>：旧 pipeline 在 <code>fill_pipeline()</code> 中显式预取 2-3 batch。SWSerial (depth=1) 不需要预取，在第一个 batch 内通过 <code>_ensure_initialized</code> 完成初始化。未来 pipelined 变体 (depth>1) 将使用 <code>SWPipeline.fill_pipeline()</code> 预取多 batch。</span>
+<span class="en"><strong>Difference from old pipeline</strong>: Old pipeline explicitly prefetches 2-3 batches in <code>fill_pipeline()</code>. SWSerial (depth=1) needs no prefetch — init completes within the first batch via <code>_ensure_initialized</code>. Future pipelined variant (depth>1) will use <code>SWPipeline.fill_pipeline()</code> for multi-batch prefetch.</span>
+</div>
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py#L135-L167" target="_blank"><code>sw_train_pipeline.py:135–167</code></a></p>
+</section>
+
+<!-- ═══════════ SW SHORTCUT ═══════════ -->
+<section id="sw-shortcut">
+<div class="phase-banner sw-prof">
+  <h2><span class="zh">Shortcut — 任务缓存与跳过机制</span><span class="en">Shortcut — Task Caching &amp; Skip Mechanism</span></h2>
+  <p><span class="zh">SWPipeline 内置的任务级快照/回放引擎，支持 Profiling 和调试</span><span class="en">SWPipeline's built-in task-level snapshot/replay engine for profiling and debugging</span></p>
+</div>
+
+<div class="callout callout-info">
+<span class="zh">📖 Shortcut 机制的完整文档（三阶段执行模式、_GraftGrad 梯度嫁接、安全 shortcut 条件）和 API 参考已迁移至 <a href="sw_pipeline_overview.html#shortcut"><strong>sw_pipeline_overview.html § Shortcut</strong></a>。</span>
+<span class="en">📖 Complete Shortcut documentation (three execution modes, _GraftGrad, safe shortcut conditions) and API reference has moved to <a href="sw_pipeline_overview.html#shortcut"><strong>sw_pipeline_overview.html § Shortcut</strong></a>.</span>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p><strong>Shortcut</strong> 是 SWPipeline 的核心基础设施之一。它允许在运行时<strong>跳过指定 Task 的计算</strong>，转而回放之前缓存的 <code>IterContext</code> 输出。这不是简单的 "删除"——它必须：</p>
+  <ul>
+    <li>精确还原 Task 对 <code>IterContext</code> 的全部副作用（新增/修改/删除的属性）</li>
+    <li>保持 <strong>autograd 图的连通性</strong>：下游 backward 能传梯度到上游参数</li>
+    <li>对 <code>globally_ordered</code> Task 仍然执行 <code>_SubmissionSequencer</code> 保序，避免跨 rank NCCL 死锁</li>
+    <li>所有 rank 必须同步 enable/disable 相同 Task</li>
+  </ul>
+</span>
+<span class="en">
+  <p><strong>Shortcut</strong> is one of SWPipeline's core infrastructure features. It allows <strong>skipping a Task's computation</strong> at runtime, replaying previously cached <code>IterContext</code> outputs instead. This is not a simple "delete" — it must:</p>
+  <ul>
+    <li>Faithfully replay all side effects on <code>IterContext</code> (added/modified/deleted attrs)</li>
+    <li>Maintain <strong>autograd graph connectivity</strong>: downstream backward propagates grads to upstream params</li>
+    <li>Still run <code>_SubmissionSequencer</code> for <code>globally_ordered</code> Tasks to avoid cross-rank NCCL deadlocks</li>
+    <li>All ranks must enable/disable the same Tasks synchronously</li>
+  </ul>
+</span>
+</div>
+
+<h3><span class="zh">三阶段执行模式 — <code>_exec_task()</code></span><span class="en">Three-Phase Execution — <code>_exec_task()</code></span></h3>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">_exec_task 决策流程</span><span class="en">_exec_task Decision Flow</span></span><span class="hint"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L391-L411" target="_blank" style="color:#94a3b8">sw_pipeline.py:391–411</a></span></div>
+<div class="svg-area">
+<svg viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="10.5">
+  <rect width="960" height="420" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="sc-a" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0,0 L7,2.5 L0,5" fill="#475569"/></marker>
+  </defs>
+
+  <!-- Entry -->
+  <rect x="360" y="14" width="240" height="32" rx="6" fill="#1e293b"/>
+  <text x="480" y="35" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_exec_task(task_def, ctx)</text>
+
+  <!-- Decision 1 -->
+  <polygon points="480,70 580,105 480,140 380,105" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="480" y="101" text-anchor="middle" fill="#ea580c" font-size="10" font-weight="600">name ∈</text>
+  <text x="480" y="114" text-anchor="middle" fill="#ea580c" font-size="10" font-weight="600">_shortcut_tasks?</text>
+  <line x1="480" y1="46" x2="480" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#sc-a)"/>
+
+  <!-- No → Mode 3 -->
+  <line x1="580" y1="105" x2="760" y2="105" stroke="#475569" stroke-width="1.5" marker-end="url(#sc-a)"/>
+  <text x="660" y="98" fill="#475569" font-size="10" font-weight="600">No</text>
+  <rect x="770" y="80" width="170" height="50" rx="8" fill="#fff" stroke="#475569" stroke-width="2"/>
+  <text x="855" y="101" text-anchor="middle" fill="#475569" font-weight="700" font-size="11">Mode 3: Normal</text>
+  <text x="855" y="118" text-anchor="middle" fill="#64748b" font-size="10">task_def.fn(ctx)</text>
+  <text x="855" y="148" text-anchor="middle" fill="#94a3b8" font-size="9">零额外开销</text>
+
+  <!-- Yes → Decision 2 -->
+  <line x1="480" y1="140" x2="480" y2="170" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sc-a)"/>
+  <text x="490" y="160" fill="#ea580c" font-size="10" font-weight="600">Yes</text>
+  <polygon points="480,170 580,205 480,240 380,205" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="480" y="201" text-anchor="middle" fill="#2563eb" font-size="10" font-weight="600">name ∈</text>
+  <text x="480" y="214" text-anchor="middle" fill="#2563eb" font-size="10" font-weight="600">_shortcut_cache?</text>
+
+  <!-- Yes → Mode 1: Shortcut Active -->
+  <line x1="380" y1="205" x2="180" y2="205" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sc-a)"/>
+  <text x="290" y="198" fill="#2563eb" font-size="10" font-weight="600">Yes (cache hit)</text>
+  <rect x="10" y="165" width="170" height="80" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+  <text x="95" y="187" text-anchor="middle" fill="#059669" font-weight="700" font-size="11">Mode 1: Shortcut</text>
+  <text x="95" y="204" text-anchor="middle" fill="#065f46" font-size="9.5">_apply_shortcut(ctx, name)</text>
+  <text x="95" y="220" text-anchor="middle" fill="#065f46" font-size="9.5">回放缓存值</text>
+  <text x="95" y="236" text-anchor="middle" fill="#065f46" font-size="9.5">+ _GraftGrad 嫁接梯度</text>
+
+  <!-- No → Mode 2: Caching -->
+  <line x1="480" y1="240" x2="480" y2="270" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sc-a)"/>
+  <text x="490" y="260" fill="#2563eb" font-size="10" font-weight="600">No (first time)</text>
+  <rect x="370" y="270" width="220" height="100" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+  <text x="480" y="293" text-anchor="middle" fill="#ea580c" font-weight="700" font-size="11">Mode 2: Caching</text>
+  <text x="480" y="312" text-anchor="middle" fill="#9a3412" font-size="9.5">① before = snapshot ctx attrs</text>
+  <text x="480" y="328" text-anchor="middle" fill="#9a3412" font-size="9.5">② task_def.fn(ctx)  <tspan fill="#64748b">// 正常执行</tspan></text>
+  <text x="480" y="344" text-anchor="middle" fill="#9a3412" font-size="9.5">③ _capture_and_cache(ctx, name, before)</text>
+  <text x="480" y="360" text-anchor="middle" fill="#94a3b8" font-size="9">diff before/after → cache produced + deleted</text>
+
+  <!-- Detail boxes for Mode 1 -->
+  <rect x="10" y="260" width="340" height="150" rx="8" fill="#f0fdf4" stroke="#a7f3d0"/>
+  <text x="20" y="280" fill="#059669" font-weight="700" font-size="10">_apply_shortcut 详解：</text>
+  <text x="20" y="298" fill="#334155" font-size="9.5">1. 从 cache 取出 (produced, deleted, input_attr_names, zero_grads)</text>
+  <text x="20" y="314" fill="#334155" font-size="9.5">2. 收集上游 inputs: [getattr(ctx, attr) for attr in input_attr_names]</text>
+  <text x="20" y="330" fill="#334155" font-size="9.5">3. 删除 ctx 上被 Task 删掉过的属性 (for k in deleted: delattr)</text>
+  <text x="20" y="346" fill="#334155" font-size="9.5">4. 恢复 produced 值: _restore_val() → detach (零拷贝)</text>
+  <text x="20" y="362" fill="#334155" font-size="9.5">5. 对 requires_grad 的 Tensor: <tspan fill="#7c3aed" font-weight="600">_GraftGrad.apply(restored, zeros, *inputs)</tspan></text>
+  <text x="20" y="378" fill="#334155" font-size="9.5">   → forward: 返回 restored 不变</text>
+  <text x="20" y="394" fill="#334155" font-size="9.5">   → backward: 传 grad_output 给 restored; 传 zeros 给 upstream inputs</text>
+
+  <!-- globally_ordered note -->
+  <rect x="620" y="280" width="320" height="80" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="630" y="300" fill="#dc2626" font-weight="700" font-size="10">globally_ordered Task 的特殊处理：</text>
+  <text x="630" y="318" fill="#334155" font-size="9.5">即使 shortcut 跳过了 fn(ctx)，_SubmissionSequencer</text>
+  <text x="630" y="334" fill="#334155" font-size="9.5">仍然会执行 execute_ordered()，保证跨 rank 的 NCCL</text>
+  <text x="630" y="350" fill="#334155" font-size="9.5">调用顺序一致 → 避免死锁。只跳计算，不跳保序。</text>
+</svg>
+</div>
+</div>
+
+<h3><span class="zh">缓存数据结构</span><span class="en">Cache Data Structure</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p><code>_shortcut_cache[name]</code> 是一个 5-tuple：</p>
+</span>
+<span class="en">
+  <p><code>_shortcut_cache[name]</code> is a 5-tuple:</p>
+</span>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">字段</span><span class="en">Field</span></th>
+  <th><span class="zh">类型</span><span class="en">Type</span></th>
+  <th><span class="zh">含义</span><span class="en">Meaning</span></th>
+</tr>
+<tr>
+  <td><code>produced</code></td>
+  <td><code>Dict[str, Any]</code></td>
+  <td><span class="zh">Task 执行后在 <code>IterContext</code> 上<strong>新增或修改</strong>的属性。Tensor 存为 <code>(detached_clone, requires_grad)</code> 二元组。</span><span class="en">Attributes <strong>added or modified</strong> on <code>IterContext</code> by the Task. Tensors stored as <code>(detached_clone, requires_grad)</code> tuples.</span></td>
+</tr>
+<tr>
+  <td><code>deleted</code></td>
+  <td><code>frozenset</code></td>
+  <td><span class="zh">Task 执行后从 <code>IterContext</code> 上<strong>删除</strong>的属性名集合。</span><span class="en">Attribute names <strong>deleted</strong> from <code>IterContext</code> by the Task.</span></td>
+</tr>
+<tr>
+  <td><code>input_attr_names</code></td>
+  <td><code>tuple</code></td>
+  <td><span class="zh">Task 执行前已存在、执行后<strong>未被修改</strong>、且 <code>requires_grad=True</code> 的 Tensor 属性名。这些是"上游输入"，<code>_GraftGrad</code> 需要它们来维持梯度链。</span><span class="en">Tensor attrs existing before Task, <strong>unchanged</strong> after, with <code>requires_grad=True</code>. These are "upstream inputs" that <code>_GraftGrad</code> needs to maintain the grad chain.</span></td>
+</tr>
+<tr>
+  <td><code>zero_grads</code></td>
+  <td><code>Tuple[Tensor, ...]</code></td>
+  <td><span class="zh">为每个 upstream input <strong>预分配</strong>的零张量，在 <code>_GraftGrad.backward</code> 中直接返回，避免每次 backward 重复分配。</span><span class="en"><strong>Pre-allocated</strong> zero tensors for each upstream input, returned directly in <code>_GraftGrad.backward</code> to avoid repeated allocations.</span></td>
+</tr>
+<tr>
+  <td><code>io_cached</code></td>
+  <td><code>List[Any]</code></td>
+  <td><span class="zh">每个 <code>DeclaredIO.capture()</code> 的返回值经 <code>_cache_val</code> 递归缓存。<code>_apply_shortcut</code> 时调用对应的 <code>dio.restore(_restore_val(cached))</code> 将外部状态写回。若 Task 无 <code>io</code>，此列表为空。</span><span class="en">Each <code>DeclaredIO.capture()</code> return value recursively cached via <code>_cache_val</code>. During <code>_apply_shortcut</code>, the corresponding <code>dio.restore(_restore_val(cached))</code> writes external state back. Empty list if Task has no <code>io</code>.</span></td>
+</tr>
+</table>
+
+<h3><span class="zh">_GraftGrad — Autograd 梯度嫁接</span><span class="en">_GraftGrad — Autograd Gradient Grafting</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p>这是 Shortcut 中最精妙的部分。当 Task 被 shortcut 时，它产出的 Tensor 是从 cache 恢复的 <code>detach()</code> 叶节点——<strong>与上游计算图断开了</strong>。如果下游 <code>loss.backward()</code> 需要梯度流过这里，就会中断。</p>
+  <p><code>_GraftGrad</code> 是一个自定义 <code>torch.autograd.Function</code>，作用如同"梯度桥"：</p>
+  <ul>
+    <li><strong>Forward</strong>：identity，直接返回 restored tensor（不改值）</li>
+    <li><strong>Backward</strong>：将 <code>grad_output</code> 传给 restored（下游正常收梯度）；将<strong>预分配的零张量</strong>传给所有 upstream inputs（触发它们的 backward 链，但因为是零所以<strong>不影响参数梯度</strong>）</li>
+  </ul>
+  <p>这保证了：即使 Task 被跳过，上游参数仍然参与 backward 图（不会报 "unused parameter" 错误），但梯度贡献为零（符合"这个 Task 没有真正计算"的语义）。</p>
+</span>
+<span class="en">
+  <p>This is the most elegant part of Shortcut. When a Task is shortcut, its output Tensors are <code>detach()</code>ed leaf nodes restored from cache — <strong>disconnected from the upstream computation graph</strong>. If downstream <code>loss.backward()</code> needs gradient flow through here, it breaks.</p>
+  <p><code>_GraftGrad</code> is a custom <code>torch.autograd.Function</code> acting as a "gradient bridge":</p>
+  <ul>
+    <li><strong>Forward</strong>: identity — returns restored tensor unchanged</li>
+    <li><strong>Backward</strong>: passes <code>grad_output</code> to restored (downstream gets normal grads); passes <strong>pre-allocated zeros</strong> to all upstream inputs (triggers their backward chains, but zeros mean <strong>no parameter gradient impact</strong>)</li>
+  </ul>
+  <p>This ensures: even with Task skipped, upstream params still participate in the backward graph (no "unused parameter" errors), but contribute zero gradients (semantically correct for "Task didn't actually compute").</p>
+</span>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">_GraftGrad Autograd 图</span><span class="en">_GraftGrad Autograd Graph</span></span><span class="hint"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L317-L342" target="_blank" style="color:#94a3b8">sw_pipeline.py:317–342</a></span></div>
+<div class="svg-area">
+<svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="10.5">
+  <rect width="900" height="330" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="gf" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0,0 L7,2.5 L0,5" fill="#2563eb"/></marker>
+    <marker id="gb" markerWidth="7" markerHeight="5" refX="0" refY="2.5" orient="auto"><path d="M7,0 L0,2.5 L7,5" fill="#dc2626"/></marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="22" text-anchor="middle" fill="#475569" font-weight="700" font-size="12">Normal Task (左) vs Shortcut Task with _GraftGrad (右)</text>
+
+  <!-- ===== LEFT: Normal ===== -->
+  <rect x="15" y="35" width="420" height="280" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="225" y="56" text-anchor="middle" fill="#059669" font-weight="700" font-size="11">Normal Execution</text>
+
+  <!-- upstream -->
+  <rect x="50" y="72" width="130" height="30" rx="5" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="115" y="92" text-anchor="middle" fill="#1e40af" font-size="10">upstream input</text>
+  <text x="115" y="112" text-anchor="middle" fill="#64748b" font-size="9">(requires_grad)</text>
+
+  <!-- Task fn -->
+  <rect x="130" y="130" width="150" height="35" rx="5" fill="#fef3c7" stroke="#d97706"/>
+  <text x="205" y="152" text-anchor="middle" fill="#92400e" font-weight="600" font-size="10">task_def.fn(ctx)</text>
+
+  <!-- output -->
+  <rect x="180" y="195" width="130" height="30" rx="5" fill="#d1fae5" stroke="#059669"/>
+  <text x="245" y="215" text-anchor="middle" fill="#065f46" font-size="10">ctx.output</text>
+
+  <!-- loss -->
+  <rect x="200" y="255" width="90" height="28" rx="5" fill="#fecaca" stroke="#dc2626"/>
+  <text x="245" y="274" text-anchor="middle" fill="#991b1b" font-size="10">loss</text>
+
+  <!-- Forward arrows -->
+  <line x1="115" y1="102" x2="155" y2="130" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+  <line x1="205" y1="165" x2="230" y2="195" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+  <line x1="245" y1="225" x2="245" y2="255" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+
+  <!-- Backward arrows -->
+  <line x1="235" y1="255" x2="235" y2="230" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <line x1="200" y1="195" x2="170" y2="168" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <line x1="150" y1="130" x2="125" y2="107" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <text x="70" y="130" fill="#dc2626" font-size="9" font-weight="600">∂L/∂input ≠ 0</text>
+
+  <!-- ===== RIGHT: Shortcut ===== -->
+  <rect x="465" y="35" width="420" height="280" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="675" y="56" text-anchor="middle" fill="#7c3aed" font-weight="700" font-size="11">Shortcut + _GraftGrad</text>
+
+  <!-- upstream -->
+  <rect x="500" y="72" width="130" height="30" rx="5" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="565" y="92" text-anchor="middle" fill="#1e40af" font-size="10">upstream input</text>
+
+  <!-- cache restore -->
+  <rect x="680" y="72" width="130" height="30" rx="5" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="4,2"/>
+  <text x="745" y="92" text-anchor="middle" fill="#7c3aed" font-size="10">cached output</text>
+  <text x="745" y="112" text-anchor="middle" fill="#94a3b8" font-size="9">(detach, leaf)</text>
+
+  <!-- _GraftGrad -->
+  <rect x="560" y="135" width="180" height="40" rx="6" fill="#7c3aed"/>
+  <text x="650" y="152" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_GraftGrad.apply(</text>
+  <text x="650" y="166" text-anchor="middle" fill="#e9d5ff" font-size="9.5">restored, zero_grads, *upstream)</text>
+
+  <!-- output -->
+  <rect x="600" y="200" width="130" height="30" rx="5" fill="#d1fae5" stroke="#059669"/>
+  <text x="665" y="220" text-anchor="middle" fill="#065f46" font-size="10">ctx.output</text>
+  <text x="665" y="240" text-anchor="middle" fill="#64748b" font-size="9">(= restored, unchanged)</text>
+
+  <!-- loss -->
+  <rect x="620" y="262" width="90" height="28" rx="5" fill="#fecaca" stroke="#dc2626"/>
+  <text x="665" y="281" text-anchor="middle" fill="#991b1b" font-size="10">loss</text>
+
+  <!-- Forward arrows -->
+  <line x1="565" y1="102" x2="590" y2="135" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+  <line x1="745" y1="102" x2="710" y2="135" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#gf)"/>
+  <line x1="650" y1="175" x2="650" y2="200" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+  <line x1="665" y1="230" x2="665" y2="262" stroke="#2563eb" stroke-width="1.5" marker-end="url(#gf)"/>
+
+  <!-- Backward arrows -->
+  <line x1="655" y1="262" x2="655" y2="235" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <line x1="640" y1="200" x2="630" y2="178" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <text x="618" y="195" fill="#dc2626" font-size="8">grad_output</text>
+
+  <!-- Backward to upstream (zero) -->
+  <line x1="590" y1="138" x2="565" y2="107" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#gb)"/>
+  <text x="498" y="134" fill="#dc2626" font-size="9" font-weight="600">zeros →</text>
+  <text x="498" y="146" fill="#dc2626" font-size="9" font-weight="600">∂L/∂input = 0</text>
+
+  <!-- fn(ctx) crossed out -->
+  <rect x="510" y="180" width="80" height="22" rx="4" fill="#fee2e2" stroke="#fecaca"/>
+  <text x="550" y="195" text-anchor="middle" fill="#dc2626" font-size="9" text-decoration="line-through">fn(ctx)</text>
+  <text x="550" y="210" text-anchor="middle" fill="#dc2626" font-weight="700" font-size="9">SKIPPED</text>
+</svg>
+</div>
+</div>
+
+<h3><span class="zh">哪些 Task 可以安全 Shortcut?</span><span class="en">Which Tasks Can Be Safely Shortcut?</span></h3>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">条件</span><span class="en">Condition</span></th>
+  <th><span class="zh">可否 Shortcut</span><span class="en">Shortcuttable?</span></th>
+  <th><span class="zh">原因</span><span class="en">Reason</span></th>
+</tr>
+<tr>
+  <td><span class="zh">纯 <code>ctx</code> 计算 Task（无外部副作用）</span><span class="en">Pure <code>ctx</code> compute Task (no side effects)</span></td>
+  <td style="color:#059669;font-weight:700">✅</td>
+  <td><span class="zh">输出可 detach+clone 缓存，<code>_GraftGrad</code> 维持梯度</span><span class="en">Outputs can be detach+clone cached, <code>_GraftGrad</code> maintains grads</span></td>
+</tr>
+<tr>
+  <td><span class="zh"><code>globally_ordered</code> Task（含 NCCL）</span><span class="en"><code>globally_ordered</code> Task (with NCCL)</span></td>
+  <td style="color:#059669;font-weight:700">✅</td>
+  <td><span class="zh"><code>_SubmissionSequencer</code> 仍执行保序，只跳 <code>fn()</code> 计算</span><span class="en"><code>_SubmissionSequencer</code> still fires for ordering, only <code>fn()</code> is skipped</span></td>
+</tr>
+<tr>
+  <td><span class="zh">有外部副作用的 Task（写 <code>pipeline_ctx</code>、module 状态等）</span><span class="en">Tasks with side effects (<code>pipeline_ctx</code>, module state, etc.)</span></td>
+  <td style="color:#059669;font-weight:700">✅ <span class="zh">需声明 <code>DeclaredIO</code></span><span class="en">with <code>DeclaredIO</code></span></td>
+  <td><span class="zh">框架自动 capture/restore 外部状态，可独立 shortcut</span><span class="en">Framework auto capture/restore external state, can shortcut independently</span></td>
+</tr>
+<tr>
+  <td><span class="zh">不可重放的 Task（如 checkpoint 写盘）</span><span class="en">Non-replayable Tasks (e.g. checkpoint writes)</span></td>
+  <td style="color:#dc2626;font-weight:700">❌</td>
+  <td><span class="zh">副作用不可逆，无法通过 capture/restore 重放</span><span class="en">Side effects are irreversible, cannot be replayed via capture/restore</span></td>
+</tr>
+</table>
+
+<p class="src-link">
+<a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L258-L411" target="_blank"><code>sw_pipeline.py:258–411</code></a> (Shortcut API + internals) ·
+<a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L317-L342" target="_blank"><code>sw_pipeline.py:317–342</code></a> (_GraftGrad)
+</p>
+</section>
+
+<!-- ═══════════ DECLARED IO ═══════════ -->
+<section id="sw-declared-io">
+<div class="phase-banner sw">
+  <h2><span class="zh">DeclaredIO — 管理 Task 的外部副作用</span><span class="en">DeclaredIO — Managing Task Side Effects</span></h2>
+  <p><span class="zh">将隐式副作用 (implicit side effects) 提升为显式声明 (declared effects)，让框架自动处理 shortcut 缓存/恢复</span><span class="en">Elevate implicit side effects into declared effects so the framework can automatically handle shortcut capture/restore</span></p>
+</div>
+
+<div class="callout callout-info">
+<span class="zh">📖 DeclaredIO 的完整设计文档（独立示例、执行流程图、概念总结）已迁移至 <a href="sw_pipeline_overview.html#declared-io"><strong>sw_pipeline_overview.html § DeclaredIO</strong></a>。此处保留在推荐系统中的具体应用说明。</span>
+<span class="en">📖 Complete DeclaredIO documentation (standalone example, execution flow diagram, concept summary) has moved to <a href="sw_pipeline_overview.html#declared-io"><strong>sw_pipeline_overview.html § DeclaredIO</strong></a>. This section retains the recommendation system-specific usage details.</span>
+</div>
+
+<h3><span class="zh">问题：Shortcut 的盲区</span><span class="en">The Problem: Shortcut's Blind Spot</span> <span class="tag tag-sw">DESIGN</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p>Shortcut 通过 diff <code>IterContext</code> 的属性来缓存/恢复 task 的输出。但许多 task 有<strong>框架看不见的副作用 (side effects)</strong>——它们读写了 <code>ctx</code> 之外的共享状态：</p>
+  <ul>
+    <li><code>PrefetchTrainPipelineContext</code>（TorchRec 的 pipeline 共享状态：<code>fused_splits_awaitables</code>、<code>input_dist_tensors_requests</code>、<code>module_input_post_prefetch</code> 等）</li>
+    <li>Module 内部状态（如 <code>SplitPrefetchPipelinedForward._cached_awaitable</code>）</li>
+  </ul>
+  <p>如果不处理这些副作用，shortcut 一个 task 后，下游 task 会从共享状态中读到过期数据，导致 <code>AssertionError</code> 或 "backward through graph a second time" 等错误。</p>
+</span>
+<span class="en">
+  <p>Shortcut diffs <code>IterContext</code> attributes to cache/restore a task's output. But many tasks have <strong>side effects invisible to the framework</strong> — they read/write shared state outside of <code>ctx</code>:</p>
+  <ul>
+    <li><code>PrefetchTrainPipelineContext</code> (TorchRec pipeline shared state: <code>fused_splits_awaitables</code>, <code>input_dist_tensors_requests</code>, <code>module_input_post_prefetch</code>, etc.)</li>
+    <li>Module internal state (e.g. <code>SplitPrefetchPipelinedForward._cached_awaitable</code>)</li>
+  </ul>
+  <p>Without handling these, shortcutting a task causes downstream tasks to read stale data from shared state, leading to <code>AssertionError</code> or "backward through graph a second time" errors.</p>
+</span>
+</div>
+
+<h3><span class="zh">旧方案 vs 新方案</span><span class="en">Before vs After</span></h3>
+
+<div class="compare-grid">
+<div class="compare-card">
+  <h4 style="background:#fee2e2;color:#991b1b"><span class="zh">旧：手动 Mirror</span><span class="en">Before: Manual Mirror</span></h4>
+  <pre>
+<span class="cm">// Task B: 写入 shared 状态</span>
+<span class="kw">def</span> <span class="fn">encode</span>(ctx):
+    ctx.embedding = encoder(ctx.features)
+    shared.buffer[<span class="st">"emb"</span>] = ctx.embedding
+    ctx._mirror_buffer = dict(shared.buffer) <span class="cm">// ← 手动复制到 ctx</span>
+
+<span class="cm">// Task C: 读取 shared 状态</span>
+<span class="kw">def</span> <span class="fn">decode</span>(ctx):
+    shared.buffer = dict(ctx._mirror_buffer) <span class="cm">// ← 手动恢复</span>
+    ctx.output = decoder(shared.buffer[<span class="st">"emb"</span>])</pre>
+  <div class="desc" style="margin-top:8px">
+    <span class="zh"><p>每个 task 都要写 mirror 代码；下游必须知道上游的命名约定；新增 task 时 mirror 链脆弱。</p></span>
+    <span class="en"><p>Every task needs mirror code; downstream must know upstream's naming conventions; mirror chain is fragile when adding new tasks.</p></span>
+  </div>
+</div>
+<div class="compare-card sw">
+  <h4 style="background:#ccfbf1;color:#0f766e"><span class="zh">新：DeclaredIO</span><span class="en">After: DeclaredIO</span></h4>
+  <pre>
+<span class="cm">// Task B: 纯业务逻辑</span>
+<span class="kw">def</span> <span class="fn">encode</span>(ctx):
+    ctx.embedding = encoder(ctx.features)
+    shared.buffer[<span class="st">"emb"</span>] = ctx.embedding  <span class="cm">// 正常写</span>
+
+<span class="cm">// Task C: 纯业务逻辑</span>
+<span class="kw">def</span> <span class="fn">decode</span>(ctx):
+    ctx.output = decoder(shared.buffer[<span class="st">"emb"</span>]) <span class="cm">// 正常读</span>
+
+<span class="cm">// 副作用声明在 task 定义处</span>
+PipelineTask(<span class="st">"encode"</span>, encode, io=[
+    DeclaredIO(
+        capture=<span class="kw">lambda</span>: dict(shared.buffer),
+        restore=<span class="kw">lambda</span> s: shared.buffer.update(s),
+    ),
+])</pre>
+</div>
+</div>
+
+<h3><span class="zh">DeclaredIO 数据结构</span><span class="en">DeclaredIO Data Structure</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p><code>DeclaredIO</code> 是一个简单的 dataclass，声明 task 对外部状态的读写合约：</p>
+</span>
+<span class="en">
+  <p><code>DeclaredIO</code> is a simple dataclass declaring the task's read/write contract with external state:</p>
+</span>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">字段</span><span class="en">Field</span></th>
+  <th><span class="zh">类型</span><span class="en">Type</span></th>
+  <th><span class="zh">含义</span><span class="en">Meaning</span></th>
+</tr>
+<tr>
+  <td><code>capture</code></td>
+  <td><code>Callable[[], Any]</code></td>
+  <td><span class="zh">Task 执行<strong>后</strong>调用。快照外部状态，返回可缓存的值。返回值经 <code>_cache_val</code> 递归 detach+clone 所有 Tensor。</span><span class="en">Called <strong>after</strong> Task runs. Snapshots external state, returns a cacheable value. Return value goes through <code>_cache_val</code> (recursive tensor detach+clone).</span></td>
+</tr>
+<tr>
+  <td><code>restore</code></td>
+  <td><code>Callable[[Any], None]</code></td>
+  <td><span class="zh">Shortcut 时调用。接收 <code>_restore_val</code> 处理后的值（全新 detached Tensor），写回外部状态，确保下游 task 能找到正确数据。</span><span class="en">Called during shortcut. Receives value processed by <code>_restore_val</code> (fresh detached tensors), writes back to external state so downstream tasks find correct data.</span></td>
+</tr>
+</table>
+
+<h3><span class="zh">执行流程</span><span class="en">Execution Flow</span></h3>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">_exec_task 中 DeclaredIO 的集成</span><span class="en">DeclaredIO Integration in _exec_task</span></span></div>
+<div class="svg-area">
+<svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="10.5">
+  <rect width="900" height="520" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="dio-a" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0,0 L7,2.5 L0,5" fill="#475569"/></marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="22" text-anchor="middle" fill="#1e293b" font-weight="700" font-size="13"><tspan class="zh">Shortcut 缓存迭代 (左) vs 回放迭代 (右)</tspan><tspan class="en">Caching Iteration (left) vs Replay Iteration (right)</tspan></text>
+
+  <!-- ===== LEFT: Caching ===== -->
+  <rect x="15" y="38" width="420" height="470" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="225" y="60" text-anchor="middle" fill="#ea580c" font-weight="700" font-size="12"><tspan class="zh">缓存迭代 (首次)</tspan><tspan class="en">Caching Iteration (first time)</tspan></text>
+
+  <rect x="40" y="75" width="370" height="28" rx="5" fill="#f1f5f9" stroke="#e2e8f0"/>
+  <text x="225" y="94" text-anchor="middle" fill="#475569" font-size="10" font-weight="600">before_ids = {k: id(v) for k, v in vars(ctx)}</text>
+
+  <line x1="225" y1="103" x2="225" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <rect x="100" y="120" width="250" height="35" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="225" y="142" text-anchor="middle" fill="#92400e" font-weight="700" font-size="11">task.fn(ctx)</text>
+
+  <text x="40" y="147" fill="#94a3b8" font-size="9"><tspan class="zh">正常执行</tspan><tspan class="en">normal run</tspan></text>
+
+  <line x1="225" y1="155" x2="225" y2="175" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <!-- ctx diff -->
+  <rect x="40" y="175" width="370" height="55" rx="5" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="50" y="194" fill="#2563eb" font-weight="700" font-size="10"><tspan class="zh">ctx diff (框架自动)</tspan><tspan class="en">ctx diff (framework auto)</tspan></text>
+  <text x="50" y="210" fill="#334155" font-size="9.5">produced = {k: _cache_val(v) for k, v in after</text>
+  <text x="50" y="223" fill="#334155" font-size="9.5">            if k not in before or id(v) != before[k]}</text>
+
+  <line x1="225" y1="230" x2="225" y2="250" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <!-- DeclaredIO capture -->
+  <rect x="40" y="250" width="370" height="55" rx="5" fill="#ecfeff" stroke="#67e8f9"/>
+  <text x="50" y="269" fill="#0891b2" font-weight="700" font-size="10"><tspan class="zh">DeclaredIO capture (框架自动)</tspan><tspan class="en">DeclaredIO capture (framework auto)</tspan></text>
+  <text x="50" y="285" fill="#334155" font-size="9.5">io_cached = [_cache_val(dio.capture())</text>
+  <text x="50" y="298" fill="#334155" font-size="9.5">             for dio in task.io]</text>
+
+  <line x1="225" y1="305" x2="225" y2="325" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <!-- cache store -->
+  <rect x="40" y="325" width="370" height="55" rx="5" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="50" y="344" fill="#7c3aed" font-weight="700" font-size="10"><tspan class="zh">存入缓存</tspan><tspan class="en">Store in Cache</tspan></text>
+  <text x="50" y="360" fill="#334155" font-size="9.5">_shortcut_cache[name] = (</text>
+  <text x="50" y="373" fill="#334155" font-size="9.5">    produced, deleted, input_attrs, zero_grads, <tspan fill="#0891b2" font-weight="700">io_cached</tspan>)</text>
+
+  <!-- state boxes -->
+  <rect x="40" y="400" width="170" height="40" rx="5" fill="#d1fae5" stroke="#059669"/>
+  <text x="125" y="417" text-anchor="middle" fill="#059669" font-weight="600" font-size="10">ctx</text>
+  <text x="125" y="432" text-anchor="middle" fill="#065f46" font-size="9"><tspan class="zh">属性已更新</tspan><tspan class="en">attrs updated</tspan></text>
+  <rect x="240" y="400" width="170" height="40" rx="5" fill="#ccfbf1" stroke="#0891b2"/>
+  <text x="325" y="417" text-anchor="middle" fill="#0891b2" font-weight="600" font-size="10"><tspan class="zh">外部状态</tspan><tspan class="en">external state</tspan></text>
+  <text x="325" y="432" text-anchor="middle" fill="#155e75" font-size="9"><tspan class="zh">已更新 (fn 的副作用)</tspan><tspan class="en">updated (fn side effect)</tspan></text>
+
+  <text x="225" y="470" text-anchor="middle" fill="#64748b" font-size="10"><tspan class="zh">→ 下游 task 正常读取 ctx 和外部状态</tspan><tspan class="en">→ downstream reads ctx and external state normally</tspan></text>
+
+  <!-- ===== RIGHT: Replay ===== -->
+  <rect x="465" y="38" width="420" height="470" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="675" y="60" text-anchor="middle" fill="#059669" font-weight="700" font-size="12"><tspan class="zh">回放迭代 (Shortcut)</tspan><tspan class="en">Replay Iteration (Shortcut)</tspan></text>
+
+  <!-- fn skipped -->
+  <rect x="545" y="75" width="250" height="35" rx="6" fill="#fee2e2" stroke="#fecaca" stroke-dasharray="4,2"/>
+  <text x="670" y="97" text-anchor="middle" fill="#dc2626" font-weight="700" font-size="11" text-decoration="line-through">task.fn(ctx)</text>
+  <text x="810" y="97" fill="#dc2626" font-weight="700" font-size="10">SKIP</text>
+
+  <line x1="670" y1="110" x2="670" y2="135" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <!-- ctx restore -->
+  <rect x="490" y="135" width="370" height="80" rx="5" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="500" y="155" fill="#2563eb" font-weight="700" font-size="10"><tspan class="zh">ctx 回放 (框架自动)</tspan><tspan class="en">ctx replay (framework auto)</tspan></text>
+  <text x="500" y="173" fill="#334155" font-size="9.5">for k in deleted: delattr(ctx, k)</text>
+  <text x="500" y="189" fill="#334155" font-size="9.5">for k, v in produced:</text>
+  <text x="500" y="205" fill="#334155" font-size="9.5">    setattr(ctx, k, _restore_val(v) | _GraftGrad)</text>
+
+  <line x1="670" y1="215" x2="670" y2="240" stroke="#475569" stroke-width="1.5" marker-end="url(#dio-a)"/>
+
+  <!-- DeclaredIO restore -->
+  <rect x="490" y="240" width="370" height="70" rx="5" fill="#ecfeff" stroke="#67e8f9"/>
+  <text x="500" y="260" fill="#0891b2" font-weight="700" font-size="10"><tspan class="zh">DeclaredIO restore (框架自动)</tspan><tspan class="en">DeclaredIO restore (framework auto)</tspan></text>
+  <text x="500" y="280" fill="#334155" font-size="9.5">for dio, cached in zip(task.io, io_cached):</text>
+  <text x="500" y="296" fill="#334155" font-size="9.5">    dio.restore(<tspan fill="#0891b2" font-weight="600">_restore_val(cached)</tspan>)</text>
+
+  <!-- state boxes -->
+  <rect x="490" y="335" width="170" height="40" rx="5" fill="#d1fae5" stroke="#059669"/>
+  <text x="575" y="352" text-anchor="middle" fill="#059669" font-weight="600" font-size="10">ctx</text>
+  <text x="575" y="367" text-anchor="middle" fill="#065f46" font-size="9"><tspan class="zh">从缓存恢复</tspan><tspan class="en">restored from cache</tspan></text>
+  <rect x="690" y="335" width="170" height="40" rx="5" fill="#ccfbf1" stroke="#0891b2"/>
+  <text x="775" y="352" text-anchor="middle" fill="#0891b2" font-weight="600" font-size="10"><tspan class="zh">外部状态</tspan><tspan class="en">external state</tspan></text>
+  <text x="775" y="367" text-anchor="middle" fill="#155e75" font-size="9"><tspan class="zh">从缓存恢复</tspan><tspan class="en">restored from cache</tspan></text>
+
+  <text x="675" y="410" text-anchor="middle" fill="#64748b" font-size="10"><tspan class="zh">→ 下游 task 正常读取 ctx 和外部状态 ✓</tspan><tspan class="en">→ downstream reads ctx and external state normally ✓</tspan></text>
+
+  <!-- key insight -->
+  <rect x="490" y="435" width="370" height="60" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="500" y="455" fill="#059669" font-weight="700" font-size="10"><tspan class="zh">核心：task function 只写业务逻辑</tspan><tspan class="en">Key: task fn = pure business logic</tspan></text>
+  <text x="500" y="473" fill="#334155" font-size="9.5"><tspan class="zh">副作用的生命周期管理完全由框架通过 DeclaredIO 驱动</tspan><tspan class="en">Side effect lifecycle fully managed by framework via DeclaredIO</tspan></text>
+  <text x="500" y="488" fill="#334155" font-size="9.5"><tspan class="zh">→ 无需手动 mirror 代码，新增 task 只需声明 io=[]</tspan><tspan class="en">→ no manual mirror code, new tasks just declare io=[]</tspan></text>
+</svg>
+</div>
+</div>
+
+<h3><span class="zh">概念总结</span><span class="en">Concept Summary</span></h3>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">概念</span><span class="en">Concept</span></th>
+  <th><span class="zh">职责</span><span class="en">Responsibility</span></th>
+  <th><span class="zh">谁写</span><span class="en">Who writes it</span></th>
+</tr>
+<tr>
+  <td><code>ctx</code> <span class="zh">属性</span><span class="en">attributes</span></td>
+  <td><span class="zh">Task 之间的显式数据流</span><span class="en">Explicit data flow between Tasks</span></td>
+  <td><span class="zh">框架自动 diff/replay</span><span class="en">Framework auto diff/replay</span></td>
+</tr>
+<tr>
+  <td><code>DeclaredIO</code></td>
+  <td><span class="zh">Task 的外部副作用（暗通道）</span><span class="en">Task's external side effects (dark channels)</span></td>
+  <td><span class="zh">用户在 Task 定义时声明</span><span class="en">User declares at Task definition</span></td>
+</tr>
+<tr>
+  <td><code>capture()</code></td>
+  <td><span class="zh">side effect → 可缓存快照</span><span class="en">side effect → cacheable snapshot</span></td>
+  <td><span class="zh">用户提供回调</span><span class="en">User-provided callback</span></td>
+</tr>
+<tr>
+  <td><code>restore()</code></td>
+  <td><span class="zh">缓存快照 → 写回 side effect</span><span class="en">cached snapshot → write back side effect</span></td>
+  <td><span class="zh">用户提供回调</span><span class="en">User-provided callback</span></td>
+</tr>
+<tr>
+  <td><code>_cache_val/_restore_val</code></td>
+  <td><span class="zh">递归 detach+clone Tensor（含嵌套结构）</span><span class="en">Recursive tensor detach+clone (nested structures)</span></td>
+  <td><span class="zh">框架内部</span><span class="en">Framework internal</span></td>
+</tr>
+<tr>
+  <td><span class="zh">shortcut 决策</span><span class="en">shortcut decision</span></td>
+  <td><span class="zh">哪些 Task 走快捷路径</span><span class="en">Which Tasks use shortcut path</span></td>
+  <td><span class="zh">Profiler / 用户 API</span><span class="en">Profiler / User API</span></td>
+</tr>
+</table>
+
+<div class="callout callout-tip">
+<span class="zh"><strong>设计哲学：</strong><code>DeclaredIO</code> 本质上是一个轻量级的 <strong>effect declaration</strong>（效果声明）系统——不依赖类型系统，而是在运行时通过 <code>capture</code>/<code>restore</code> 回调让框架管理 side effect 的生命周期。核心原则：<strong>task function 只负责计算，side effect 的生命周期管理交给框架。</strong></span>
+<span class="en"><strong>Design philosophy:</strong> <code>DeclaredIO</code> is essentially a lightweight <strong>effect declaration</strong> system — instead of relying on a type system, it uses runtime <code>capture</code>/<code>restore</code> callbacks to let the framework manage side effect lifecycles. Core principle: <strong>task functions handle only computation; side effect lifecycle management is the framework's job.</strong></span>
+</div>
+
+<h3><span class="zh">SWSerialTrainPipeline 中的实际应用</span><span class="en">Real-World Usage in SWSerialTrainPipeline</span></h3>
+
+<div class="desc">
+<span class="zh">
+  <p>在推荐系统 pipeline 中，Task 2–5 都有外部副作用（读写 <code>PrefetchTrainPipelineContext</code> 和 <code>SplitPrefetchPipelinedForward</code> 内部状态）。通过 <code>DeclaredIO</code>，每个 task function 只写业务逻辑：</p>
+</span>
+<span class="en">
+  <p>In the recommendation pipeline, Tasks 2–5 all have side effects (read/write <code>PrefetchTrainPipelineContext</code> and <code>SplitPrefetchPipelinedForward</code> internal state). With <code>DeclaredIO</code>, each task function contains only business logic:</p>
+</span>
+</div>
+
+<table class="tbl">
+<tr>
+  <th>Task</th>
+  <th><span class="zh">外部副作用</span><span class="en">Side Effect</span></th>
+  <th><code>DeclaredIO.capture</code></th>
+  <th><code>DeclaredIO.restore</code></th>
+</tr>
+<tr>
+  <td>EmbInputDistStart</td>
+  <td><code>pipeline_ctx.fused_splits_awaitables</code><br><code>pipeline_ctx.module_contexts_next_batch</code></td>
+  <td><span class="zh">快照两者（<code>Awaitable</code> 包 <code>_IdempotentAwaitable</code>）</span><span class="en">Snapshot both (wrap <code>Awaitable</code> in <code>_IdempotentAwaitable</code>)</span></td>
+  <td><span class="zh">写回 <code>pipeline_ctx</code></span><span class="en">Write back to <code>pipeline_ctx</code></span></td>
+</tr>
+<tr>
+  <td>EmbInputDistWait</td>
+  <td><code>pipeline_ctx.input_dist_tensors_requests</code><br><code>pipeline_ctx.module_contexts</code></td>
+  <td><span class="zh">快照两者</span><span class="en">Snapshot both</span></td>
+  <td><span class="zh">写回 <code>pipeline_ctx</code></span><span class="en">Write back to <code>pipeline_ctx</code></span></td>
+</tr>
+<tr>
+  <td>EmbPrefetch</td>
+  <td><code>pipeline_ctx.module_input_post_prefetch</code><br><code>pipeline_ctx.module_contexts_post_prefetch</code></td>
+  <td><span class="zh">快照两者</span><span class="en">Snapshot both</span></td>
+  <td><span class="zh">写回 <code>pipeline_ctx</code></span><span class="en">Write back to <code>pipeline_ctx</code></span></td>
+</tr>
+<tr>
+  <td>MPEmbForward</td>
+  <td><code>fwd._cached_awaitable</code><br><span class="zh">（Module 内部状态）</span><span class="en">(module internal state)</span></td>
+  <td><code>fwd.get_embedding_result()</code></td>
+  <td><code>fwd.set_embedding_result(cached)</code></td>
+</tr>
+</table>
+
+</section>
+
+<!-- ═══════════ SW PROFILER ═══════════ -->
+<section id="sw-profiler">
+<div class="phase-banner sw-prof">
+  <h2><span class="zh">TaskProfiler — 暴露时间测量</span><span class="en">TaskProfiler — Exposed Time Measurement</span></h2>
+  <p><span class="zh">通过 Shortcut 缓存机制跳过单个 Task，测量对整体耗时的影响</span><span class="en">Skips individual Tasks via Shortcut caching to measure their impact on total time</span></p>
+</div>
+
+<div class="callout callout-info">
+<span class="zh">📖 TaskProfiler 的完整 API 参考（<code>profile()</code>、<code>profile_many()</code>、<code>ProfileResult.print_report()</code>）已迁移至 <a href="sw_pipeline_overview.html#profiler"><strong>sw_pipeline_overview.html § Profiler</strong></a>。</span>
+<span class="en">📖 Full TaskProfiler API reference (<code>profile()</code>, <code>profile_many()</code>, <code>ProfileResult.print_report()</code>) has moved to <a href="sw_pipeline_overview.html#profiler"><strong>sw_pipeline_overview.html § Profiler</strong></a>.</span>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p>SWPipeline 内置 <strong>Shortcut</strong> 机制：启用后首次执行正常运行并缓存 <code>IterContext</code> 输出，后续跳过 <code>fn(ctx)</code> 直接回放缓存值。<strong>TaskProfiler</strong> 利用此机制测量 <em>exposed time</em>：</p>
+  <ul>
+    <li><code>exposed(T) = baseline_serial − serial_with_T_shortcut</code></li>
+    <li>结果驱动自动调度：确定哪些 Task 应分配到不同 stage 以最大化重叠</li>
+  </ul>
+</span>
+<span class="en">
+  <p>SWPipeline's built-in <strong>Shortcut</strong> mechanism: on first execution, runs normally and caches <code>IterContext</code> outputs; subsequent runs skip <code>fn(ctx)</code> and replay cached values. <strong>TaskProfiler</strong> leverages this for <em>exposed time</em> measurement:</p>
+  <ul>
+    <li><code>exposed(T) = baseline_serial − serial_with_T_shortcut</code></li>
+    <li>Results drive auto-scheduling: determining which Tasks should be on different stages for max overlap</li>
+  </ul>
+</span>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span>_exec_task — Three Modes</span><span class="hint">Shortcut / Caching / Normal</span></div>
+<div class="svg-container">
+<svg viewBox="0 0 780 200" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="780" height="200" fill="#fafbfc" rx="8"/>
+  <!-- Mode 1 -->
+  <rect x="20" y="20" width="230" height="95" rx="6" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+  <text x="135" y="40" text-anchor="middle" fill="#065f46" font-weight="700" font-size="11">Mode 1: Shortcut Active</text>
+  <text x="135" y="58" text-anchor="middle" fill="#065f46" font-size="10">name ∈ shortcut_tasks</text>
+  <text x="135" y="72" text-anchor="middle" fill="#065f46" font-size="10">AND cache exists</text>
+  <line x1="30" y1="82" x2="240" y2="82" stroke="#a7f3d0"/>
+  <text x="135" y="100" text-anchor="middle" fill="#059669" font-size="10" font-weight="600">skip fn → replay cached → ctx</text>
+  <!-- Mode 2 -->
+  <rect x="275" y="20" width="230" height="95" rx="6" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="390" y="40" text-anchor="middle" fill="#854d0e" font-weight="700" font-size="11">Mode 2: Caching</text>
+  <text x="390" y="58" text-anchor="middle" fill="#854d0e" font-size="10">name ∈ shortcut_tasks</text>
+  <text x="390" y="72" text-anchor="middle" fill="#854d0e" font-size="10">BUT no cache yet</text>
+  <line x1="285" y1="82" x2="495" y2="82" stroke="#fde68a"/>
+  <text x="390" y="100" text-anchor="middle" fill="#ca8a04" font-size="10" font-weight="600">run fn → capture → cache</text>
+  <!-- Mode 3 -->
+  <rect x="530" y="20" width="230" height="95" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="645" y="40" text-anchor="middle" fill="#475569" font-weight="700" font-size="11">Mode 3: Normal</text>
+  <text x="645" y="58" text-anchor="middle" fill="#475569" font-size="10">name ∉ shortcut_tasks</text>
+  <text x="645" y="72" text-anchor="middle" fill="#475569" font-size="10">&nbsp;</text>
+  <line x1="540" y1="82" x2="750" y2="82" stroke="#e2e8f0"/>
+  <text x="645" y="100" text-anchor="middle" fill="#64748b" font-size="10" font-weight="600">run fn(ctx) — zero overhead</text>
+  <!-- Result note -->
+  <rect x="20" y="135" width="740" height="50" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="35" y="155" fill="#1e40af" font-weight="700" font-size="11">ProfileResult</text>
+  <text x="35" y="172" fill="#334155" font-size="10">baseline_s: median wall-clock per serial iteration  |  exposed_s: {task: max(0, baseline − median_shortcut)}</text>
+</svg>
+</div>
+</div>
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py#L1039-L1186" target="_blank"><code>sw_pipeline.py:1039–1186</code></a></p>
+</section>
+
+<!-- ═══════════ SW vs OLD COMPARISON ═══════════ -->
+<section id="sw-compare">
+<h3><span class="tag tag-compare">CMP</span> <span class="zh">旧 Pipeline vs SWPipeline 对比</span><span class="en">Old Pipeline vs SWPipeline Comparison</span></h3>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">维度</span><span class="en">Dimension</span></th>
+  <th>PrefetchTrainPipelineSparseDist</th>
+  <th>SWSerialTrainPipeline</th>
+</tr>
+<tr><td><strong><span class="zh">设计范式</span><span class="en">Paradigm</span></strong></td><td><span class="zh">硬编码 4 阶段</span><span class="en">Hard-coded 4 stages</span></td><td><span class="zh">声明式 Task DAG + PipelinePlan</span><span class="en">Declarative Task DAG + PipelinePlan</span></td></tr>
+<tr><td><strong><span class="zh">调度方式</span><span class="en">Scheduling</span></strong></td><td><span class="zh">固定 stream 分配</span><span class="en">Fixed stream assignment</span></td><td><span class="zh">可配置 stage/stream/thread_group</span><span class="en">Configurable stage/stream/thread_group</span></td></tr>
+<tr><td><strong><span class="zh">初始化</span><span class="en">Init</span></strong></td><td><code>fill_pipeline()</code><span class="zh"> 预取 2-3 batch</span><span class="en"> prefetch 2-3 batches</span></td><td><code>_ensure_initialized()</code><span class="zh"> 首 batch 内</span><span class="en"> within 1st batch</span></td></tr>
+<tr><td><strong><span class="zh">模型 Rewrite</span><span class="en">Model Rewrite</span></strong></td><td><code>PrefetchPipelinedForward</code></td><td><code>PrefetchPipelinedForward</code><span class="zh">（相同）</span><span class="en"> (same)</span></td></tr>
+<tr><td><strong><span class="zh">同步</span><span class="en">Sync</span></strong></td><td><code>wait_stream + record_stream</code></td><td><span class="zh">两阶段：CPU signal + CUDA event</span><span class="en">Two-phase: CPU signal + CUDA event</span></td></tr>
+<tr><td><strong><span class="zh">跨迭代依赖</span><span class="en">Cross-Iter</span></strong></td><td><span class="zh">隐式（stream 序）</span><span class="en">Implicit (stream order)</span></td><td><span class="zh">显式 <code>cross_iter_deps</code></span><span class="en">Explicit <code>cross_iter_deps</code></span></td></tr>
+<tr><td><strong>Profiling</strong></td><td><span class="zh">无内置</span><span class="en">None built-in</span></td><td><strong>TaskProfiler</strong><span class="zh"> shortcut + exposed time</span><span class="en"> shortcut + exposed time</span></td></tr>
+<tr><td><strong><span class="zh">多线程</span><span class="en">Threading</span></strong></td><td><span class="zh">单线程</span><span class="en">Single thread</span></td><td><span class="zh">每 thread_group 一个 worker</span><span class="en">One worker per thread_group</span></td></tr>
+<tr><td><strong><span class="zh">全局序列化</span><span class="en">Global Order</span></strong></td><td>N/A</td><td><code>_SubmissionSequencer</code><span class="zh"> 保证跨 rank NCCL 顺序</span><span class="en"> consistent NCCL order across ranks</span></td></tr>
+<tr><td><strong><span class="zh">注册名</span><span class="en">Name</span></strong></td><td><code>"jagged_prefetch_sparse_dist"</code></td><td><code>"jagged_sw_serial"</code></td></tr>
+</table>
+
+<div class="compare-grid">
+<div class="compare-card base">
+<h4>Old: PrefetchTrainPipelineSparseDist</h4>
+<pre><span class="cm"># Fixed 4-stage pipeline</span>
+<span class="kw">def</span> <span class="fn">__init__</span>(self, ...):
+    self._memcpy_stream = cuda.Stream()
+    self._data_dist_stream = cuda.Stream()
+    self._prefetch_stream = cuda.Stream()
+    <span class="cm"># Stages hard-coded in progress()</span></pre>
+</div>
+<div class="compare-card sw">
+<h4>New: SWSerialTrainPipeline</h4>
+<pre><span class="cm"># Declarative Task DAG</span>
+<span class="kw">def</span> <span class="fn">_build_pipeline</span>(self):
+    t_h2d = PipelineTask("H2D", fn)
+    <span class="cm">... 11 tasks ...</span>
+    plan = PipelinePlan(
+        schedule={t: TaskSchedule(stage=0)},
+        deps=[(t_dist, t_h2d), ...],
+        pipeline_depth=1,  <span class="cm"># serial</span>
+    )
+    <span class="kw">return</span> SWPipeline(plan)</pre>
+</div>
+</div>
+
+<div class="callout callout-tip">
+<span class="zh"><strong>演进路线</strong>：SWSerialTrainPipeline 是 serial baseline。下一步创建 pipelined 变体——只改 PipelinePlan（H2D/InputDist 分到 stage 1 + 独立 stream/thread），Task 函数不改。TaskProfiler 的 exposed time 数据自动指导最优 stage 划分。</span>
+<span class="en"><strong>Evolution</strong>: SWSerialTrainPipeline is the serial baseline. The pipelined variant only changes the PipelinePlan (assign H2D/InputDist to stage 1 + separate stream/thread). Task functions stay unchanged. TaskProfiler exposed time guides optimal stage partitioning.</span>
+</div>
+</section>
+
+<!-- ═══════════ Source Files ═══════════ -->
+<section>
+<h3><span class="zh">源码文件索引</span><span class="en">Source File Reference</span></h3>
+<table class="tbl">
+<tr><th><span class="zh">文件</span><span class="en">File</span></th><th><span class="zh">关键内容</span><span class="en">Key Contents</span></th></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py" target="_blank"><code>examples/commons/pipeline/train_pipeline.py</code></a></td><td>TrainPipelineSparseDist, PrefetchTrainPipelineSparseDist, JaggedMegatron* variants</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py" target="_blank"><code>examples/commons/pipeline/utils.py</code></a></td><td>TrainPipelineContext, PrefetchTrainPipelineContext, PipelinedForward, PrefetchPipelinedForward, _rewrite_model, _start_data_dist, _prefetch_embeddings, ArgInfo</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_pipeline.py</code></a></td><td>SWPipeline, PipelineTask, PipelinePlan, TaskSchedule, IterContext, TaskProfiler, _SubmissionSequencer</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/sw_train_pipeline.py" target="_blank"><code>examples/commons/pipeline/sw_train_pipeline.py</code></a></td><td>SWSerialTrainPipeline (11 tasks, serial baseline)</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline_factory.py" target="_blank"><code>examples/commons/pipeline/train_pipeline_factory.py</code></a></td><td>Pipeline factory — selects variant by config name</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/hstu/test/test_pipeline.py" target="_blank"><code>examples/hstu/test/test_pipeline.py</code></a></td><td>test_sw_serial_pipeline — numerical equivalence vs JaggedMegatronTrainNonePipeline</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/hstu/training/trainer/training.py" target="_blank"><code>examples/hstu/training/trainer/training.py</code></a></td><td>pipeline_breakdown() — TaskProfiler integration</td></tr>
+<tr><td><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/distributed/finalize_model_grads.py" target="_blank"><code>examples/commons/distributed/finalize_model_grads.py</code></a></td><td>DDP gradient AllReduce synchronization</td></tr>
+</table>
+</section>
+
+</div><!-- .container -->
+
+<footer>
+  <div class="xref-bar" style="justify-content:center;margin-bottom:12px">
+    <a href="index.html">← 总入口</a>
+    <a href="forward_hijack.html">Forward Hijack →</a>
+    <a href="context_lifecycle.html">Context Lifecycle →</a>
+    <a href="runtime_timeline.html">Runtime Timeline →</a>
+    <a href="sw_pipeline_overview.html">SWPipeline →</a>
+  </div>
+  Based on <a href="https://github.com/NVIDIA/recsys-examples">NVIDIA/recsys-examples</a> · Pipeline initialization analysis<br>
+  Style inspired by <a href="https://jacocheung.github.io/visualization/recsys-examples/dynamicemb/index.html">DynamicEmb Training Pipeline Deep Dive</a>
+</footer>
+
+<!-- ═══════════ Floating TOC ═══════════ -->
+<div class="ftoc" id="ftoc">
+  <button class="ftoc-toggle" onclick="document.getElementById('ftoc').classList.toggle('collapsed')">☰</button>
+  <div class="ftoc-panel">
+    <div class="ftoc-head" id="ftocHead">
+      <span><span class="zh">目录导航</span><span class="en">Contents</span></span>
+      <span style="cursor:pointer" onclick="document.getElementById('ftoc').classList.add('collapsed')">✕</span>
+    </div>
+    <ul class="ftoc-list" id="ftocList">
+      <li><a href="#overview"><span class="toc-tag" style="background:#7c3aed">ALL</span> <span class="zh">总览</span><span class="en">Overview</span></a></li>
+      <li><a href="#rewrite"><span class="toc-tag" style="background:#7c3aed">INIT</span> _rewrite_model</a></li>
+      <li><a href="#rewrite-detail"><span class="toc-tag" style="background:#7c3aed">FX</span> _rewrite (FX)</a></li>
+      <li><a href="#fill-base"><span class="toc-tag" style="background:#2563eb">BASE</span> fill_pipeline</a></li>
+      <li><a href="#fill-prefetch"><span class="toc-tag" style="background:#059669">PREF</span> _fill_pipeline</a></li>
+      <li><a href="#forward-cmp"><span class="toc-tag" style="background:#6366f1">FWD</span> Forward <span class="zh">对比</span><span class="en">Compare</span></a></li>
+      <li><a href="#context"><span class="toc-tag" style="background:#dc2626">CTX</span> Context</a></li>
+      <li><a href="#ctx-detail"><span class="toc-tag" style="background:#dc2626">CTX</span> Context 详解</a></li>
+      <li><a href="#progress"><span class="toc-tag" style="background:#dc2626">CMP</span> progress()</a></li>
+      <li style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px"><a href="#sw-overview"><span class="toc-tag" style="background:#0891b2">SW</span> SWPipeline</a></li>
+      <li><a href="#sw-dag"><span class="toc-tag" style="background:#0891b2">SW</span> 11-Task DAG</a></li>
+      <li><a href="#sw-sync"><span class="toc-tag" style="background:#ea580c">SYNC</span> Two-Phase</a></li>
+      <li><a href="#sw-init"><span class="toc-tag" style="background:#16a34a">INIT</span> _ensure_init</a></li>
+      <li><a href="#sw-shortcut"><span class="toc-tag" style="background:#7c3aed">SC</span> Shortcut</a></li>
+      <li><a href="#sw-profiler"><span class="toc-tag" style="background:#ca8a04">PROF</span> Profiler</a></li>
+      <li><a href="#sw-compare"><span class="toc-tag" style="background:#dc2626">CMP</span> <span class="zh">对比</span><span class="en">Compare</span></a></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const nav = document.getElementById('nav');
+const links = nav.querySelectorAll('.nav-links a');
+window.addEventListener('scroll', () => {
+  let cur = '';
+  document.querySelectorAll('section[id]').forEach(s => {
+    if (s.getBoundingClientRect().top < 60) cur = s.id;
+  });
+  links.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+  document.querySelectorAll('#ftocList a').forEach(a => {
+    a.classList.toggle('cur', a.getAttribute('href') === '#' + cur);
+  });
+});
+
+function toggleLang() {
+  const body = document.body;
+  const isZh = body.classList.contains('lang-zh');
+  body.classList.toggle('lang-zh', !isZh);
+  body.classList.toggle('lang-en', isZh);
+  const btn = document.getElementById('langBtn');
+  btn.textContent = isZh ? '中文' : 'EN';
+  document.documentElement.lang = isZh ? 'en' : 'zh-CN';
+  try { localStorage.setItem('pipeInit_lang', isZh ? 'en' : 'zh'); } catch(e) {}
+}
+(function initLang() {
+  var saved = 'en';
+  try { saved = localStorage.getItem('pipeInit_lang') || 'en'; } catch(e) {}
+  document.body.classList.add('lang-' + saved);
+  if (saved === 'zh') {
+    document.body.classList.remove('lang-en');
+    document.getElementById('langBtn').textContent = 'EN';
+    document.documentElement.lang = 'zh-CN';
+  }
+})();
+
+// Draggable floating TOC
+(function(){
+  const ftoc = document.getElementById('ftoc');
+  const head = document.getElementById('ftocHead');
+  let dragging = false, ox, oy, sx, sy;
+  head.addEventListener('mousedown', e => {
+    dragging = true;
+    const r = ftoc.getBoundingClientRect();
+    ox = e.clientX; oy = e.clientY;
+    sx = r.left; sy = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    ftoc.style.right = 'auto';
+    ftoc.style.left = (sx + e.clientX - ox) + 'px';
+    ftoc.style.top = (sy + e.clientY - oy) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+})();
+</script>
+
+</body>
+</html>

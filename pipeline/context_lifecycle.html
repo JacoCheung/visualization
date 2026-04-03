@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Context — Class Hierarchy, TorchRec Types & Lifecycle</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7}
+a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
+code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:3px;color:#0f172a}
+pre{font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.6;overflow-x:auto;white-space:pre}
+
+header{background:linear-gradient(135deg,#1e40af 0%,#2563eb 40%,#0891b2 100%);color:#fff;padding:28px 0 22px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+header p{font-size:12px;color:rgba(255,255,255,.6);margin-top:4px}
+
+nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:0;z-index:50;overflow-x:auto;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;align-items:center;height:48px}
+.nav-links{overflow-x:auto;white-space:nowrap;flex:1}
+.nav-links a{display:inline-block;padding:10px 14px;font-size:12.5px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;transition:all .15s}
+.nav-links a:hover{color:#1e293b;text-decoration:none}
+.nav-links a.active{color:#2563eb;border-bottom-color:#2563eb}
+.lang-btn{flex-shrink:0;margin-left:auto;padding:5px 14px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer}
+.lang-btn:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+
+body.lang-en .zh{display:none!important}
+body.lang-zh .en{display:none!important}
+
+.container{max-width:1280px;margin:0 auto;padding:0 24px 80px}
+
+.phase-banner{margin:36px 0 24px;padding:18px 24px;border-radius:10px;border-left:4px solid}
+.phase-banner h2{font-size:17px;font-weight:700;margin-bottom:4px}
+.phase-banner p{font-size:13px;opacity:.75}
+.pb-class{background:#faf5ff;border-color:#7c3aed;color:#4c1d95}
+.pb-torchrec{background:#fff7ed;border-color:#ea580c;color:#9a3412}
+.pb-lifecycle{background:#eff6ff;border-color:#2563eb;color:#1e40af}
+.pb-prefetch{background:#ecfdf5;border-color:#059669;color:#065f46}
+
+section{margin-bottom:40px}
+.desc{font-size:13.5px;color:#334155;margin-bottom:14px}
+.desc ul{padding-left:20px;margin:6px 0}.desc li{margin-bottom:4px}.desc strong{color:#0f172a}
+
+.svg-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:12px}
+.svg-wrap:has(.seq-wrap){overflow:visible}
+.svg-header{background:#f8fafc;padding:8px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.svg-header span{font-size:11px;font-weight:600;color:#64748b}
+.svg-header .hint{font-size:10px;color:#94a3b8}
+.svg-area{text-align:center}
+.svg-area svg{display:block;width:100%;height:auto}
+
+/* Sticky sequence actors */
+.seq-wrap{padding:0}
+.seq-actors{position:sticky;top:48px;z-index:10;background:rgba(250,251,252,.97);backdrop-filter:blur(4px);border-bottom:1px solid #e2e8f0;height:44px;margin:0}
+.seq-actor{position:absolute;top:7px;transform:translateX(-50%);padding:6px 12px;border-radius:6px;color:#fff;font-weight:700;font-size:10.5px;text-align:center;font-family:'SF Mono',Consolas,monospace;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+
+.callout{padding:14px 18px;border-radius:8px;font-size:13px;margin:12px 0}
+.callout-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.callout-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.callout-tip{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0}
+.tbl th,.tbl td{padding:8px 12px;border:1px solid #e2e8f0;text-align:left}
+.tbl th{background:#f8fafc;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+.tbl td code{background:#f1f5f9;font-size:11px}
+
+.src-link{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#7c3aed;margin-top:4px}
+.src-link::before{content:'📄'}
+
+footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
+
+/* Site-wide navigation */
+.site-nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:36px;gap:0;overflow-x:auto;white-space:nowrap}
+.site-nav a{display:inline-block;padding:6px 14px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);transition:color .15s;text-decoration:none}
+.site-nav a:hover{color:#fff;text-decoration:none}
+.site-nav a.here{color:#67e8f9}
+.site-nav .home{color:rgba(255,255,255,.8);font-weight:800;margin-right:8px;font-size:12px}
+.xref-bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.xref-bar a{display:inline-block;padding:5px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:11.5px;font-weight:600;color:#475569;transition:all .15s}
+.xref-bar a:hover{background:#2563eb;color:#fff;border-color:#2563eb;text-decoration:none}
+</style>
+</head>
+<body class="lang-zh">
+
+<div class="site-nav">
+  <a class="home" href="index.html">Pipeline Docs</a>
+  <a href="pipeline_init.html">Pipeline Init</a>
+  <a href="forward_hijack.html">Forward Hijack</a>
+  <a class="here" href="context_lifecycle.html">Context Lifecycle</a>
+  <a href="runtime_timeline.html">Runtime Timeline</a>
+  <a href="sw_pipeline_overview.html">SWPipeline</a>
+  <a href="sw_pipeline_api.html">SWPipeline API</a>
+</div>
+
+<header>
+  <h1>Pipeline Context — Class Hierarchy, TorchRec Types &amp; Lifecycle</h1>
+  <p>NVIDIA recsys-examples · TrainPipelineContext 深度解析</p>
+</header>
+
+<nav>
+  <div class="nav-links">
+    <a href="#class-diagram">类图</a>
+    <a href="#torchrec-types">TorchRec 类型</a>
+    <a href="#field-detail">字段详解</a>
+    <a href="#lifecycle-base">生命周期 (Base)</a>
+    <a href="#lifecycle-prefetch">生命周期 (Prefetch)</a>
+  </div>
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()">EN</button>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ CLASS DIAGRAM ═══════════ -->
+<section id="class-diagram">
+<div class="phase-banner pb-class">
+  <h2><span class="zh">Context 类层次图</span><span class="en">Context Class Hierarchy</span></h2>
+  <p><span class="zh">TrainPipelineContext 及其派生类、关联的 TorchRec 类型</span><span class="en">TrainPipelineContext, derived classes, and associated TorchRec types</span></p>
+</div>
+<div class="xref-bar">
+<a href="forward_hijack.html#context">Context 作为拆分桥梁的角色 → Forward Hijack</a>
+<a href="pipeline_init.html#context">Pipeline Init 中的 Context 对比 →</a>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">类关系图 — 继承 + 组合</span><span class="en">Class Diagram — Inheritance + Composition</span></span></div>
+<div class="svg-area">
+<svg viewBox="0 0 1100 780" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="1100" height="780" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="aI" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto"><path d="M12,0 L0,5 L12,10 z" fill="#fff" stroke="#475569" stroke-width="1.5"/></marker>
+    <marker id="aC" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <marker id="aD" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto"><polygon points="12,0 0,5 12,10 6,5" fill="#fff" stroke="#94a3b8" stroke-width="1"/></marker>
+  </defs>
+
+  <!-- ====== TrainPipelineContext ====== -->
+  <rect x="50" y="30" width="420" height="260" rx="10" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+  <rect x="50" y="30" width="420" height="30" rx="10" fill="#2563eb"/><rect x="50" y="52" width="420" height="8" fill="#2563eb"/>
+  <text x="260" y="52" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">TrainPipelineContext</text>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L89" target="_blank"><text x="260" y="70" text-anchor="middle" fill="#93c5fd" font-size="10" style="cursor:pointer">@dataclass · utils.py:89</text></a>
+
+  <text x="65" y="96" fill="#dc2626" font-weight="700" font-size="10">FIELDS (split phase):</text>
+  <text x="65" y="114" fill="#334155">input_dist_splits_requests: Dict[str, <tspan fill="#ea580c">Awaitable</tspan>]</text>
+  <text x="65" y="130" fill="#334155">fused_splits_awaitables: List[(..., <tspan fill="#ea580c">FusedKJTListSplitsAwaitable</tspan>)]</text>
+
+  <text x="65" y="152" fill="#059669" font-weight="700" font-size="10">FIELDS (tensor phase):</text>
+  <text x="65" y="170" fill="#334155">input_dist_tensors_requests: Dict[str, <tspan fill="#ea580c">Awaitable</tspan>]</text>
+  <text x="65" y="186" fill="#334155">module_contexts: Dict[str, <tspan fill="#0891b2">Multistreamable</tspan>]</text>
+
+  <text x="65" y="208" fill="#7c3aed" font-weight="700" font-size="10">FIELDS (metadata):</text>
+  <text x="65" y="226" fill="#334155">events: List[torch.Event]</text>
+  <text x="65" y="242" fill="#334155">postproc_fwd_results: Dict[str, Any]</text>
+  <text x="65" y="258" fill="#334155">index: Optional[int]</text>
+  <text x="65" y="274" fill="#94a3b8">module_contexts_next_batch: Dict  <tspan font-size="9">(v0 deprecated)</tspan></text>
+
+  <!-- ====== PrefetchTrainPipelineContext ====== -->
+  <rect x="50" y="370" width="420" height="150" rx="10" fill="#fff" stroke="#059669" stroke-width="2.5"/>
+  <rect x="50" y="370" width="420" height="30" rx="10" fill="#059669"/><rect x="50" y="392" width="420" height="8" fill="#059669"/>
+  <text x="260" y="392" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">PrefetchTrainPipelineContext</text>
+  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L130" target="_blank"><text x="260" y="410" text-anchor="middle" fill="#6ee7b7" font-size="10" style="cursor:pointer">extends TrainPipelineContext · utils.py:130</text></a>
+
+  <text x="65" y="436" fill="#059669" font-weight="700" font-size="10">ADDITIONAL FIELDS (post-prefetch):</text>
+  <text x="65" y="454" fill="#334155">module_input_post_prefetch: Dict[str, <tspan fill="#0891b2">Multistreamable</tspan>]</text>
+  <text x="65" y="470" fill="#334155">module_contexts_post_prefetch: Dict[str, <tspan fill="#0891b2">Multistreamable</tspan>]</text>
+  <text x="65" y="488" fill="#94a3b8">module_input_post_prefetch_next_batch  <tspan font-size="9">(v0 deprecated)</tspan></text>
+  <text x="65" y="504" fill="#94a3b8">module_contexts_post_prefetch_next_batch  <tspan font-size="9">(v0 deprecated)</tspan></text>
+
+  <!-- Inheritance arrow -->
+  <line x1="260" y1="370" x2="260" y2="295" stroke="#475569" stroke-width="2" marker-end="url(#aI)"/>
+  <text x="268" y="340" fill="#475569" font-size="10" font-weight="600">extends</text>
+
+  <!-- ====== TorchRec type boxes (right side) ====== -->
+  <!-- Awaitable -->
+  <rect x="580" y="30" width="240" height="100" rx="8" fill="#fff" stroke="#ea580c" stroke-width="2"/>
+  <rect x="580" y="30" width="240" height="26" rx="8" fill="#ea580c"/><rect x="580" y="48" width="240" height="8" fill="#ea580c"/>
+  <text x="700" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Awaitable[W]</text>
+  <text x="700" y="66" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="9">torchrec.distributed.types</text>
+  <text x="595" y="88" fill="#334155" font-size="10.5">ABC + Generic[W]</text>
+  <text x="595" y="104" fill="#334155" font-size="10.5"><tspan fill="#ea580c" font-weight="600">wait() → W</tspan>  (calls _wait_impl)</text>
+  <text x="595" y="120" fill="#334155" font-size="10.5">callbacks: List[Callable[[W], W]]</text>
+
+  <!-- Multistreamable -->
+  <rect x="580" y="155" width="240" height="80" rx="8" fill="#fff" stroke="#0891b2" stroke-width="2"/>
+  <rect x="580" y="155" width="240" height="26" rx="8" fill="#0891b2"/><rect x="580" y="173" width="240" height="8" fill="#0891b2"/>
+  <text x="700" y="175" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Multistreamable</text>
+  <text x="700" y="191" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="9">torchrec.streamable</text>
+  <text x="595" y="213" fill="#334155" font-size="10.5">ABC</text>
+  <text x="595" y="229" fill="#334155" font-size="10.5"><tspan fill="#0891b2" font-weight="600">record_stream(stream)</tspan></text>
+
+  <!-- KJTListSplitsAwaitable -->
+  <rect x="850" y="30" width="230" height="100" rx="8" fill="#fff" stroke="#be185d" stroke-width="1.5"/>
+  <rect x="850" y="30" width="230" height="26" rx="8" fill="#be185d"/><rect x="850" y="48" width="230" height="8" fill="#be185d"/>
+  <text x="965" y="50" text-anchor="middle" fill="#fff" font-weight="700" font-size="10.5">KJTListSplitsAwaitable</text>
+  <text x="965" y="66" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="8">torchrec.distributed.embedding_sharding</text>
+  <text x="862" y="88" fill="#334155" font-size="10">Awaitable[Awaitable[KJTList]]</text>
+  <text x="862" y="104" fill="#334155" font-size="10">wait() → KJTListAwaitable</text>
+  <text x="862" y="120" fill="#64748b" font-size="9">Phase 1: splits AllToAll</text>
+
+  <!-- FusedKJTListSplitsAwaitable -->
+  <rect x="850" y="155" width="230" height="80" rx="8" fill="#fff" stroke="#9333ea" stroke-width="1.5"/>
+  <rect x="850" y="155" width="230" height="26" rx="8" fill="#9333ea"/><rect x="850" y="173" width="230" height="8" fill="#9333ea"/>
+  <text x="965" y="175" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">FusedKJTListSplitsAwaitable</text>
+  <text x="862" y="213" fill="#334155" font-size="10">fuses multiple KJTListSplits</text>
+  <text x="862" y="229" fill="#334155" font-size="10">wait() → List[KJTListAwaitable]</text>
+
+  <!-- KJTAllToAllTensorsAwaitable -->
+  <rect x="850" y="260" width="230" height="80" rx="8" fill="#fff" stroke="#dc2626" stroke-width="1.5"/>
+  <rect x="850" y="260" width="230" height="26" rx="8" fill="#dc2626"/><rect x="850" y="278" width="230" height="8" fill="#dc2626"/>
+  <text x="965" y="280" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">KJTAllToAllTensorsAwaitable</text>
+  <text x="862" y="318" fill="#334155" font-size="10">Awaitable[KeyedJaggedTensor]</text>
+  <text x="862" y="334" fill="#334155" font-size="10">wait() → KJT on local rank</text>
+
+  <!-- ShardedModule context (right) -->
+  <rect x="580" y="260" width="240" height="100" rx="8" fill="#fff" stroke="#16a34a" stroke-width="2"/>
+  <rect x="580" y="260" width="240" height="26" rx="8" fill="#16a34a"/><rect x="580" y="278" width="240" height="8" fill="#16a34a"/>
+  <text x="700" y="280" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">ShardedModule</text>
+  <text x="700" y="296" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="9">torchrec.distributed.types</text>
+  <text x="595" y="318" fill="#334155" font-size="10.5"><tspan fill="#16a34a" font-weight="600">create_context()</tspan> → ShrdCtx</text>
+  <text x="595" y="334" fill="#334155" font-size="10.5"><tspan fill="#16a34a" font-weight="600">input_dist(ctx, kjt)</tspan> → Awt[Awt]</text>
+  <text x="595" y="350" fill="#334155" font-size="10.5"><tspan fill="#16a34a" font-weight="600">compute_and_output_dist(ctx, data)</tspan></text>
+
+  <!-- Composition arrows: Context → TorchRec types -->
+  <line x1="470" y1="114" x2="580" y2="70" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#aC)"/>
+  <line x1="470" y1="130" x2="850" y2="185" stroke="#9333ea" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#aC)"/>
+  <line x1="470" y1="186" x2="580" y2="195" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#aC)"/>
+
+  <!-- Awaitable hierarchy arrows -->
+  <line x1="850" y1="80" x2="820" y2="80" stroke="#ea580c" stroke-width="1" marker-end="url(#aI)"/>
+  <line x1="850" y1="195" x2="820" y2="130" stroke="#ea580c" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#aI)"/>
+  <line x1="850" y1="300" x2="820" y2="130" stroke="#ea580c" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- ====== BaseForward / PipelinedForward ====== -->
+  <rect x="580" y="400" width="240" height="100" rx="8" fill="#fff" stroke="#6366f1" stroke-width="2"/>
+  <rect x="580" y="400" width="240" height="26" rx="8" fill="#6366f1"/><rect x="580" y="418" width="240" height="8" fill="#6366f1"/>
+  <text x="700" y="420" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">BaseForward[TCtx]</text>
+  <text x="595" y="448" fill="#334155" font-size="10.5">_context: TCtx <tspan fill="#64748b">(bound TrainPipelineContext)</tspan></text>
+  <text x="595" y="464" fill="#334155" font-size="10.5">_module: ShardedModule</text>
+  <text x="595" y="480" fill="#334155" font-size="10.5">_args: List[ArgInfo]</text>
+  <text x="595" y="496" fill="#6366f1" font-size="10.5" font-weight="600">set_context(ctx) / get_context()</text>
+
+  <!-- PipelinedForward -->
+  <rect x="580" y="530" width="160" height="52" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="660" y="553" text-anchor="middle" fill="#1e40af" font-weight="700" font-size="10">PipelinedForward</text>
+  <text x="660" y="570" text-anchor="middle" fill="#1e40af" font-size="9">pops tensors_requests</text>
+
+  <!-- PrefetchPipelinedForward -->
+  <rect x="760" y="530" width="180" height="52" rx="6" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+  <text x="850" y="553" text-anchor="middle" fill="#065f46" font-weight="700" font-size="10">PrefetchPipelinedFwd</text>
+  <text x="850" y="570" text-anchor="middle" fill="#065f46" font-size="9">pops post_prefetch</text>
+
+  <!-- SplitPrefetchPipelinedForward -->
+  <rect x="760" y="600" width="180" height="40" rx="6" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="850" y="620" text-anchor="middle" fill="#166534" font-weight="700" font-size="9.5">SplitPrefetchPipelinedFwd</text>
+  <text x="850" y="634" text-anchor="middle" fill="#166534" font-size="8.5">embedding + dense 两阶段</text>
+
+  <!-- Inheritance arrows for Forward -->
+  <line x1="660" y1="530" x2="660" y2="505" stroke="#475569" stroke-width="1.5" marker-end="url(#aI)"/>
+  <line x1="850" y1="530" x2="750" y2="505" stroke="#475569" stroke-width="1.5" marker-end="url(#aI)"/>
+  <line x1="850" y1="600" x2="850" y2="585" stroke="#475569" stroke-width="1.5" marker-end="url(#aI)"/>
+
+  <!-- BaseForward holds ref to Context -->
+  <path d="M580,450 L470,450 L470,290" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#aC)"/>
+  <text x="490" y="395" fill="#2563eb" font-size="9" font-weight="600">_context ref</text>
+
+  <!-- ====== Pipeline (deque) management ====== -->
+  <rect x="50" y="570" width="420" height="190" rx="10" fill="#fff" stroke="#475569" stroke-width="1.5"/>
+  <rect x="50" y="570" width="420" height="28" rx="10" fill="#475569"/><rect x="50" y="590" width="420" height="8" fill="#475569"/>
+  <text x="260" y="590" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">TrainPipelineSparseDist</text>
+
+  <text x="65" y="618" fill="#334155" font-size="10.5" font-weight="600">batches: Deque[Optional[In]]</text>
+  <text x="65" y="636" fill="#2563eb" font-size="10.5" font-weight="600">contexts: Deque[TrainPipelineContext]</text>
+  <text x="65" y="654" fill="#334155" font-size="10.5">_pipelined_modules: List[ShardedModule]</text>
+  <line x1="65" y1="663" x2="455" y2="663" stroke="#e2e8f0"/>
+  <text x="65" y="680" fill="#475569" font-size="10.5"><tspan font-weight="600">contexts[0]</tspan> → current forward/backward batch</text>
+  <text x="65" y="698" fill="#475569" font-size="10.5"><tspan font-weight="600">contexts[1]</tspan> → next batch (input_dist running)</text>
+  <text x="65" y="716" fill="#475569" font-size="10.5">每 progress() 调 <tspan fill="#dc2626" font-weight="600">dequeue_batch()</tspan> → popleft + set_module_context</text>
+  <text x="65" y="734" fill="#475569" font-size="10.5">新 batch 入队 → <tspan fill="#059669" font-weight="600">_create_context(index)</tspan> → append</text>
+  <text x="65" y="752" fill="#94a3b8" font-size="10">PrefetchPipeline 使用 _batch_i/_batch_ip1 (v0 legacy)</text>
+
+  <!-- Pipeline → Context deque arrow -->
+  <path d="M260,570 L260,520" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#aC)"/>
+  <text x="270" y="550" fill="#2563eb" font-size="9">holds deque of</text>
+
+  <!-- ====== Two-phase AllToAll legend ====== -->
+  <rect x="580" y="660" width="500" height="100" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="600" y="682" fill="#ea580c" font-weight="700" font-size="11">TorchRec AllToAll 两阶段模型</text>
+  <text x="600" y="702" fill="#334155" font-size="10">Phase 1 (splits): input_dist() → <tspan fill="#be185d">KJTListSplitsAwaitable</tspan> → .wait() → <tspan fill="#dc2626">KJTAllToAllTensorsAwaitable</tspan></text>
+  <text x="600" y="722" fill="#334155" font-size="10">Phase 2 (tensors): tensors_awaitable.wait() → <tspan fill="#16a34a" font-weight="600">KeyedJaggedTensor</tspan> (本地数据就绪)</text>
+  <text x="600" y="744" fill="#64748b" font-size="9.5">Pipeline Context 的字段名直接对应这两个阶段：input_dist_<tspan font-weight="600">splits</tspan>_requests → input_dist_<tspan font-weight="600">tensors</tspan>_requests</text>
+</svg>
+</div>
+</div>
+<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L89-L141" target="_blank"><code>utils.py:89–141</code></a> (Context) · <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L467-L636" target="_blank"><code>utils.py:467–636</code></a> (BaseForward hierarchy)</p>
+</section>
+
+<!-- ═══════════ TORCHREC TYPES ═══════════ -->
+<section id="torchrec-types">
+<div class="phase-banner pb-torchrec">
+  <h2><span class="zh">TorchRec 核心类型详解</span><span class="en">TorchRec Core Types Deep Dive</span></h2>
+  <p><span class="zh">Context 字段中存储的 TorchRec 对象实际上是什么？</span><span class="en">What are the TorchRec objects stored in Context fields?</span></p>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">类型</span><span class="en">Type</span></th>
+  <th><span class="zh">来源</span><span class="en">Source</span></th>
+  <th><span class="zh">核心方法</span><span class="en">Key Method</span></th>
+  <th><span class="zh">含义</span><span class="en">Meaning</span></th>
+</tr>
+<tr>
+  <td><code>Awaitable[W]</code></td>
+  <td>torchrec.distributed.types</td>
+  <td><code>wait() → W</code></td>
+  <td><span class="zh">异步通信句柄的抽象基类。<strong>不是</strong> Python asyncio —— 是 TorchRec 自己的 "wait 模式"，统一表示 AllToAll 等通信操作的未就绪结果。<code>wait()</code> 内部调 <code>_wait_impl()</code> 然后依次执行 <code>callbacks</code>。</span><span class="en">ABC for async communication handles. NOT Python asyncio — TorchRec's own "wait pattern". <code>wait()</code> calls <code>_wait_impl()</code> then runs <code>callbacks</code> in chain.</span></td>
+</tr>
+<tr>
+  <td><code>Multistreamable</code></td>
+  <td>torchrec.streamable</td>
+  <td><code>record_stream(s)</code></td>
+  <td><span class="zh">允许跨 CUDA stream 传递的对象接口。语义等同 <code>torch.Tensor.record_stream</code>：声明该对象将在指定 stream 上被读取，防止 CUDA 缓存分配器过早回收内存。<code>ShardedModule.create_context()</code> 返回的上下文实现此接口。</span><span class="en">Interface for objects that can be safely passed across CUDA streams. Semantically equivalent to <code>torch.Tensor.record_stream</code>: declares the object will be read on the given stream. <code>ShardedModule.create_context()</code> returns objects implementing this.</span></td>
+</tr>
+<tr>
+  <td><code>KJTListSplitsAwaitable</code></td>
+  <td>torchrec.distributed.embedding_sharding</td>
+  <td><code>wait() → KJTListAwaitable</code></td>
+  <td><span class="zh"><strong>AllToAll Phase 1</strong>：包含多个 KJTSplitsAllToAllMeta（splits 张量列表）。<code>wait()</code> 完成 splits 通信，得到各 rank 的 tensor 大小，返回 <code>KJTListAwaitable</code>（Phase 2 句柄）。存储在 <code>input_dist_splits_requests</code>。</span><span class="en"><strong>AllToAll Phase 1</strong>: Contains KJTSplitsAllToAllMeta. <code>wait()</code> completes splits communication, returns <code>KJTListAwaitable</code> (Phase 2 handle). Stored in <code>input_dist_splits_requests</code>.</span></td>
+</tr>
+<tr>
+  <td><code>FusedKJTListSplitsAwaitable</code></td>
+  <td>torchrec.distributed.embedding_sharding</td>
+  <td><code>wait() → List[KJTListAwaitable]</code></td>
+  <td><span class="zh">多组 KJT 的 splits AllToAll <strong>融合为一次通信</strong>。<code>_fuse_input_dist_splits()</code> 按 ProcessGroup 分组创建。存储在 <code>fused_splits_awaitables</code>。</span><span class="en">Fuses multiple KJT splits AllToAll into a single communication. Created by <code>_fuse_input_dist_splits()</code> grouped by ProcessGroup. Stored in <code>fused_splits_awaitables</code>.</span></td>
+</tr>
+<tr>
+  <td><code>KJTAllToAllTensorsAwaitable</code></td>
+  <td>torchrec.distributed.dist_data</td>
+  <td><code>wait() → KeyedJaggedTensor</code></td>
+  <td><span class="zh"><strong>AllToAll Phase 2</strong>：已知 splits 后，对 values/lengths 等张量分量做 <code>all_to_all_single</code>。<code>wait()</code> 返回本 rank 重排后的 <code>KeyedJaggedTensor</code>。这就是 <code>input_dist_tensors_requests</code> 中存储的对象。</span><span class="en"><strong>AllToAll Phase 2</strong>: With splits known, performs <code>all_to_all_single</code> on values/lengths tensor components. <code>wait()</code> returns the reassembled local <code>KeyedJaggedTensor</code>. This is what's stored in <code>input_dist_tensors_requests</code>.</span></td>
+</tr>
+<tr>
+  <td><code>ShrdCtx (Multistreamable)</code></td>
+  <td>torchrec.distributed.types</td>
+  <td><code>record_stream()</code></td>
+  <td><span class="zh"><code>ShardedModule.create_context()</code> 的返回值。包含 sharding metadata（input_splits, output_splits, recat 等）。由 <code>_start_data_dist</code> 创建，存入 <code>module_contexts</code>，在 <code>PipelinedForward.__call__</code> 中传给 <code>compute_and_output_dist(ctx, data)</code>。</span><span class="en">Return value of <code>ShardedModule.create_context()</code>. Contains sharding metadata. Created by <code>_start_data_dist</code>, stored in <code>module_contexts</code>, passed to <code>compute_and_output_dist(ctx, data)</code> during forward.</span></td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════ FIELD DETAIL ═══════════ -->
+<section id="field-detail">
+<div class="phase-banner pb-class">
+  <h2><span class="zh">字段生产者/消费者映射</span><span class="en">Field Producer / Consumer Mapping</span></h2>
+</div>
+
+<table class="tbl">
+<tr>
+  <th><span class="zh">字段</span><span class="en">Field</span></th>
+  <th><span class="zh">类型</span><span class="en">Type</span></th>
+  <th><span class="zh">写入者 (Producer)</span><span class="en">Writer (Producer)</span></th>
+  <th><span class="zh">读取者 (Consumer)</span><span class="en">Reader (Consumer)</span></th>
+  <th>Stream</th>
+</tr>
+<tr>
+  <td><code>input_dist_splits_requests</code></td>
+  <td>Dict[str, Awaitable]</td>
+  <td><code>_start_data_dist()</code></td>
+  <td><code>_fuse_input_dist_splits()</code></td>
+  <td>data_dist</td>
+</tr>
+<tr>
+  <td><code>fused_splits_awaitables</code></td>
+  <td>List[(names, FusedAwaitable)]</td>
+  <td><code>_fuse_input_dist_splits()</code></td>
+  <td><code>wait_sparse_data_dist()</code></td>
+  <td>data_dist</td>
+</tr>
+<tr>
+  <td><code>input_dist_tensors_requests</code></td>
+  <td>Dict[str, Awaitable]</td>
+  <td><code>wait_sparse_data_dist()</code></td>
+  <td><code>PipelinedForward</code> / <code>_prefetch_embeddings</code></td>
+  <td>data_dist → default / prefetch</td>
+</tr>
+<tr>
+  <td><code>module_contexts</code></td>
+  <td>Dict[str, Multistreamable]</td>
+  <td><code>_start_data_dist()</code></td>
+  <td><code>PipelinedForward</code> / <code>_prefetch_embeddings</code></td>
+  <td>data_dist → default / prefetch</td>
+</tr>
+<tr style="background:#ecfdf5">
+  <td><code>module_input_post_prefetch</code></td>
+  <td>Dict[str, Multistreamable]</td>
+  <td><code>_prefetch_embeddings()</code></td>
+  <td><code>PrefetchPipelinedForward</code></td>
+  <td>prefetch → default</td>
+</tr>
+<tr style="background:#ecfdf5">
+  <td><code>module_contexts_post_prefetch</code></td>
+  <td>Dict[str, Multistreamable]</td>
+  <td><code>_prefetch_embeddings()</code></td>
+  <td><code>PrefetchPipelinedForward</code></td>
+  <td>prefetch → default</td>
+</tr>
+</table>
+
+<div class="callout callout-info">
+<span class="zh"><strong>关键理解</strong>：Context 是一个 <strong>"按阶段填充"</strong> 的字典容器。每个 pipeline stage 负责写入特定字段、清空上一阶段的字段。字典的 key 都是 ShardedModule 的 FQN（如 <code>"model.sparse_arch.embedding_bag_collection"</code>），value 是 TorchRec 的 Awaitable 或已完成的数据。</span>
+<span class="en"><strong>Key insight</strong>: Context is a <strong>"progressively filled"</strong> dictionary container. Each pipeline stage writes specific fields and clears previous ones. Dict keys are ShardedModule FQNs, values are TorchRec Awaitables or resolved data.</span>
+</div>
+</section>
+
+<!-- ═══════════ LIFECYCLE BASE ═══════════ -->
+<section id="lifecycle-base">
+<div class="phase-banner pb-lifecycle">
+  <h2><span class="zh">Context 生命周期 — Base Pipeline</span><span class="en">Context Lifecycle — Base Pipeline</span></h2>
+  <p><span class="zh">TrainPipelineContext 在 TrainPipelineSparseDist 中从创建到销毁的完整流程</span><span class="en">Full lifecycle of TrainPipelineContext in TrainPipelineSparseDist</span></p>
+</div>
+<div class="xref-bar">
+<a href="pipeline_init.html#fill-base">fill_pipeline 初始化流程 → Pipeline Init</a>
+<a href="pipeline_init.html#progress">progress() 稳态循环 →</a>
+<a href="runtime_timeline.html">交互式 Timeline 可视化 →</a>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">Base Pipeline Context 生命周期序列图</span><span class="en">Base Pipeline Context Lifecycle</span></span></div>
+<div class="seq-wrap">
+<div class="seq-actors">
+  <div class="seq-actor" style="left:8%;background:#475569">Pipeline</div>
+  <div class="seq-actor" style="left:24%;background:#2563eb">Context</div>
+  <div class="seq-actor" style="left:42%;background:#ea580c">splits_req</div>
+  <div class="seq-actor" style="left:58%;background:#9333ea">fused_awaitables</div>
+  <div class="seq-actor" style="left:74%;background:#dc2626">tensors_req</div>
+  <div class="seq-actor" style="left:90%;background:#16a34a">module_ctx</div>
+</div>
+<div class="svg-area">
+<svg viewBox="0 0 1000 740" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="10.5">
+  <rect width="1000" height="740" fill="#fafbfc" rx="8"/>
+  <defs>
+    <marker id="la" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0,0 L7,2.5 L0,5" fill="#475569"/></marker>
+    <marker id="lr" markerWidth="7" markerHeight="5" refX="0" refY="2.5" orient="auto"><path d="M7,0 L0,2.5 L7,5" fill="#94a3b8"/></marker>
+  </defs>
+
+  <!-- Lifelines -->
+  <line x1="80" y1="10" x2="80" y2="720" stroke="#475569" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="240" y1="10" x2="240" y2="720" stroke="#2563eb" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="420" y1="10" x2="420" y2="720" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="580" y1="10" x2="580" y2="720" stroke="#9333ea" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="740" y1="10" x2="740" y2="720" stroke="#dc2626" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="900" y1="10" x2="900" y2="720" stroke="#16a34a" stroke-width="1" stroke-dasharray="5,4"/>
+
+  <!-- PHASE 0: Creation -->
+  <rect x="10" y="20" width="980" height="60" rx="6" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="20" y="38" fill="#7c3aed" font-weight="700" font-size="11">PHASE 0: Creation — _create_context()</text>
+  <rect x="74" y="45" width="12" height="25" rx="2" fill="#e2e8f0" stroke="#475569"/>
+  <line x1="86" y1="55" x2="234" y2="55" stroke="#2563eb" stroke-width="1.5" marker-end="url(#la)"/>
+  <text x="105" y="50" fill="#2563eb" font-size="10" font-weight="600">new Context(index=N, version=1)</text>
+  <text x="250" y="67" fill="#2563eb" font-size="9">所有 Dict 字段 = {} (empty)</text>
+
+  <!-- PHASE 1: _start_data_dist -->
+  <rect x="10" y="95" width="980" height="130" rx="6" fill="#fff7ed" stroke="#ea580c" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="20" y="113" fill="#ea580c" font-weight="700" font-size="11">PHASE 1: _start_data_dist(batch, ctx) — on data_dist_stream</text>
+
+  <rect x="74" y="125" width="12" height="90" rx="2" fill="#ffedd5" stroke="#ea580c"/>
+
+  <!-- 1a: create_context for each module -->
+  <line x1="86" y1="138" x2="894" y2="138" stroke="#16a34a" stroke-width="1.5" marker-end="url(#la)"/>
+  <text x="300" y="133" fill="#16a34a" font-size="10">sm.create_context() → module_contexts[name] = <tspan font-weight="600">ShrdCtx</tspan></text>
+
+  <!-- 1b: input_dist -->
+  <line x1="86" y1="162" x2="414" y2="162" stroke="#ea580c" stroke-width="1.5" marker-end="url(#la)"/>
+  <text x="120" y="157" fill="#ea580c" font-size="10">sm.input_dist(module_ctx, kjt) → splits_requests[name] = <tspan font-weight="600">KJTListSplitsAwaitable</tspan></text>
+
+  <!-- 1c: fuse -->
+  <line x1="414" y1="185" x2="574" y2="185" stroke="#9333ea" stroke-width="1.5" marker-end="url(#la)"/>
+  <text x="425" y="180" fill="#9333ea" font-size="10">_fuse_input_dist_splits() → fused_splits_awaitables</text>
+
+  <text x="420" y="210" fill="#ea580c" font-size="9" font-style="italic">AllToAll Phase 1 通信已启动 (异步)</text>
+
+  <!-- PHASE 2: wait_sparse_data_dist -->
+  <rect x="10" y="240" width="980" height="100" rx="6" fill="#eff6ff" stroke="#2563eb" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="20" y="258" fill="#2563eb" font-weight="700" font-size="11">PHASE 2: wait_sparse_data_dist(ctx) — on data_dist_stream</text>
+
+  <rect x="574" y="270" width="12" height="50" rx="2" fill="#f5f3ff" stroke="#9333ea"/>
+
+  <!-- 2a: fused wait -->
+  <line x1="580" y1="282" x2="734" y2="282" stroke="#dc2626" stroke-width="1.5" marker-end="url(#la)"/>
+  <text x="595" y="277" fill="#dc2626" font-size="10">fused_awaitable.wait() → tensors_requests[name] = <tspan font-weight="600">KJTAllToAllTensorsAwaitable</tspan></text>
+
+  <!-- 2b: clear splits -->
+  <line x1="580" y1="305" x2="420" y2="305" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="430" y="300" fill="#94a3b8" font-size="9">splits_requests.clear()</text>
+  <line x1="580" y1="318" x2="580" y2="318" stroke="#94a3b8"/>
+  <text x="585" y="330" fill="#94a3b8" font-size="9">fused_awaitables.clear()</text>
+
+  <!-- PHASE 3: PipelinedForward.__call__ -->
+  <rect x="10" y="355" width="980" height="130" rx="6" fill="#ecfdf5" stroke="#059669" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="20" y="373" fill="#059669" font-weight="700" font-size="11">PHASE 3: PipelinedForward.__call__() — on default_stream (during model(batch))</text>
+
+  <rect x="734" y="385" width="12" height="50" rx="2" fill="#fef2f2" stroke="#dc2626"/>
+
+  <!-- 3a: pop tensors_request -->
+  <text x="600" y="397" fill="#dc2626" font-size="10">request = tensors_requests.<tspan font-weight="600">pop</tspan>(name)</text>
+
+  <!-- 3b: wait -->
+  <text x="600" y="417" fill="#dc2626" font-size="10">data = request.<tspan font-weight="600">wait()</tspan> → KeyedJaggedTensor</text>
+
+  <!-- 3c: pop module_contexts -->
+  <line x1="740" y1="440" x2="894" y2="440" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="755" y="435" fill="#16a34a" font-size="10">ctx = module_contexts.<tspan font-weight="600">pop</tspan>(name)</text>
+
+  <!-- 3d: compute -->
+  <text x="600" y="470" fill="#059669" font-size="10" font-weight="600">sm.compute_and_output_dist(ctx, data) → embedding output</text>
+
+  <!-- PHASE 4: Dequeue -->
+  <rect x="10" y="500" width="980" height="60" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="20" y="518" fill="#475569" font-weight="700" font-size="11">PHASE 4: dequeue_batch() — after backward + optimizer</text>
+
+  <line x1="86" y1="535" x2="234" y2="535" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="100" y="530" fill="#94a3b8" font-size="10">contexts.popleft() → <tspan font-weight="600">Context 出队，等待 GC</tspan></text>
+  <text x="250" y="548" fill="#94a3b8" font-size="9">所有 Dict 已被 pop 清空</text>
+
+  <!-- Visual: field state timeline -->
+  <rect x="10" y="580" width="980" height="145" rx="8" fill="#fff" stroke="#e2e8f0"/>
+  <text x="20" y="600" fill="#334155" font-weight="700" font-size="11">各字段状态时间线</text>
+
+  <!-- Timeline bars -->
+  <text x="20" y="624" fill="#ea580c" font-size="9" font-weight="600">splits_requests:</text>
+  <rect x="210" y="614" width="160" height="16" rx="3" fill="#fed7aa" stroke="#ea580c"/>
+  <text x="260" y="626" text-anchor="middle" fill="#ea580c" font-size="8" font-weight="600">LIVE</text>
+  <rect x="370" y="614" width="100" height="16" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="420" y="626" text-anchor="middle" fill="#94a3b8" font-size="8">cleared</text>
+
+  <text x="20" y="648" fill="#9333ea" font-size="9" font-weight="600">fused_awaitables:</text>
+  <rect x="260" y="638" width="110" height="16" rx="3" fill="#e9d5ff" stroke="#9333ea"/>
+  <text x="315" y="650" text-anchor="middle" fill="#9333ea" font-size="8" font-weight="600">LIVE</text>
+  <rect x="370" y="638" width="100" height="16" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="420" y="650" text-anchor="middle" fill="#94a3b8" font-size="8">cleared</text>
+
+  <text x="20" y="672" fill="#dc2626" font-size="9" font-weight="600">tensors_requests:</text>
+  <rect x="370" y="662" width="180" height="16" rx="3" fill="#fecaca" stroke="#dc2626"/>
+  <text x="460" y="674" text-anchor="middle" fill="#dc2626" font-size="8" font-weight="600">LIVE (AllToAll Phase 2 running)</text>
+  <rect x="550" y="662" width="80" height="16" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="590" y="674" text-anchor="middle" fill="#94a3b8" font-size="8">popped</text>
+
+  <text x="20" y="696" fill="#16a34a" font-size="9" font-weight="600">module_contexts:</text>
+  <rect x="210" y="686" width="340" height="16" rx="3" fill="#bbf7d0" stroke="#16a34a"/>
+  <text x="380" y="698" text-anchor="middle" fill="#16a34a" font-size="8" font-weight="600">LIVE (holds ShrdCtx from create_context)</text>
+  <rect x="550" y="686" width="80" height="16" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="590" y="698" text-anchor="middle" fill="#94a3b8" font-size="8">popped</text>
+
+  <!-- Phase labels on timeline -->
+  <text x="210" y="718" fill="#ea580c" font-size="8">Phase 1</text>
+  <text x="370" y="718" fill="#2563eb" font-size="8">Phase 2</text>
+  <text x="550" y="718" fill="#059669" font-size="8">Phase 3</text>
+  <text x="700" y="718" fill="#475569" font-size="8">Phase 4: GC</text>
+</svg>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ LIFECYCLE PREFETCH ═══════════ -->
+<section id="lifecycle-prefetch">
+<div class="phase-banner pb-prefetch">
+  <h2><span class="zh">Context 生命周期 — Prefetch Pipeline</span><span class="en">Context Lifecycle — Prefetch Pipeline</span></h2>
+  <p><span class="zh">PrefetchTrainPipelineContext 额外的 prefetch 阶段</span><span class="en">PrefetchTrainPipelineContext's additional prefetch phase</span></p>
+</div>
+
+<div class="desc">
+<span class="zh">
+  <p>Prefetch Pipeline 在 Phase 2 和 Phase 3 之间插入了 <strong>Phase 2.5: _prefetch_embeddings()</strong>。这个阶段在 <code>prefetch_stream</code> 上执行：</p>
+  <ol>
+    <li>从 <code>input_dist_tensors_requests</code> pop 出 awaitable 并 <code>wait()</code>（等 AllToAll Phase 2 完成）</li>
+    <li>调用 <code>ShardedModule.prefetch(ctx, dist_input)</code>（DynamicEmb cache 预热）</li>
+    <li>将结果存入 <code>module_input_post_prefetch</code> 和 <code>module_contexts_post_prefetch</code></li>
+  </ol>
+  <p>这样 Phase 3（<code>PrefetchPipelinedForward.__call__</code>）只需从 <code>post_prefetch</code> 字段 pop 数据，<strong>零等待</strong>。</p>
+</span>
+<span class="en">
+  <p>Prefetch Pipeline inserts <strong>Phase 2.5: _prefetch_embeddings()</strong> between Phase 2 and Phase 3. This runs on <code>prefetch_stream</code>:</p>
+  <ol>
+    <li>Pop awaitable from <code>input_dist_tensors_requests</code> and <code>wait()</code> (completes AllToAll Phase 2)</li>
+    <li>Call <code>ShardedModule.prefetch(ctx, dist_input)</code> (DynamicEmb cache warm-up)</li>
+    <li>Store results in <code>module_input_post_prefetch</code> and <code>module_contexts_post_prefetch</code></li>
+  </ol>
+  <p>Phase 3 (<code>PrefetchPipelinedForward.__call__</code>) simply pops from <code>post_prefetch</code> fields — <strong>zero wait</strong>.</p>
+</span>
+</div>
+
+<div class="svg-wrap">
+<div class="svg-header"><span><span class="zh">Prefetch Pipeline Context 字段状态时间线</span><span class="en">Prefetch Pipeline Context Field Timeline</span></span></div>
+<div class="svg-area">
+<svg viewBox="0 0 1000 310" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="10.5">
+  <rect width="1000" height="310" fill="#fafbfc" rx="8"/>
+
+  <!-- Phase labels at top -->
+  <rect x="90" y="12" width="130" height="22" rx="4" fill="#ea580c"/>
+  <text x="155" y="27" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">_start_data_dist</text>
+  <rect x="230" y="12" width="130" height="22" rx="4" fill="#2563eb"/>
+  <text x="295" y="27" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">wait_sparse_dist</text>
+  <rect x="370" y="12" width="160" height="22" rx="4" fill="#0891b2"/>
+  <text x="450" y="27" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">_prefetch_embeddings</text>
+  <rect x="540" y="12" width="160" height="22" rx="4" fill="#059669"/>
+  <text x="620" y="27" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">PrefetchPipelinedFwd</text>
+  <rect x="710" y="12" width="100" height="22" rx="4" fill="#475569"/>
+  <text x="760" y="27" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">dequeue</text>
+
+  <!-- Field bars -->
+  <text x="10" y="64" fill="#ea580c" font-size="9" font-weight="600">splits_requests</text>
+  <rect x="90" y="52" width="130" height="18" rx="3" fill="#fed7aa" stroke="#ea580c"/>
+  <rect x="220" y="52" width="10" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+
+  <text x="10" y="92" fill="#9333ea" font-size="9" font-weight="600">fused_awaitables</text>
+  <rect x="150" y="80" width="80" height="18" rx="3" fill="#e9d5ff" stroke="#9333ea"/>
+  <rect x="230" y="80" width="10" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+
+  <text x="10" y="120" fill="#dc2626" font-size="9" font-weight="600">tensors_requests</text>
+  <rect x="230" y="108" width="140" height="18" rx="3" fill="#fecaca" stroke="#dc2626"/>
+  <text x="300" y="120" text-anchor="middle" fill="#dc2626" font-size="8">AllToAll Phase 2</text>
+  <rect x="370" y="108" width="30" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="405" y="120" fill="#94a3b8" font-size="8">popped by _prefetch</text>
+
+  <text x="10" y="148" fill="#16a34a" font-size="9" font-weight="600">module_contexts</text>
+  <rect x="90" y="136" width="280" height="18" rx="3" fill="#bbf7d0" stroke="#16a34a"/>
+  <text x="230" y="148" text-anchor="middle" fill="#16a34a" font-size="8">ShrdCtx (sharding metadata)</text>
+  <rect x="370" y="136" width="30" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+
+  <!-- Post-prefetch fields (green highlighting) -->
+  <rect x="0" y="165" width="1000" height="80" rx="0" fill="#ecfdf5" fill-opacity=".4"/>
+  <text x="10" y="182" fill="#0891b2" font-size="9" font-weight="700">★ PREFETCH-ONLY FIELDS:</text>
+
+  <text x="10" y="204" fill="#059669" font-size="9" font-weight="600">post_prefetch (input)</text>
+  <rect x="370" y="192" width="160" height="18" rx="3" fill="#6ee7b7" stroke="#059669"/>
+  <text x="450" y="204" text-anchor="middle" fill="#065f46" font-size="8">wait+prefetch done</text>
+  <rect x="540" y="192" width="30" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+  <text x="580" y="204" fill="#94a3b8" font-size="8">popped</text>
+
+  <text x="10" y="232" fill="#059669" font-size="9" font-weight="600">post_prefetch (ctx)</text>
+  <rect x="370" y="220" width="160" height="18" rx="3" fill="#6ee7b7" stroke="#059669"/>
+  <text x="450" y="232" text-anchor="middle" fill="#065f46" font-size="8">ShrdCtx transferred</text>
+  <rect x="540" y="220" width="30" height="18" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="2,1"/>
+
+  <!-- Key insight -->
+  <rect x="20" y="260" width="960" height="36" rx="6" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="40" y="280" fill="#1e40af" font-size="10"><tspan font-weight="700">关键区别：</tspan>Base Pipeline 在 Phase 3 (forward) 时 wait tensors → 有延迟。Prefetch Pipeline 在 Phase 2.5 就 wait 了 → Phase 3 零等待。</text>
+</svg>
+</div>
+</div>
+
+<div class="callout callout-tip">
+<span class="zh"><strong>总结</strong>：<code>TrainPipelineContext</code> 是一个<strong>阶段性字典容器</strong>——Pipeline 的每个 stage 往里 "存" 数据（异步句柄或已完成结果），下一个 stage 从中 "取" 并 pop。Context 随 batch 一起入队 (<code>contexts deque</code>)，生命周期 = 一个 batch 从 H2D 到 backward/optimizer 完成。所有字段在出队时已被 pop 清空，等待 Python GC。</span>
+<span class="en"><strong>Summary</strong>: <code>TrainPipelineContext</code> is a <strong>stage-progressive dictionary container</strong> — each pipeline stage "stores" data (async handles or resolved results), the next stage "pops" and consumes. Context enters the deque with its batch, lives through H2D → forward → backward → optimizer, and all fields are pop-emptied by dequeue time.</span>
+</div>
+
+<p class="src-link">
+<a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L304" target="_blank"><code>train_pipeline.py:304</code></a> (_create_context) · <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L249" target="_blank"><code>train_pipeline.py:249</code></a> (dequeue_batch) · <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/train_pipeline.py#L642" target="_blank"><code>train_pipeline.py:642</code></a> (progress)
+</p>
+</section>
+
+</div>
+
+<footer>
+  <div class="xref-bar" style="justify-content:center;margin-bottom:12px">
+    <a href="index.html">← 总入口</a>
+    <a href="pipeline_init.html">← Pipeline Init</a>
+    <a href="forward_hijack.html">← Forward Hijack</a>
+    <a href="runtime_timeline.html">Runtime Timeline →</a>
+  </div>
+  NVIDIA recsys-examples · Pipeline Context Deep Dive
+</footer>
+
+<script>
+function toggleLang(){
+  const b=document.body,z=b.classList.contains('lang-zh');
+  b.classList.toggle('lang-zh',!z);b.classList.toggle('lang-en',z);
+  document.getElementById('langBtn').textContent=z?'EN':'中文';
+  document.documentElement.lang=z?'en':'zh-CN';
+}
+const secs=document.querySelectorAll('section[id]');
+window.addEventListener('scroll',()=>{
+  let c='';secs.forEach(s=>{if(s.getBoundingClientRect().top<60)c=s.id;});
+  document.querySelectorAll('.nav-links a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+c));
+});
+</script>
+</body>
+</html>

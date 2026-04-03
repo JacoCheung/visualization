@@ -8,12 +8,17 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#333;overflow:hidden}
+.site-nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:32px;gap:0;overflow-x:auto;white-space:nowrap;flex-shrink:0}
+.site-nav a{display:inline-block;padding:4px 12px;font-size:11px;font-weight:600;color:rgba(255,255,255,.55);transition:color .15s;text-decoration:none}
+.site-nav a:hover{color:#fff;text-decoration:none}
+.site-nav a.here{color:#22d3ee}
+.site-nav .home{color:rgba(255,255,255,.8);font-weight:800;margin-right:8px;font-size:11.5px}
 #header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
 #header h1{font-size:17px;font-weight:600}
 .controls{display:flex;gap:6px}
 .controls button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s}
 .controls button:hover{background:rgba(255,255,255,.25)}
-#main{display:flex;height:calc(100vh - 48px)}
+#main{display:flex;height:calc(100vh - 80px)}
 #chart-container{flex:1;overflow:hidden;position:relative;background:#fafbfc}
 #detail-panel{width:330px;background:#fff;border-left:1px solid #e0e0e0;padding:20px;overflow-y:auto}
 #detail-panel h2{font-size:14px;margin-bottom:10px;color:#1a1a2e}
@@ -34,6 +39,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </style>
 </head>
 <body>
+<div class="site-nav">
+  <a class="home" href="index.html">Pipeline Docs</a>
+  <a href="pipeline_init.html">Pipeline Init</a>
+  <a href="forward_hijack.html">Forward Hijack</a>
+  <a href="context_lifecycle.html">Context Lifecycle</a>
+  <a class="here" href="runtime_timeline.html">Runtime Timeline</a>
+  <a href="sw_pipeline_overview.html">SWPipeline</a>
+  <a href="sw_pipeline_api.html">SWPipeline API</a>
+</div>
 <div id="header">
   <h1>progress() — 3-Iteration Pipeline Timeline</h1>
   <div class="controls">
@@ -61,6 +75,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <h2>Operation Details</h2>
     <p id="detail-placeholder" style="color:#aaa;font-size:12px;margin-top:8px">Click any operation box or barrier to inspect.</p>
     <div id="detail-content"></div>
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e0e0e0">
+      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:8px">Related Docs</p>
+      <a href="pipeline_init.html#progress" style="display:block;padding:6px 10px;margin-bottom:4px;background:#f8f8fa;border-radius:4px;font-size:11.5px;color:#2563eb;text-decoration:none">progress() 稳态循环对比</a>
+      <a href="context_lifecycle.html#lifecycle-base" style="display:block;padding:6px 10px;margin-bottom:4px;background:#f8f8fa;border-radius:4px;font-size:11.5px;color:#2563eb;text-decoration:none">Context 生命周期序列图</a>
+      <a href="forward_hijack.html#timeline" style="display:block;padding:6px 10px;margin-bottom:4px;background:#f8f8fa;border-radius:4px;font-size:11.5px;color:#2563eb;text-decoration:none">Forward 拆分后的执行效果</a>
+      <a href="index.html" style="display:block;padding:6px 10px;background:#f8f8fa;border-radius:4px;font-size:11.5px;color:#2563eb;text-decoration:none">← 总入口</a>
+    </div>
   </div>
 </div>
 
@@ -86,7 +107,7 @@ const CODE = {
   prev_pf:  'train_pipeline.py:918-919\n_wait_for_batch(cast(In, self._batch_i), self._prefetch_stream)\n\nutils.py:790\ntorch.get_device_module(device).current_stream().wait_stream(stream)  # GPU-level, non-blocking',
   prev_dd:  'train_pipeline.py:931-932\nself._wait_sparse_data_dist()\n\ntrain_pipeline.py:499-501\nfor names, awaitable in self._context.fused_splits_awaitables:\n    for name, request in zip(names, awaitable.wait()):  # CPU blocks here',
   h2d:      'train_pipeline.py:922-928\nwith self._stream_context(self._memcpy_stream):\n    raw_batch = _to_device(raw_batch, self._device, non_blocking=True)',
-  ag_wkld:  'train_pipeline.py:936-941\nwith self._stream_context(self._memcpy_stream):\n    shuffle_handle = self._batch_shuffler.start_shuffle_async(\n        raw_batch, parallel_state.get_data_parallel_group())',
+  ag_wkld:  'train_pipeline.py:936-941\nwith self._stream_context(self._memcpy_stream):\n    shuffle_handle = self._batch_shuffler.start_shuffle_async(...)\n\nbatch_shuffler.py:211-222 (inside start_shuffle_async):\n  allgather_workloads = gather_along_first_dim(workloads, pg_group)  # NCCL AllGather\n  allgather_workloads_cpu = allgather_workloads.tolist()              # D2H on _memcpy_stream',
   fwd:      'train_pipeline.py:944-946\nlosses, output = self._model_fwd(self._batch_i)',
   kk:       'batch_shuffler.py: start_shuffle_async()\nself._kk_executor.submit(kk_partition, ...)',
   finish:   'train_pipeline.py:949-964\nwith self._stream_context(self._memcpy_stream):\n    self._batch_ip2 = self._batch_shuffler.finish_shuffle(\n        raw_batch, shuffle_handle, pg_group)',
@@ -100,7 +121,7 @@ const DESC = {
   prev_pf: b => '【GPU wait，不阻塞 CPU】\n\n等待上一轮的 (10) prefetch（batch['+b+'] embedding lookup）完成。\n\n机制：current_stream().wait_stream(_prefetch_stream)——这是 GPU 级别的 wait_stream，CPU 调用后立即返回。GPU default_stream 上后续操作（(6) forward）会自动等 _prefetch_stream 完成后才执行。\n\n等待的 batch：batch['+b+']（_batch_i，即将 forward 的 batch）。',
   prev_dd: b => '【CPU 阻塞等待】\n\n等待上一轮的 (13) input_dist（batch['+b+'] sparse data distribution / AllToAll）完成。\n\n机制：调用 awaitable.wait()——这是 CPU 级别的阻塞。CPU 主线程会卡住，直到 _data_dist_stream 上的 AllToAll 完成并返回结果 tensor。在此期间，(4)(6) 等后续步骤的 GPU 指令都无法被提交。\n\n等待的 batch：batch['+b+']（_batch_ip1，本轮将在 (10) 做 prefetch 的 batch）。\n\n为什么必须 CPU 阻塞：需要拿到 input_dist 的结果 tensor 才能继续；同时确保 _data_dist_stream 上的 NCCL 空闲，防止 (4) 的 AllGather 与之冲突。',
   h2d:     b => 'Host→Device 拷贝 batch['+b+'] 到 GPU，在 _memcpy_stream 上执行。仅 memcpy，无 NCCL 通信。CPU 调用是 non-blocking，立即返回。',
-  ag_wkld: b => '在 _memcpy_stream 上 AllGather workload sizes（每个 rank 的 batch 工作量）for batch['+b+']。使用 DP group 的 NCCL communicator。完成后将 KK partitioning 任务提交到 CPU 后台线程。',
+  ag_wkld: b => '在 _memcpy_stream 上执行两步操作 for batch['+b+']：\n\n1) AllGather workload sizes（NCCL DP communicator）：收集所有 rank 的 batch 工作量。\n\n2) .tolist() D2H：将 AllGather 结果从 GPU tensor 转成 CPU list。必须在 _memcpy_stream 上（主线程）完成，不能延迟到 KK 后台线程——否则后台线程的 .tolist() 会在 default_stream 上发起 D2H，不会等 _memcpy_stream 的 AllGather 完成 → 经典 stream 同步 race → 读到不完整/脏数据导致 KK 分区不确定。\n\n完成后将 CPU list 传入 KK partitioning 任务，提交到 ThreadPoolExecutor 后台线程。',
   fwd:     b => 'batch['+b+'] 的 forward pass，在 default_stream 上执行。这是主要的 GPU 计算。与 CPU 后台线程上的 (5) KK partitioning 并行执行——这种重叠正是 2-phase async shuffle 设计的核心收益。',
   kk:      b => 'Karmarkar-Karp 负载均衡算法（batch['+b+']），在 CPU 后台线程（ThreadPoolExecutor）上执行。由 (4) 结束时提交，与 (6) forward 并行运行。结果通过 Future.result() 在 (7) 中被消费。',
   finish:  b => '在 _memcpy_stream 上完成 shuffle（batch['+b+']）。首先 CPU 阻塞等待 KK Future.result()，然后 GPU 执行：AllGather batch data（NCCL DP）+ index_select 按 KK 分配重排 → 生成 _batch_ip2。',
@@ -129,7 +150,7 @@ for (let i = 0; i < NUM_ITERS; i++) {
   OPS.push(
     { id:pfx+'h2d', num:'2', name:'H2D ['+bH+']', si:1, t0:off+7, t1:off+14, iter:i,
       desc:DESC.h2d(bH), code:CODE.h2d },
-    { id:pfx+'ag_wkld', num:'4', name:'AG wkld ['+bH+']', si:1, t0:off+16, t1:off+24, iter:i,
+    { id:pfx+'ag_wkld', num:'4', name:'AG wkld+D2H ['+bH+']', si:1, t0:off+16, t1:off+24, iter:i,
       desc:DESC.ag_wkld(bH), code:CODE.ag_wkld },
     { id:pfx+'fwd', num:'6', name:'forward ['+bF+']', si:0, t0:off+22, t1:off+42, iter:i,
       desc:DESC.fwd(bF), code:CODE.fwd },
@@ -550,13 +571,31 @@ function hlArrows(opId, on) {
   });
 }
 
+const GH_COMMIT = 'bb2558de93143ba3192042eb9125f888b1d156a1';
+const GH_BASE = 'https://github.com/NVIDIA/recsys-examples/blob/' + GH_COMMIT;
+const FILE_MAP = {
+  'train_pipeline.py': 'examples/commons/pipeline/train_pipeline.py',
+  'utils.py': 'examples/commons/pipeline/utils.py',
+  'sw_pipeline.py': 'examples/commons/pipeline/sw_pipeline.py',
+  'sw_train_pipeline.py': 'examples/commons/pipeline/sw_train_pipeline.py',
+  'batch_shuffler.py': 'examples/commons/distributed/batch_shuffler.py',
+};
+function linkifyCode(text) {
+  return text.replace(/(\w+\.py):(\d+)(?:-(\d+))?/g, (m, file, l1, l2) => {
+    const path = FILE_MAP[file];
+    if (!path) return m;
+    const frag = l2 ? '#L' + l1 + '-L' + l2 : '#L' + l1;
+    return '<a href="' + GH_BASE + '/' + path + frag + '" target="_blank" style="color:#2563eb">' + m + '</a>';
+  });
+}
+
 function showDetail(op, st) {
   d3.select('#detail-placeholder').style('display', 'none');
   const p = d3.select('#detail-content').html('');
   const add = (label, val, isCode) => {
     const d = p.append('div').attr('class', 'detail-item');
     d.append('div').attr('class', 'detail-label').text(label);
-    if (isCode) d.append('div').attr('class', 'code-ref').text(val);
+    if (isCode) d.append('div').attr('class', 'code-ref').html(linkifyCode(val.replace(/</g,'&lt;').replace(/>/g,'&gt;')));
     else d.append('div').attr('class', 'detail-value').text(val);
   };
   add('Operation', (op.num ? op.num + ' ' : '') + op.name);

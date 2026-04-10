@@ -50,6 +50,11 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
     <h2>DynamicEmb Training Pipeline</h2>
     <p>NVIDIA DynamicEmb 训练迭代五阶段（input_dist → wait_sparse → prefetch → forward → backward）序列图与文档，涵盖 CACHE / HBM_DIRECT / DEFAULT 三种 StorageMode 路径对比。</p>
   </a>
+  <a class="card" href="torchrec-internals/sharded_ec_internals.html">
+    <span class="tag tag-doc">Documentation</span>
+    <h2>ShardedEmbeddingCollection 内部机制</h2>
+    <p>深度解析 TorchRec ShardedEC 的模块层级、state_dict hook 流程、PyTorch 函数重写汇总，以及如何访问底层 FBGEMM TBE module。</p>
+  </a>
 </div>
 <footer>GitHub Pages · JacoCheung/visualization</footer>
 </body>

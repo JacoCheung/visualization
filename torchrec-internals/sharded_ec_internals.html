@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TorchRec ShardedEmbeddingCollection 内部机制深度解析</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --heading: #e6edf3;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f78166;
+    --accent5: #ffa657;
+    --code-bg: #0d1117;
+    --tag-bg: #1f6feb22;
+    --tag-border: #1f6feb66;
+    --warn-bg: #bb800926;
+    --warn-border: #bb800966;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  h1 {
+    font-size: 2em;
+    color: var(--heading);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 1.5em;
+    color: var(--heading);
+    margin-top: 48px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.15em;
+    color: var(--accent);
+    margin-top: 28px;
+    margin-bottom: 10px;
+  }
+  p { margin-bottom: 14px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.88em;
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 14px 0 18px;
+    font-size: 0.85em;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 1em;
+  }
+  .keyword { color: #ff7b72; }
+  .cls { color: #ffa657; }
+  .str { color: #a5d6ff; }
+  .comment { color: #8b949e; font-style: italic; }
+  .func { color: #d2a8ff; }
+  .param { color: #79c0ff; }
+  .num { color: #79c0ff; }
+  .op { color: #c9d1d9; }
+
+  .diagram-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 18px 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82em;
+    line-height: 1.55;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.72em;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .tag-visible {
+    background: #23863622;
+    color: var(--accent2);
+    border: 1px solid #23863666;
+  }
+  .tag-hidden {
+    background: #da363422;
+    color: #f85149;
+    border: 1px solid #da363466;
+  }
+  .tag-hook {
+    background: var(--tag-bg);
+    color: var(--accent);
+    border: 1px solid var(--tag-border);
+  }
+  .tag-override {
+    background: #8957e522;
+    color: var(--accent3);
+    border: 1px solid #8957e566;
+  }
+
+  .callout {
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 18px 0;
+  }
+  .callout-warn {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--accent5);
+  }
+  .callout-info {
+    background: var(--tag-bg);
+    border-left: 4px solid var(--accent);
+  }
+  .callout-tip {
+    background: #23863618;
+    border-left: 4px solid var(--accent2);
+  }
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--heading);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 0.9em;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+  }
+  th {
+    background: var(--surface);
+    color: var(--heading);
+    font-weight: 600;
+  }
+  td { background: var(--surface2); }
+  tr:hover td { background: var(--surface); }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    margin: 10px 0;
+    gap: 14px;
+  }
+  .flow-num {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85em;
+  }
+  .flow-content { flex: 1; }
+
+  .file-ref {
+    color: var(--text-muted);
+    font-size: 0.82em;
+    font-style: italic;
+  }
+
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 36px;
+  }
+  .toc-title {
+    font-weight: 600;
+    color: var(--heading);
+    margin-bottom: 10px;
+    font-size: 1.05em;
+  }
+  .toc ol { padding-left: 22px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--accent); }
+
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .badge {
+    font-size: 0.75em;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .badge-torch { background: #ee4c2c33; color: #ee4c2c; border: 1px solid #ee4c2c55; }
+  .badge-fbgemm { background: #4267B233; color: #7aa2f7; border: 1px solid #4267B255; }
+  .badge-torchrec { background: #3fb95033; color: #3fb950; border: 1px solid #3fb95055; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>TorchRec ShardedEmbeddingCollection<br>内部机制深度解析</h1>
+
+<div class="badge-row">
+  <span class="badge badge-torch">PyTorch nn.Module</span>
+  <span class="badge badge-fbgemm">FBGEMM TBE</span>
+  <span class="badge badge-torchrec">TorchRec Sharding</span>
+</div>
+
+<div class="toc">
+  <div class="toc-title">目录</div>
+  <ol>
+    <li><a href="#problem">问题现象：为什么 modules() 看不到 lookups？</a></li>
+    <li><a href="#hierarchy">完整模块层级结构</a></li>
+    <li><a href="#why-plain-list">为什么用 Plain List 而不是 nn.ModuleList？</a></li>
+    <li><a href="#overrides">TorchRec 重写/hook 了哪些 PyTorch 函数</a></li>
+    <li><a href="#state-dict-flow">State Dict 完整工作流</a></li>
+    <li><a href="#access-fbgemm">如何访问底层 FBGEMM TBE Module</a></li>
+    <li><a href="#key-classes">关键类速查表</a></li>
+    <li><a href="#weight-path">Embedding Weight 的双重身份</a></li>
+  </ol>
+</div>
+
+<!-- ===== Section 1 ===== -->
+<h2 id="problem">1. 问题现象：为什么 modules() 看不到 lookups？</h2>
+
+<div class="callout callout-warn">
+  <div class="callout-title">⚠ 核心问题</div>
+  <code>__repr__</code> 和 <code>state_dict()</code> 能看到所有模块信息，但 <code>.modules()</code> / <code>.named_modules()</code> 只能看到 <code>self.embeddings</code>（一个 <code>nn.ModuleDict</code>），看不到实际执行计算的 lookup / input_dist / output_dist 模块。
+</div>
+
+<p>根本原因在于 <code>ShardedEmbeddingModule</code> 基类将三大核心子模块存储为<strong>普通 Python List</strong>，而不是 <code>nn.ModuleList</code>：</p>
+
+<pre><code><span class="comment"># torchrec/distributed/embedding_types.py:392-394</span>
+<span class="keyword">class</span> <span class="cls">ShardedEmbeddingModule</span>(...):
+    <span class="keyword">def</span> <span class="func">__init__</span>(self, ...):
+        self._input_dists: <span class="cls">List</span>[nn.Module] = []   <span class="comment"># ← 普通 list, 不是 nn.ModuleList!</span>
+        self._lookups: <span class="cls">List</span>[nn.Module] = []      <span class="comment"># ← 普通 list, 不是 nn.ModuleList!</span>
+        self._output_dists: <span class="cls">List</span>[nn.Module] = [] <span class="comment"># ← 普通 list, 不是 nn.ModuleList!</span>
+</code></pre>
+
+<p>PyTorch 的 <code>nn.Module.__setattr__</code> 只会自动注册以下类型到 <code>_modules</code> 字典：</p>
+<ul style="margin: 10px 0 14px 24px;">
+  <li>直接赋值的 <code>nn.Module</code> 实例</li>
+  <li><code>nn.ModuleList</code> / <code>nn.ModuleDict</code></li>
+  <li>通过 <code>add_module()</code> / <code>register_module()</code> 显式注册</li>
+</ul>
+<p><strong>普通 Python <code>list</code> 中的 <code>nn.Module</code> 不会被 PyTorch 追踪</strong>，因此 <code>.modules()</code>、<code>.named_modules()</code>、<code>.parameters()</code> 等方法都无法遍历到它们。</p>
+
+<p>而 <code>__repr__</code> 之所以能显示 lookups，是因为 <code>ShardedEmbeddingModule</code> 重写了 <code>extra_repr()</code>，手动遍历这些 list：</p>
+
+<pre><code><span class="comment"># torchrec/distributed/embedding_types.py:424-444</span>
+<span class="keyword">def</span> <span class="func">extra_repr</span>(self) -> str:
+    rep = []
+    rep.extend(loop(<span class="str">"lookups"</span>, self._lookups))       <span class="comment"># 手动遍历 list</span>
+    rep.extend(loop(<span class="str">"_input_dists"</span>, self._input_dists))
+    rep.extend(loop(<span class="str">"_output_dists"</span>, self._output_dists))
+    <span class="keyword">return</span> <span class="str">"\n "</span>.join(rep)
+</code></pre>
+
+<hr class="section-divider">
+
+<!-- ===== Section 2 ===== -->
+<h2 id="hierarchy">2. 完整模块层级结构</h2>
+
+<p>下图展示了 <code>ShardedEmbeddingCollection</code> 的完整内部结构。绿色为 PyTorch <code>.modules()</code> 可见部分，红色为不可见部分：</p>
+
+<div class="diagram-box"><span style="color:#e6edf3;font-weight:bold">ShardedEmbeddingCollection</span>
+│
+├── <span style="color:#3fb950">self.embeddings</span> <span class="tag tag-visible">nn.ModuleDict ✓ modules()可见</span>
+│   ├── <span style="color:#3fb950">"table_0"</span> → nn.Module
+│   │   └── .weight → <span style="color:#d2a8ff">TableBatchedEmbeddingSlice(nn.Parameter)</span>
+│   ├── <span style="color:#3fb950">"table_1"</span> → nn.Module
+│   │   └── .weight → <span style="color:#d2a8ff">TableBatchedEmbeddingSlice(nn.Parameter)</span>
+│   └── ...
+│
+├── <span style="color:#f85149">self._lookups</span> <span class="tag tag-hidden">plain list ✗ modules()不可见</span>
+│   └── <span style="color:#ffa657">GroupedEmbeddingsLookup</span>(nn.Module)
+│       └── self._emb_modules (nn.ModuleList)
+│           └── <span style="color:#ffa657">BatchedFusedEmbedding</span>(nn.Module)
+│               ├── self._emb_module → <span style="color:#79c0ff;font-weight:bold">SplitTableBatchedEmbeddingBagsCodegen</span> <span style="color:#8b949e">← 真正的 FBGEMM TBE!</span>
+│               └── self._optim → EmbeddingFusedOptimizer
+│
+├── <span style="color:#f85149">self._input_dists</span> <span class="tag tag-hidden">plain list ✗ 不可见</span>
+│   └── input distribution modules (AllToAll, etc.)
+│
+└── <span style="color:#f85149">self._output_dists</span> <span class="tag tag-hidden">plain list ✗ 不可见</span>
+    └── output distribution modules (AllToAll, etc.)
+</div>
+
+<h3>继承链</h3>
+<div class="diagram-box"><span style="color:#ffa657">ShardedEmbeddingCollection</span>
+  ↑ extends
+<span style="color:#ffa657">ShardedEmbeddingModule</span>[CompIn, DistOut, Out, ShrdCtx]  <span style="color:#8b949e"># embedding_types.py:373</span>
+  ↑ extends
+<span style="color:#ffa657">ShardedModule</span>[CompIn, DistOut, Out, ShrdCtx]             <span style="color:#8b949e"># types.py:1184</span>
+  ↑ extends
+<span style="color:#ffa657">abc.ABC</span> + <span style="color:#ffa657">nn.Module</span> + <span style="color:#ffa657">ModuleNoCopyMixin</span>
+
+同时还实现:
+<span style="color:#ffa657">FusedOptimizerModule</span>  <span style="color:#8b949e"># optim/fused.py — 提供 fused_optimizer 属性</span>
+<span style="color:#ffa657">ModuleShardingMixIn</span>  <span style="color:#8b949e"># 提供 module_sharding_plan 属性</span>
+</div>
+
+<hr class="section-divider">
+
+<!-- ===== Section 3 ===== -->
+<h2 id="why-plain-list">3. 为什么用 Plain List 而不是 nn.ModuleList？</h2>
+
+<div class="callout callout-info">
+  <div class="callout-title">设计意图</div>
+  这是有意为之的设计选择，原因如下：
+</div>
+
+<table>
+  <tr><th>原因</th><th>说明</th></tr>
+  <tr>
+    <td><strong>避免重复参数追踪</strong></td>
+    <td>Lookup 内部的 TBE weight 已经通过 <code>self.embeddings[table].weight</code> 注册为参数。如果 lookups 也被注册为子模块，<code>.parameters()</code> 会返回重复的参数引用，导致优化器问题。</td>
+  </tr>
+  <tr>
+    <td><strong>State Dict 路径控制</strong></td>
+    <td>需要 state_dict 的 key 为 <code>embeddings.table_name.weight</code>（与原始 EmbeddingCollection 一致），而不是 <code>_lookups.0._emb_modules.0.table_name.weight</code>。</td>
+  </tr>
+  <tr>
+    <td><strong>计算与状态分离</strong></td>
+    <td><code>self.embeddings</code> 负责对外暴露兼容的 nn.Module API（state_dict / parameters / named_modules），<code>self._lookups</code> 负责实际的 forward 计算。两者解耦。</td>
+  </tr>
+  <tr>
+    <td><strong>训练模式手动管理</strong></td>
+    <td><code>ShardedEmbeddingModule.train()</code> 手动对 <code>_lookups</code> 调用 <code>.train(mode)</code>，不依赖 PyTorch 自动递归。</td>
+  </tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ===== Section 4 ===== -->
+<h2 id="overrides">4. TorchRec 重写 / Hook 了哪些 PyTorch 函数</h2>
+
+<p>以下是 TorchRec 在各个层级对 PyTorch <code>nn.Module</code> 标准方法的修改汇总：</p>
+
+<h3>4.1 ShardedEmbeddingCollection 层</h3>
+<table>
+  <tr><th>PyTorch 方法</th><th>处理方式</th><th>文件位置</th></tr>
+  <tr>
+    <td><code>state_dict()</code></td>
+    <td>
+      <span class="tag tag-hook">pre hook</span> <code>_pre_state_dict_hook</code> — 先 flush lookups<br>
+      <span class="tag tag-hook">post hook</span> <code>post_state_dict_hook</code> — 将 plain tensor 替换为 ShardedTensor/DTensor
+    </td>
+    <td class="file-ref">embedding.py:712, 1047</td>
+  </tr>
+  <tr>
+    <td><code>load_state_dict()</code></td>
+    <td>
+      <span class="tag tag-hook">pre hook</span> <code>_pre_load_state_dict_hook</code> — 将 ShardedTensor/DTensor 拆为 local tensor<br>
+      <span class="tag tag-hook">post hook</span> <code>_post_load_state_dict_hook</code> — 清理 virtual table 的 missing_keys
+    </td>
+    <td class="file-ref">embedding.py:724, 1160</td>
+  </tr>
+  <tr>
+    <td><code>extra_repr()</code></td>
+    <td><span class="tag tag-override">override</span> 手动遍历 <code>_lookups</code>, <code>_input_dists</code>, <code>_output_dists</code> 生成 repr</td>
+    <td class="file-ref">embedding_types.py:424</td>
+  </tr>
+  <tr>
+    <td><code>train()</code></td>
+    <td><span class="tag tag-override">override</span> 除调用 <code>super().train()</code> 外，手动对每个 lookup 调用 <code>.train(mode)</code></td>
+    <td class="file-ref">embedding_types.py:446</td>
+  </tr>
+  <tr>
+    <td><code>modules()</code> / <code>named_modules()</code></td>
+    <td><span style="color:var(--text-muted)">未重写</span> — 只能看到 <code>self.embeddings</code> (nn.ModuleDict)</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><code>parameters()</code> / <code>named_parameters()</code></td>
+    <td><span style="color:var(--text-muted)">未重写</span> — 通过 <code>self.embeddings[table].weight</code> 注册的 <code>TableBatchedEmbeddingSlice</code> 可见</td>
+    <td>—</td>
+  </tr>
+</table>
+
+<h3>4.2 GroupedEmbeddingsLookup 层</h3>
+<table>
+  <tr><th>PyTorch 方法</th><th>处理方式</th><th>文件位置</th></tr>
+  <tr>
+    <td><code>state_dict()</code></td>
+    <td><span class="tag tag-override">override</span> 遍历 <code>_emb_modules</code> 收集每个 kernel 的 state_dict</td>
+    <td class="file-ref">embedding_lookup.py:388</td>
+  </tr>
+  <tr>
+    <td><code>load_state_dict()</code></td>
+    <td><span class="tag tag-override">override</span> 通过 <code>_load_state_dict()</code> 辅助函数分发到各 kernel</td>
+    <td class="file-ref">embedding_lookup.py:407</td>
+  </tr>
+  <tr>
+    <td><code>named_parameters()</code></td>
+    <td><span class="tag tag-override">override</span> 手动遍历 <code>_emb_modules</code></td>
+    <td class="file-ref">embedding_lookup.py:415</td>
+  </tr>
+  <tr>
+    <td><code>named_buffers()</code></td>
+    <td><span class="tag tag-override">override</span> 手动遍历 <code>_emb_modules</code></td>
+    <td class="file-ref">embedding_lookup.py:425</td>
+  </tr>
+  <tr>
+    <td><em>自定义</em>: <code>named_parameters_by_table()</code></td>
+    <td><span class="tag tag-override">新增</span> 按 table 名返回 <code>TableBatchedEmbeddingSlice</code></td>
+    <td class="file-ref">embedding_lookup.py:435</td>
+  </tr>
+</table>
+
+<h3>4.3 BatchedFusedEmbedding 层 (TBE Wrapper)</h3>
+<table>
+  <tr><th>PyTorch 方法</th><th>处理方式</th><th>文件位置</th></tr>
+  <tr>
+    <td><code>state_dict()</code></td>
+    <td><span class="tag tag-override">override</span> 通过 <code>get_state_dict()</code> 辅助函数，从 TBE 的 <code>split_embedding_weights()</code> 构造</td>
+    <td class="file-ref">batched_embedding_kernel.py:1836</td>
+  </tr>
+  <tr>
+    <td><code>named_parameters()</code></td>
+    <td><span class="tag tag-override">override</span> 调用 <code>named_split_embedding_weights()</code>，包裹为 <code>nn.Parameter</code> 并挂 <code>_in_backward_optimizers</code></td>
+    <td class="file-ref">batched_embedding_kernel.py:2606</td>
+  </tr>
+  <tr>
+    <td><code>named_buffers()</code></td>
+    <td><span class="tag tag-override">override</span> 返回空 — fused params 以 buffer 形式存在于 TBE 内部，不对外暴露</td>
+    <td class="file-ref">batched_embedding_kernel.py:2596</td>
+  </tr>
+  <tr>
+    <td><em>自定义</em>: <code>named_parameters_by_table()</code></td>
+    <td><span class="tag tag-override">新增</span> 返回 <code>(table_name, TableBatchedEmbeddingSlice)</code> 迭代器</td>
+    <td class="file-ref">batched_embedding_kernel.py:1890</td>
+  </tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ===== Section 5 ===== -->
+<h2 id="state-dict-flow">5. State Dict 完整工作流</h2>
+
+<h3>5.1 保存路径: <code>model.state_dict()</code></h3>
+
+<div class="flow-step">
+  <div class="flow-num">1</div>
+  <div class="flow-content">
+    <strong>pre_state_dict_hook</strong> — flush 所有 lookups<br>
+    <span class="file-ref">确保 UVM cache / KV store 中的数据被写回</span>
+  </div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">2</div>
+  <div class="flow-content">
+    <strong>PyTorch 标准递归</strong> — 遍历 <code>self.embeddings</code> (nn.ModuleDict)<br>
+    <span class="file-ref">收集每个 table 的 <code>.weight</code> (TableBatchedEmbeddingSlice → 实际是 TBE weight 的 view)</span>
+  </div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">3</div>
+  <div class="flow-content">
+    <strong>post_state_dict_hook</strong> — 替换为分布式张量<br>
+    <span class="file-ref">将 destination 中的 plain tensor 替换为预构建的 <code>ShardedTensor</code> 或 <code>DTensor</code>，<br>
+    对 KV store 类型额外调用 <code>get_named_split_embedding_weights_snapshot()</code> 获取快照</span>
+  </div>
+</div>
+
+<p>最终 state_dict 的 key 格式：<code>embeddings.{table_name}.weight</code></p>
+
+<h3>5.2 加载路径: <code>model.load_state_dict()</code></h3>
+
+<div class="flow-step">
+  <div class="flow-num">1</div>
+  <div class="flow-content">
+    <strong>pre_load_state_dict_hook</strong> — 拆解分布式张量<br>
+    <span class="file-ref">ShardedTensor → 提取 <code>local_shards()[0].tensor</code><br>
+    DTensor → <code>.to_local()</code><br>
+    Virtual Table → 删除 <code>weight_id</code>, <code>bucket</code>, <code>metadata</code> keys</span>
+  </div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">2</div>
+  <div class="flow-content">
+    <strong>PyTorch 标准加载</strong> — 将 tensor 拷贝到 <code>self.embeddings[table].weight</code><br>
+    <span class="file-ref">因为 weight 是 <code>TableBatchedEmbeddingSlice</code>（TBE weight 的 view），数据直接写入 TBE</span>
+  </div>
+</div>
+<div class="flow-step">
+  <div class="flow-num">3</div>
+  <div class="flow-content">
+    <strong>post_load_state_dict_hook</strong> — 清理 missing keys<br>
+    <span class="file-ref">Virtual table 的 runtime 生成 key 不应报错</span>
+  </div>
+</div>
+
+<h3>5.3 Hook 注册代码</h3>
+<pre><code><span class="comment"># torchrec/distributed/embedding.py:1170-1175</span>
+self.<span class="func">register_state_dict_pre_hook</span>(self._pre_state_dict_hook)
+self.<span class="func">_register_state_dict_hook</span>(post_state_dict_hook)
+self.<span class="func">_register_load_state_dict_pre_hook</span>(
+    self._pre_load_state_dict_hook, with_module=<span class="keyword">True</span>
+)
+self.<span class="func">register_load_state_dict_post_hook</span>(_post_load_state_dict_hook)
+</code></pre>
+
+<hr class="section-divider">
+
+<!-- ===== Section 6 ===== -->
+<h2 id="access-fbgemm">6. 如何访问底层 FBGEMM TBE Module</h2>
+
+<div class="callout callout-tip">
+  <div class="callout-title">✓ 推荐方法</div>
+  通过 <code>_lookups</code> 列表逐层访问。
+</div>
+
+<h3>方法一：直接遍历 _lookups（最常用）</h3>
+<pre><code>sharded_ec: ShardedEmbeddingCollection = ...
+
+<span class="keyword">for</span> lookup <span class="keyword">in</span> sharded_ec._lookups:
+    <span class="comment"># lookup 是 GroupedEmbeddingsLookup</span>
+    <span class="keyword">for</span> emb_module <span class="keyword">in</span> lookup._emb_modules:
+        <span class="comment"># emb_module 是 BatchedFusedEmbedding / BatchedDenseEmbedding / ...</span>
+        tbe = emb_module._emb_module
+        <span class="comment"># tbe 就是 SplitTableBatchedEmbeddingBagsCodegen (fbgemm TBE)</span>
+        <span class="func">print</span>(<span class="func">type</span>(tbe))
+        <span class="comment"># &lt;class 'fbgemm_gpu...SplitTableBatchedEmbeddingBagsCodegen'&gt;</span>
+</code></pre>
+
+<h3>方法二：获取所有 TBE 的通用辅助函数</h3>
+<pre><code><span class="keyword">def</span> <span class="func">get_all_tbes</span>(sharded_module):
+    <span class="str">"""从 ShardedEmbeddingCollection 或 ShardedEmbeddingBagCollection 提取所有 TBE"""</span>
+    tbes = []
+    <span class="keyword">for</span> lookup <span class="keyword">in</span> sharded_module._lookups:
+        <span class="comment"># 处理 DDP 包裹</span>
+        <span class="keyword">while</span> <span class="func">isinstance</span>(lookup, DistributedDataParallel):
+            lookup = lookup.module
+        <span class="keyword">for</span> emb_module <span class="keyword">in</span> lookup._emb_modules:
+            <span class="keyword">if</span> <span class="func">hasattr</span>(emb_module, <span class="str">'_emb_module'</span>):
+                tbes.append(emb_module._emb_module)
+    <span class="keyword">return</span> tbes
+</code></pre>
+
+<h3>方法三：通过 named_parameters_by_table() 访问权重切片</h3>
+<pre><code><span class="comment"># 按 table 获取权重 (不需要直接访问 TBE)</span>
+<span class="keyword">for</span> lookup <span class="keyword">in</span> sharded_ec._lookups:
+    <span class="keyword">for</span> table_name, tbe_slice <span class="keyword">in</span> lookup.named_parameters_by_table():
+        <span class="func">print</span>(f<span class="str">"{table_name}: shape={tbe_slice.shape}, dtype={tbe_slice.dtype}"</span>)
+        <span class="comment"># tbe_slice 是 TableBatchedEmbeddingSlice(nn.Parameter)</span>
+        <span class="comment"># 它是底层 TBE weight tensor 的一个 view</span>
+</code></pre>
+
+<h3>方法四：通过 DistributedModelParallel (DMP) 访问</h3>
+<pre><code><span class="comment"># 如果你的模型被 DMP 包裹，sharded module 在 DMP 内部</span>
+dmp_model: DistributedModelParallel = ...
+
+<span class="comment"># 找到 sharded embedding collection</span>
+<span class="keyword">for</span> name, module <span class="keyword">in</span> dmp_model._dmp_wrapped_module.named_modules():
+    <span class="keyword">if</span> <span class="func">isinstance</span>(module, ShardedEmbeddingCollection):
+        <span class="keyword">for</span> lookup <span class="keyword">in</span> module._lookups:
+            <span class="keyword">for</span> emb <span class="keyword">in</span> lookup._emb_modules:
+                tbe = emb._emb_module  <span class="comment"># fbgemm TBE</span>
+</code></pre>
+
+<div class="callout callout-warn">
+  <div class="callout-title">⚠ 注意事项</div>
+  <ul style="margin-left: 18px;">
+    <li><code>_lookups</code>, <code>_emb_modules</code>, <code>_emb_module</code> 都是私有属性，不属于公开 API，未来版本可能变动。</li>
+    <li>如果 lookup 被 <code>DistributedDataParallel</code> 包裹（DATA_PARALLEL sharding type），需要先 unwrap <code>lookup.module</code>。</li>
+    <li>不同 compute kernel（FUSED / DENSE / KEY_VALUE / SSD 等）对应不同的 embedding kernel 类，不都有 <code>_emb_module</code> 属性。</li>
+  </ul>
+</div>
+
+<hr class="section-divider">
+
+<!-- ===== Section 7 ===== -->
+<h2 id="key-classes">7. 关键类速查表</h2>
+
+<table>
+  <tr><th>类名</th><th>文件</th><th>职责</th><th>存储方式</th></tr>
+  <tr>
+    <td><code>ShardedEmbeddingCollection</code></td>
+    <td>distributed/embedding.py</td>
+    <td>Sharded EC 的顶层容器，管理 state_dict 兼容性</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><code>ShardedEmbeddingModule</code></td>
+    <td>distributed/embedding_types.py</td>
+    <td>基类，定义 _lookups/_input_dists/_output_dists</td>
+    <td>plain List[nn.Module]</td>
+  </tr>
+  <tr>
+    <td><code>GroupedEmbeddingsLookup</code></td>
+    <td>distributed/embedding_lookup.py</td>
+    <td>按 sharding type 分组的 lookup，管理多个 embedding kernel</td>
+    <td>nn.ModuleList (_emb_modules)</td>
+  </tr>
+  <tr>
+    <td><code>BatchedFusedEmbedding</code></td>
+    <td>distributed/batched_embedding_kernel.py</td>
+    <td>FUSED compute kernel 的实现，包裹 FBGEMM TBE</td>
+    <td>_emb_module (nn.Module 自动注册)</td>
+  </tr>
+  <tr>
+    <td><code>SplitTableBatchedEmbedding<br>BagsCodegen</code></td>
+    <td>fbgemm_gpu (外部)</td>
+    <td><strong>真正的 TBE</strong> — 执行 GPU embedding lookup 的 CUDA kernel</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><code>TableBatchedEmbeddingSlice</code></td>
+    <td>distributed/composable/<br>table_batched_embedding_slice.py</td>
+    <td>TBE weight 的 view wrapper，继承 nn.Parameter</td>
+    <td>registered in embeddings[table].weight</td>
+  </tr>
+  <tr>
+    <td><code>EmbeddingFusedOptimizer</code></td>
+    <td>distributed/batched_embedding_kernel.py</td>
+    <td>包裹 TBE 的内置优化器（SGD/Adam/etc in CUDA）</td>
+    <td>_optim 属性</td>
+  </tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ===== Section 8 ===== -->
+<h2 id="weight-path">8. Embedding Weight 的双重身份</h2>
+
+<p>TorchRec 中 embedding weight 同时存在于两条路径，这是理解整个系统的关键：</p>
+
+<div class="diagram-box"><span style="color:#e6edf3;font-weight:bold">路径 A: State Dict / Parameter 路径 (对外)</span>
+<span style="color:#3fb950">ShardedEmbeddingCollection</span>
+  └── .embeddings["table_0"].weight
+      └── <span style="color:#d2a8ff">TableBatchedEmbeddingSlice</span> (nn.Parameter, 是 TBE weight 的 view)
+          │
+          │  post_state_dict_hook 将其替换为 ↓
+          │
+          └── <span style="color:#79c0ff">ShardedTensor</span> / <span style="color:#79c0ff">DTensor</span> (分布式张量, checkpoint 格式)
+
+
+<span style="color:#e6edf3;font-weight:bold">路径 B: 计算路径 (对内, forward pass)</span>
+<span style="color:#f85149">ShardedEmbeddingCollection._lookups[i]</span>
+  └── <span style="color:#ffa657">GroupedEmbeddingsLookup._emb_modules[j]</span>
+      └── <span style="color:#ffa657">BatchedFusedEmbedding._emb_module</span>
+          └── <span style="color:#79c0ff;font-weight:bold">SplitTableBatchedEmbeddingBagsCodegen</span>
+              └── .split_embedding_weights()  →  实际的 GPU 上的 weight tensor
+
+
+<span style="color:#8b949e">两条路径指向同一块内存!</span>
+<span style="color:#d2a8ff">TableBatchedEmbeddingSlice</span> 是通过 TBE 的 split_embedding_weights() 获取的 view,
+修改任一路径的值，另一条路径也会同步变化。
+</div>
+
+<h3>_initialize_torch_state() 如何建立连接</h3>
+
+<pre><code><span class="comment"># torchrec/distributed/embedding.py:919-929</span>
+<span class="keyword">for</span> (table_name, tbe_slice) <span class="keyword">in</span> lookup.named_parameters_by_table():
+    <span class="comment"># tbe_slice 是 TableBatchedEmbeddingSlice</span>
+    <span class="comment"># 它底层是 TBE weight tensor 的一个 view</span>
+    self.embeddings[table_name].<span class="func">register_parameter</span>(<span class="str">"weight"</span>, tbe_slice)
+    <span class="comment">#          ↑ nn.ModuleDict 中的空 nn.Module</span>
+    <span class="comment">#            现在有了 .weight 参数, 指向 TBE 内存</span>
+</code></pre>
+
+<p>这样做的效果：</p>
+<ul style="margin: 10px 0 14px 24px;">
+  <li><code>state_dict()</code> 遍历 <code>self.embeddings</code> 时能找到 <code>.weight</code> 参数</li>
+  <li><code>parameters()</code> 能正确返回所有 embedding weights</li>
+  <li>权重指向 TBE 的实际 GPU 内存，零拷贝</li>
+  <li>通过 <code>post_state_dict_hook</code> 在 checkpoint 时替换为 ShardedTensor/DTensor 格式</li>
+</ul>
+
+<div class="callout callout-info">
+  <div class="callout-title">总结</div>
+  <p>TorchRec 的 <code>ShardedEmbeddingCollection</code> 通过精心设计的双层结构实现了以下目标：</p>
+  <ol style="margin-left: 18px; margin-top: 8px;">
+    <li><strong>API 兼容性</strong> — <code>state_dict()</code>, <code>parameters()</code> 的行为与标准 <code>EmbeddingCollection</code> 一致</li>
+    <li><strong>高性能计算</strong> — forward pass 直接使用 FBGEMM TBE 的 CUDA kernel</li>
+    <li><strong>分布式 checkpoint</strong> — 通过 hooks 自动在 plain tensor ↔ ShardedTensor/DTensor 之间转换</li>
+    <li><strong>零内存开销</strong> — <code>TableBatchedEmbeddingSlice</code> 是 view，不占额外内存</li>
+  </ol>
+  <p style="margin-top: 8px;">代价是 <code>.modules()</code> / <code>.named_modules()</code> 无法看到计算子模块，需要通过 <code>._lookups</code> 私有属性手动访问。</p>
+</div>
+
+<div style="text-align: center; margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.82em;">
+  Generated on 2026-04-10 &nbsp;|&nbsp; Based on TorchRec source at <code>torchrec/distributed/</code>
+</div>
+
+</div>
+</body>
+</html>

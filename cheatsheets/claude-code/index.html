@@ -855,8 +855,8 @@
           </button>
         </div>
         <div class="header-meta">
-          <span class="version-info">Claude Code v2.1.81</span>
-          <span class="last-updated">最后更新：2026 年 3 月 24 日</span>
+          <span class="version-info">Claude Code · Opus 4.7</span>
+          <span class="last-updated">速查随官方 changelog 更新 · 版本以 <code>claude --version</code> 为准</span>
         </div>
       </div>
     </header>
@@ -867,11 +867,11 @@
         <span class="changelog-dismiss" role="button" tabindex="0" title="关闭">✕</span>
       </div>
       <ul class="changelog-list">
-        <li><code>--bare</code> 参数 - 极简无头模式（无 hooks/LSP/插件）</li>
-        <li><code>--channels</code> - 权限转发与 MCP 推送消息（预览）</li>
-        <li><code>effort</code> frontmatter 已支持 skills 与 slash commands</li>
-        <li><code>/fork</code> 已重命名为 <code>/branch</code>（保留别名）</li>
-        <li><code>SendMessage</code> 可自动恢复已停止的 agents</li>
+        <li><strong>Claude Opus 4.7</strong>：新增 <code>xhigh</code> effort（介于 <code>high</code> 与 <code>max</code>），可用 <code>/effort</code> / <code>--effort</code> / 模型选择器</li>
+        <li><code>/effort</code> 无参打开<strong>交互滑块</strong>，方向键切换档位，Enter 确认</li>
+        <li><code>/ultrareview</code>：云端并行多 Agent 代码审查；无参审查当前分支，或 <code>/ultrareview &lt;PR#&gt;</code> 审查指定 GitHub PR</li>
+        <li><code>/less-permission-prompts</code>：扫描 transcript 中常见只读 Bash/MCP 调用，为 <code>.claude/settings.json</code> 生成优先级 allowlist 建议</li>
+        <li><code>/theme</code> 新增 <strong>Auto (match terminal)</strong>，跟随终端深浅色</li>
       </ul>
     </div>
 
@@ -941,8 +941,10 @@
     const S_KB = "⌨️ 键盘快捷键";
     add(S_KB, "通用控制", "Ctrl+C", "取消输入/生成", ["cancel", "中断"]);
     add(S_KB, "通用控制", "Ctrl+D", "退出会话");
-    add(S_KB, "通用控制", "Ctrl+L", "清屏");
-    add(S_KB, "通用控制", "Ctrl+O", "切换详细输出");
+    add(S_KB, "通用控制", "Ctrl+L", "清屏并强制全屏重绘");
+    add(S_KB, "通用控制", "Ctrl+O", "正常 ↔ 详细 transcript");
+    add(S_KB, "通用控制", "Ctrl+U", "清空整段输入缓冲");
+    add(S_KB, "通用控制", "Ctrl+Y", "还原 Ctrl+U 清空的内容");
     add(S_KB, "通用控制", "Ctrl+R", "反向搜索历史");
     add(S_KB, "通用控制", "Ctrl+G", "在编辑器中打开提示词");
     add(S_KB, "通用控制", "Ctrl+B", "后台运行任务");
@@ -995,9 +997,9 @@
     add(S_SLASH, "配置", "/model [model]", "切换模型（←→ 调节 effort）");
     add(S_SLASH, "配置", "/fast [on|off]", "切换快速模式");
     add(S_SLASH, "配置", "/vim", "切换 vim 模式");
-    add(S_SLASH, "配置", "/theme", "更改颜色主题");
+    add(S_SLASH, "配置", "/theme", "主题；含 Auto (match terminal) 匹配终端深浅色");
     add(S_SLASH, "配置", "/permissions", "查看/更新权限");
-    add(S_SLASH, "配置", "/effort [level]", "设置 effort（low/med/high/max/auto）", ["NEW"]);
+    add(S_SLASH, "配置", "/effort [level]", "无参=交互滑块；low/med/high/xhigh/max/auto（xhigh 需 Opus 4.7）", ["NEW"]);
     add(S_SLASH, "配置", "/color [color]", "设置提示栏颜色");
     add(S_SLASH, "配置", "/keybindings", "自定义键盘快捷键");
     add(S_SLASH, "配置", "/terminal-setup", "配置终端快捷键");
@@ -1023,6 +1025,10 @@
     add(S_SLASH, "特殊功能", "/usage", "套餐限额与速率状态");
     add(S_SLASH, "特殊功能", "/schedule", "云端计划任务");
     add(S_SLASH, "特殊功能", "/security-review", "变更的安全分析");
+    add(S_SLASH, "特殊功能", "/ultrareview [PR#]", "云端多 Agent 代码审查；无参=当前分支", ["NEW"]);
+    add(S_SLASH, "特殊功能", "/less-permission-prompts", "扫描只读 Bash/MCP 调用，生成权限 allowlist 建议", ["NEW"]);
+    add(S_SLASH, "特殊功能", "/tui [sub]", "全屏 TUI：如 /tui fullscreen 减闪烁", ["NEW"]);
+    add(S_SLASH, "特殊功能", "/focus", "切换 focus 视图（与 Ctrl+O transcript 模式分离）", ["NEW"]);
     add(S_SLASH, "特殊功能", "/help", "显示帮助 + 命令");
     add(S_SLASH, "特殊功能", "/feedback（/bug）", "提交反馈");
     add(S_SLASH, "特殊功能", "/release-notes", "查看完整更新日志");
@@ -1046,8 +1052,9 @@
     add(S_FLOW, "Plan 模式", "--permission-mode plan", "以 plan 模式启动");
     add(S_FLOW, "思考与 Effort", "Alt+T", "开关思考模式");
     add(S_FLOW, "思考与 Effort", "ultrathink", "本轮最高 effort");
-    add(S_FLOW, "思考与 Effort", "Ctrl+O", "查看思考过程（详细）");
-    add(S_FLOW, "思考与 Effort", "/effort", "○ 低 · ◐ 中 · ● 高", ["NEW"]);
+    add(S_FLOW, "思考与 Effort", "/focus", "切换 focus/专注视图");
+    add(S_FLOW, "思考与 Effort", "Ctrl+O", "详细 transcript（非 focus；见 /focus）");
+    add(S_FLOW, "思考与 Effort", "/effort", "○ 低 · ◐ 中 · ● 高 · xhigh（4.7）· max", ["NEW"]);
     add(S_FLOW, "Git Worktrees", "--worktree name", "每个功能独立分支工作区");
     add(S_FLOW, "Git Worktrees", "isolation: worktree", "Agent 在独立 worktree 中运行");
     add(S_FLOW, "Git Worktrees", "sparsePaths", "仅 checkout 所需目录", ["NEW"]);
@@ -1058,7 +1065,7 @@
     add(S_FLOW, "上下文管理", "/context", "使用情况 + 优化建议");
     add(S_FLOW, "上下文管理", "/compact [focus]", "带焦点压缩");
     add(S_FLOW, "上下文管理", "Auto-compact", "约 95% 容量");
-    add(S_FLOW, "上下文管理", "1M context", "Opus 4.6（Max/Team/Ent）");
+    add(S_FLOW, "上下文管理", "1M context", "Opus 4.6 / 4.7 等（Max/Team/Ent）");
     add(S_FLOW, "上下文管理", "CLAUDE.md", "压缩后仍保留");
     add(S_FLOW, "会话高阶技巧", "claude -c", "继续最近一次对话");
     add(S_FLOW, "会话高阶技巧", "claude -r \"name\"", "按名称恢复");
@@ -1141,7 +1148,7 @@
     add(S_CLI, "关键 Flags", "--bare", "极简无头（无 hooks/LSP）", ["NEW"]);
     add(S_CLI, "关键 Flags", "--channels", "权限转发 / MCP 推送", ["NEW"]);
     add(S_CLI, "关键 Flags", "--remote", "网页会话");
-    add(S_CLI, "关键 Flags", "--effort", "low/med/high/max");
+    add(S_CLI, "关键 Flags", "--effort", "low/med/high/xhigh/max（xhigh：Opus 4.7）");
     add(S_CLI, "关键 Flags", "--permission-mode plan/default/…", "");
     add(S_CLI, "关键 Flags", "--dangerously-skip-permissions", "跳过所有提示 ⚠️");
     add(S_CLI, "关键 Flags", "--chrome", "Chrome");

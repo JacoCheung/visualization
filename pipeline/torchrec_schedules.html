@@ -134,6 +134,7 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
     <a href="#staged">Staged</a>
     <a href="#comp">CompAutograd</a>
     <a href="#comparison"><span class="zh">对比</span><span class="en">Compare</span></a>
+    <a href="#buffer-analysis">Buffer</a>
   </div>
   <button class="lang-btn" id="langBtn" onclick="toggleLang()">中文</button>
 </nav>
@@ -1361,7 +1362,7 @@ PipelinePlan(
   <td>3</td>
   <td>2</td>
   <td>3</td>
-  <td>3</td>
+  <td>4</td>
   <td>3</td>
   <td>2</td>
   <td>N</td>
@@ -1485,6 +1486,108 @@ PipelinePlan(
   <td>&#10003;</td>
 </tr>
 </table>
+</div>
+
+<!-- ── Buffer / Copy Analysis ── -->
+<h3 id="buffer-analysis" style="margin-top:28px"><span class="zh">中间数据副本数分析</span><span class="en">In-Flight Buffer Copy Analysis</span></h3>
+
+<div class="callout callout-info">
+<span class="zh"><strong>公式:</strong> <code>copies = stage<sub>consumer</sub> − stage<sub>producer</sub> + 1</code>。
+流水线中某个中间数据从 <em>producer</em> 阶段产生，到 <em>consumer</em> 阶段被消费，跨越的 period 数就是需要同时保留的副本数。
+例如 <code>SparseDist</code>：<code>H2D</code> 在 stage 0 产生 GPU batch，<code>Forward</code> 在 stage 2 消费 → 2 − 0 + 1 = 3 份副本（对应源码中的 <code>batches[0], batches[1], batches[2]</code>）。
+<br>"—" 表示该 pipeline 不产生此类中间数据。</span>
+<span class="en"><strong>Formula:</strong> <code>copies = stage<sub>consumer</sub> − stage<sub>producer</sub> + 1</code>.
+An intermediate tensor produced at the <em>producer</em> stage and consumed at the <em>consumer</em> stage spans that many periods simultaneously, requiring that many live copies.
+E.g. <code>SparseDist</code>: <code>H2D</code> produces GPU batch at stage 0, <code>Forward</code> consumes at stage 2 → 2 − 0 + 1 = 3 copies (matching source code's <code>batches[0], batches[1], batches[2]</code>).
+<br>"—" means this pipeline does not produce that data type.</span>
+</div>
+
+<div style="overflow-x:auto">
+<table class="tbl" style="min-width:1000px">
+<tr>
+  <th style="min-width:160px"><span class="zh">数据类型</span><span class="en">Data Type</span></th>
+  <th><span class="zh">计算</span><span class="en">Calc</span></th>
+  <th>Base</th>
+  <th>PT2</th>
+  <th>SD</th>
+  <th>SDLite</th>
+  <th>Fused</th>
+  <th>Semi</th>
+  <th>Prefetch</th>
+  <th>EvalSD</th>
+  <th>Staged</th>
+  <th>CompAuto</th>
+</tr>
+<tr>
+  <td><strong>Batch GPU</strong><br><span style="font-size:11px;color:#64748b"><span class="zh">H2D 后的 GPU batch tensor</span><span class="en">GPU batch after H2D</span></span></td>
+  <td style="font-size:11px"><code>s<sub>fwd</sub> − s<sub>h2d</sub> + 1</code></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">1−0+1</span></td>
+  <td><strong>1</strong><br><span style="font-size:10px;color:#94a3b8">0−0+1</span></td>
+  <td><strong>3</strong><br><span style="font-size:10px;color:#94a3b8">2−0+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">1−0+1</span></td>
+  <td><strong>3</strong><br><span style="font-size:10px;color:#94a3b8">2−0+1</span></td>
+  <td><strong>4</strong><br><span style="font-size:10px;color:#94a3b8">3−0+1</span></td>
+  <td><strong>3</strong><br><span style="font-size:10px;color:#94a3b8">2−0+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">1−0+1</span></td>
+  <td>N</td>
+  <td><strong>3</strong><br><span style="font-size:10px;color:#94a3b8">2−0+1</span></td>
+</tr>
+<tr>
+  <td><strong>InputDist Output</strong><br><span style="font-size:11px;color:#64748b"><span class="zh">all-to-all 结果 + module_contexts</span><span class="en">all-to-all results + module_contexts</span></span></td>
+  <td style="font-size:11px"><code>s<sub>cons</sub> − s<sub>idw</sub> + 1</code></td>
+  <td>—</td>
+  <td>—</td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">2−1+1</span></td>
+  <td><strong>1</strong><br><span style="font-size:10px;color:#94a3b8">1−1+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">2−1+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">2−1+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">2−1+1</span></td>
+  <td><strong>1</strong><br><span style="font-size:10px;color:#94a3b8">1−1+1</span></td>
+  <td>—</td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">2−1+1</span></td>
+</tr>
+<tr>
+  <td><strong>EmbLookup Output</strong><br><span style="font-size:11px;color:#64748b"><span class="zh">compute_and_output_dist 结果</span><span class="en">compute_and_output_dist results</span></span></td>
+  <td style="font-size:11px"><code>s<sub>fwd</sub> − s<sub>emb</sub> + 1</code></td>
+  <td>—</td>
+  <td>—</td>
+  <td><span style="font-size:11px"><span class="zh">在 FWD 中</span><span class="en">in FWD</span></span></td>
+  <td><span style="font-size:11px"><span class="zh">在 FWD 中</span><span class="en">in FWD</span></span></td>
+  <td><strong>1</strong><br><span style="font-size:10px;color:#94a3b8">2−2+1</span></td>
+  <td><strong>2</strong><br><span style="font-size:10px;color:#94a3b8">3−2+1</span></td>
+  <td><span style="font-size:11px"><span class="zh">在 FWD 中</span><span class="en">in FWD</span></span></td>
+  <td>—</td>
+  <td>—</td>
+  <td><span style="font-size:11px"><span class="zh">在 FWD 中</span><span class="en">in FWD</span></span></td>
+</tr>
+<tr>
+  <td><strong>Activations</strong><br><span style="font-size:11px;color:#64748b"><span class="zh">Forward 输出 → Backward 消费</span><span class="en">Forward output → Backward consumes</span></span></td>
+  <td style="font-size:11px"><code>s<sub>bwd</sub> − s<sub>fwd</sub> + 1</code></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td><strong>1</strong></td>
+  <td>—</td>
+  <td>—</td>
+  <td><strong>1</strong></td>
+</tr>
+</table>
+</div>
+
+<div class="callout callout-warn">
+<span class="zh"><strong>SemiSync 是内存开销最大的 pipeline:</strong> depth=4 意味着 4 份 GPU batch 副本同时存活。
+此外 EmbLookup output 也需要 2 份（stage 2 → stage 3），其他 pipeline 在 FWD 内部就地执行 EmbLookup 因此只需 1 份。
+代价是获得 EmbLookup 与 Forward 的 <strong>完全重叠</strong>（不同迭代）。
+<br><br><strong>内存归还时机:</strong> 每个副本在 consumer stage 完成后即可释放。以 SparseDist 为例，<code>batches[0]</code>（stage 2 消费的 batch）在 <code>OptimizerStep</code> 结束后释放并被下一次 H2D 复用。
+TorchRec 源码通过 <code>batches</code> 列表的 rotation 实现此复用：<code>batches[0] = batches[1]; batches[1] = batches[2]; batches[2] = new_batch</code>。</span>
+<span class="en"><strong>SemiSync has the highest memory overhead:</strong> depth=4 means 4 GPU batch copies alive simultaneously.
+Additionally, EmbLookup output needs 2 copies (stage 2 → stage 3), while other pipelines run EmbLookup in-place inside FWD and need only 1.
+The tradeoff: <strong>full overlap</strong> of EmbLookup with Forward (across iterations).
+<br><br><strong>Buffer release timing:</strong> Each copy can be freed after its consumer stage completes. For SparseDist, <code>batches[0]</code> (consumed at stage 2) is released after <code>OptimizerStep</code> finishes and reused by the next H2D.
+TorchRec source implements this via <code>batches</code> list rotation: <code>batches[0] = batches[1]; batches[1] = batches[2]; batches[2] = new_batch</code>.</span>
 </div>
 
 <div class="callout callout-tip">

@@ -353,14 +353,17 @@ pre code {
   <a href="#deps-pitfalls" class="sub"><span class="zh">常见陷阱</span><span class="en">Pitfalls</span></a>
   <a href="#ready-first" class="sub"><span class="zh">Ready-First 调度</span><span class="en">Ready-First Scheduling</span></a>
 
-  <div class="sidebar-section"><span class="zh">核心类</span><span class="en">Core Classes</span></div>
+  <div class="sidebar-section"><span class="zh">类层次</span><span class="en">Class Hierarchy</span></div>
+  <a href="#class-hierarchy"><span class="zh">继承结构</span><span class="en">Inheritance</span></a>
+  <a href="#PipelineBase"><code>_PipelineBase</code></a>
   <a href="#SWPipeline"><code>SWPipeline</code></a>
+  <a href="#DataFlowPipeline"><code>DataFlowPipeline</code></a>
   <a href="#TaskProfiler"><code>TaskProfiler</code></a>
 
   <div class="sidebar-section"><span class="zh">执行时序</span><span class="en">Sequence Diagram</span></div>
   <a href="#sequence-diagram"><span class="zh">progress() 时序图</span><span class="en">progress() Sequence</span></a>
 
-  <div class="sidebar-section">SWPipeline <span class="zh">方法</span><span class="en">Methods</span></div>
+  <div class="sidebar-section">_PipelineBase <span class="zh">方法</span><span class="en">Methods</span></div>
   <a href="#fill_pipeline"><code>fill_pipeline()</code></a>
   <a href="#progress"><code>progress()</code></a>
   <a href="#run"><code>run()</code></a>
@@ -369,10 +372,17 @@ pre code {
   <a href="#enable_shortcut"><code>enable_shortcut()</code></a>
   <a href="#disable_shortcut"><code>disable_shortcut()</code></a>
   <a href="#drain"><code>drain()</code></a>
+
+  <div class="sidebar-section">SWPipeline <span class="zh">方法</span><span class="en">Methods</span></div>
   <a href="#print_schedule"><code>print_schedule()</code></a>
   <a href="#format_schedule"><code>format_schedule()</code></a>
   <a href="#print_stage_analysis"><code>print_stage_analysis()</code></a>
   <a href="#repr"><code>__repr__()</code></a>
+
+  <div class="sidebar-section">DataFlowPipeline <span class="zh">方法</span><span class="en">Methods</span></div>
+  <a href="#df-try-fire"><code>_try_fire_task()</code></a>
+  <a href="#df-try-advance"><code>_try_advance()</code></a>
+  <a href="#df-sweep-fire"><code>_sweep_fire()</code></a>
 
   <div class="sidebar-section">TaskProfiler <span class="zh">方法</span><span class="en">Methods</span></div>
   <a href="#profiler-profile"><code>profile()</code></a>
@@ -387,6 +397,12 @@ pre code {
   <a href="#restore-val"><code>_restore_val()</code></a>
   <a href="#GraftGrad"><code>_GraftGrad</code></a>
   <a href="#SubmissionSequencer"><code>_SubmissionSequencer</code></a>
+
+  <div class="sidebar-section"><span class="zh">执行模型</span><span class="en">Execution Model</span></div>
+  <a href="#exec-model"><span class="zh">同步 vs 异步流水线</span><span class="en">Sync vs Async Pipeline</span></a>
+  <a href="#sync-model" class="sub"><span class="zh">同步 (Clock-Driven)</span><span class="en">Synchronous</span></a>
+  <a href="#async-model" class="sub"><span class="zh">异步 (Data-Flow)</span><span class="en">Asynchronous</span></a>
+  <a href="#exec-model-tradeoff" class="sub"><span class="zh">对比与取舍</span><span class="en">Tradeoffs</span></a>
 
   <div class="sidebar-section"><span class="zh">端到端示例</span><span class="en">Example</span></div>
   <a href="#e2e-example"><span class="zh">FusedSparseDist 示例</span><span class="en">FusedSparseDist Example</span></a>
@@ -1314,17 +1330,109 @@ GPU <span class="zh">时间线</span><span class="en">timeline</span>:
 
 
 <!-- ════════════════════════════════════════════ -->
+<!-- ════════════════════════════════════════════ -->
+<h2 id="class-hierarchy"><span class="zh">类层次结构</span><span class="en">Class Hierarchy</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card">
+<div class="api-desc">
+<span class="zh"><p>流水线框架采用 <strong>Template Method</strong> 模式，将通用基础设施（同步资源、worker 线程、shortcut 缓存）抽取到抽象基类 <code>_PipelineBase</code>，调度策略由子类实现：</p></span>
+<span class="en"><p>The pipeline framework uses the <strong>Template Method</strong> pattern. Universal infrastructure (sync resources, worker threads, shortcut caching) is extracted into the abstract base class <code>_PipelineBase</code>, while scheduling strategies are implemented by subclasses:</p></span>
+</div>
+
+<pre><code><span style="color:var(--text-dim)">                    _PipelineBase  (abstract)
+                   ┌─────────────────────────────────────┐
+                   │  fill_pipeline / progress / drain    │  ← 公共 API
+                   │  run / run_serial / run_one_serial   │
+                   │  enable_shortcut / disable_shortcut  │
+                   │  _submit_task + _after_task_complete  │  ← hook
+                   │  _start_workers / _stop_workers      │
+                   │  CUDA events / CPU signals / slots   │
+                   └───────────┬─────────────┬───────────┘
+                               │             │
+              ┌────────────────┘             └────────────────┐
+              │                                               │
+    <span style="color:var(--accent)">SWPipeline</span> (clock-driven)              <span style="color:var(--green)">DataFlowPipeline</span> (data-flow)
+    ┌────────────────────────┐              ┌────────────────────────┐
+    │  _do_fill: depth 个     │              │  _do_fill: _try_advance │
+    │    period 逐步填充      │              │    burst 连续发射       │
+    │  _do_retire: enqueue    │              │  _do_retire: sweep_fire │
+    │    next period          │              │    + try_advance        │
+    │  _enqueue_period()      │              │  _after_task_complete:  │
+    │  _build_enqueue_order() │              │    触发下游 task        │
+    │  stage / period 概念    │              │  _try_fire_task()       │
+    │  format_schedule()      │              │  无 stage/period 概念   │
+    └────────────────────────┘              └────────────────────────┘</span></code></pre>
+
+<p style="color:var(--text-muted);font-size:0.88rem;margin-top:10px;">
+<span class="zh"><strong>文件布局:</strong> <code>sw_pipeline.py</code> 包含 <code>_PipelineBase</code> + <code>SWPipeline</code> + <code>TaskProfiler</code> + 数据类；<code>dataflow_pipeline.py</code> 包含 <code>DataFlowPipeline</code>。</span>
+<span class="en"><strong>File layout:</strong> <code>sw_pipeline.py</code> contains <code>_PipelineBase</code> + <code>SWPipeline</code> + <code>TaskProfiler</code> + data classes; <code>dataflow_pipeline.py</code> contains <code>DataFlowPipeline</code>.</span>
+</p>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<h3 id="PipelineBase">_PipelineBase</h3>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card cls">
+  <span class="badge-class api-badge">Abstract</span>
+  <div class="api-sig">
+    <span class="kw">class</span> <span class="cls-name">_PipelineBase</span><span class="punct">(</span><span class="param">plan</span><span class="punct">:</span> <span class="type">PipelinePlan</span><span class="punct">,</span> <span class="param">num_slots</span><span class="punct">:</span> <span class="type">int</span><span class="punct">,</span> <span class="param">device</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh">流水线引擎的抽象基类。解析 <code>PipelinePlan</code> 中的任务定义和依赖关系，按 <code>num_slots</code> 预分配 CUDA events 和 CPU signals，管理 worker 线程、shortcut 缓存、NVTX 标注。不包含任何调度策略 — 子类通过实现 <code>_do_fill()</code>、<code>_do_retire()</code> 和可选的 <code>_after_task_complete()</code> hook 来定义调度行为。</span>
+    <span class="en">Abstract base class for pipeline engines. Parses task definitions and dependencies from <code>PipelinePlan</code>, pre-allocates CUDA events and CPU signals for <code>num_slots</code>, manages worker threads, shortcut caching, and NVTX annotations. Contains no scheduling strategy — subclasses define scheduling by implementing <code>_do_fill()</code>, <code>_do_retire()</code>, and optionally overriding the <code>_after_task_complete()</code> hook.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>plan</td><td>PipelinePlan</td><td><span class="zh">完整调度计划（任务、依赖、stream 分配）</span><span class="en">Complete scheduling plan (tasks, deps, stream assignments)</span></td></tr>
+    <tr><td>num_slots</td><td>int</td><td><span class="zh">同步槽位数。SWPipeline 传 <code>depth</code>，DataFlowPipeline 传 <code>max_depth</code></span><span class="en">Sync slots. SWPipeline passes <code>depth</code>, DataFlowPipeline passes <code>max_depth</code></span></td></tr>
+    <tr><td>device</td><td>int</td><td><span class="zh">CUDA 设备号（默认 0）</span><span class="en">CUDA device (default 0)</span></td></tr>
+  </table>
+
+  <div class="example-label">▸ <span class="zh">Template Method 模式</span><span class="en">Template Method Pattern</span></div>
+<pre><code><span style="color:var(--purple)">class</span> _PipelineBase:
+    <span style="color:var(--purple)">def</span> fill_pipeline(self, data_iter):
+        self._reset_state()
+        self._start_workers()
+        self.<span style="color:var(--accent)">_do_fill</span>(data_iter)       <span style="color:var(--text-dim)"># 抽象: 子类实现填充策略</span>
+        self._pipeline_started = <span style="color:var(--green)">True</span>
+        <span style="color:var(--purple)">return</span> data_iter
+
+    <span style="color:var(--purple)">def</span> progress(self, data_iter=<span style="color:var(--green)">None</span>):
+        oldest = self._next_retire
+        <span style="color:var(--text-dim)"># ... 等待 _iter_complete, 检查 error, wait_event ...</span>
+        self.<span style="color:var(--accent)">_do_retire</span>(oldest, data_iter)  <span style="color:var(--text-dim)"># 抽象: 子类实现退休+推进策略</span>
+        <span style="color:var(--text-dim)"># ... check drain ...</span>
+        <span style="color:var(--purple)">return</span> oldest
+
+    <span style="color:var(--purple)">def</span> _submit_task(self, iter_idx, task_def):
+        <span style="color:var(--text-dim)"># ... wait deps, exec task, record events ...</span>
+        self.<span style="color:var(--green)">_after_task_complete</span>(task_def.name, iter_idx)  <span style="color:var(--text-dim)"># hook</span>
+
+    <span style="color:var(--purple)">def</span> _after_task_complete(self, task_name, iter_idx):
+        <span style="color:var(--purple)">pass</span>  <span style="color:var(--text-dim)"># SWPipeline: no-op; DataFlowPipeline: 触发下游</span></code></pre>
+
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/sw_pipeline.py#L193-L997">sw_pipeline.py:193–997</a></p>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
 <h2 id="SWPipeline">SWPipeline</h2>
 <!-- ════════════════════════════════════════════ -->
 
 <div class="api-card cls">
   <span class="badge-class api-badge">Class</span>
   <div class="api-sig">
-    <span class="kw">class</span> <span class="cls-name">SWPipeline</span><span class="punct">(</span><span class="param">plan</span><span class="punct">:</span> <span class="type">PipelinePlan</span><span class="punct">,</span> <span class="param">device</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span>
+    <span class="kw">class</span> <span class="cls-name">SWPipeline</span><span class="punct">(</span><span class="type">_PipelineBase</span><span class="punct">)</span>
+  </div>
+  <div class="api-sig" style="margin-top:4px;">
+    <span class="kw">def</span> <span class="fn-name">__init__</span><span class="punct">(</span><span class="param">self</span><span class="punct">,</span> <span class="param">plan</span><span class="punct">:</span> <span class="type">PipelinePlan</span><span class="punct">,</span> <span class="param">device</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span>
   </div>
   <div class="api-desc">
-    <span class="zh">通用软件流水线引擎。接收 <code>PipelinePlan</code> 后自动完成拓扑排序、分配同步资源、创建 <code>_SubmissionSequencer</code>。支持 pipelined / serial / single-iter 三种执行模式，以及运行时 task shortcut。构造时验证 DAG（无环、stage 单调、名称唯一）。</span>
-    <span class="en">General-purpose software pipeline engine. Parses <code>PipelinePlan</code>, performs topo sort, allocates sync resources, creates <code>_SubmissionSequencer</code>. Supports pipelined / serial / single-iter execution and runtime task shortcutting. Validates DAG at construction (acyclic, monotone stages, unique names).</span>
+    <span class="zh"><strong>Clock-driven（同步）流水线引擎</strong>，继承 <code>_PipelineBase</code>。以 <strong>period</strong> 为节拍，每个 period 提交所有 task 各一次（<code>iter_idx = period − stage</code>）。构造时从 <code>TaskSchedule.stage</code> 推断 <code>depth = max(stage) + 1</code>，传入基类作为 <code>num_slots</code>。支持 pipelined / serial / single-iter 三种执行模式，以及运行时 task shortcut。构造时验证 DAG（无环、stage 单调、名称唯一）。</span>
+    <span class="en"><strong>Clock-driven (synchronous) pipeline engine</strong>, inheriting from <code>_PipelineBase</code>. Advances in <strong>periods</strong>, submitting every task once per period (<code>iter_idx = period − stage</code>). At construction, infers <code>depth = max(stage) + 1</code> from <code>TaskSchedule.stage</code> and passes it to the base as <code>num_slots</code>. Supports pipelined / serial / single-iter execution and runtime task shortcutting. Validates DAG at construction (acyclic, monotone stages, unique names).</span>
   </div>
   <table class="param-table">
     <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
@@ -1805,6 +1913,158 @@ for i, r in enumerate(results):
 <hr class="divider">
 
 <!-- ════════════════════════════════════════════ -->
+<h2 id="DataFlowPipeline">DataFlowPipeline</h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="api-card cls">
+  <span class="badge-class api-badge">Class</span>
+  <div class="api-sig">
+    <span class="kw">class</span> <span class="cls-name">DataFlowPipeline</span><span class="punct">(</span><span class="type">_PipelineBase</span><span class="punct">)</span>
+  </div>
+  <div class="api-sig" style="margin-top:4px;">
+    <span class="kw">def</span> <span class="fn-name">__init__</span><span class="punct">(</span><span class="param">self</span><span class="punct">,</span> <span class="param">plan</span><span class="punct">:</span> <span class="type">PipelinePlan</span><span class="punct">,</span> <span class="param">max_depth</span><span class="punct">:</span> <span class="type">int</span><span class="punct">,</span> <span class="param">device</span><span class="punct">:</span> <span class="type">int</span> <span class="punct">=</span> 0<span class="punct">)</span>
+  </div>
+  <div class="api-desc">
+    <span class="zh"><strong>Data-flow（异步）流水线引擎</strong>，继承 <code>_PipelineBase</code>。没有 period 或 stage 概念 — 每个 task 在<strong>所有依赖完成 + buffer 有空位</strong>时立即发射。<code>max_depth</code> 控制同时在飞的最大迭代数，既是 buffer 容量上限，也是反压机制。<code>TaskSchedule.stage</code> 字段被忽略。</span>
+    <span class="en"><strong>Data-flow (asynchronous) pipeline engine</strong>, inheriting from <code>_PipelineBase</code>. No period or stage concept — each task fires as soon as <strong>all dependencies are met + buffer available</strong>. <code>max_depth</code> controls the maximum number of in-flight iterations, acting as both buffer capacity and back-pressure. The <code>TaskSchedule.stage</code> field is ignored.</span>
+  </div>
+  <table class="param-table">
+    <tr><th><span class="zh">参数</span><span class="en">Param</span></th><th><span class="zh">类型</span><span class="en">Type</span></th><th><span class="zh">说明</span><span class="en">Description</span></th></tr>
+    <tr><td>plan</td><td>PipelinePlan</td><td><span class="zh">完整调度计划（<code>stage</code> 被忽略）</span><span class="en">Complete scheduling plan (<code>stage</code> ignored)</span></td></tr>
+    <tr><td>max_depth</td><td>int</td><td><span class="zh">最大在飞迭代数（≥ 1）</span><span class="en">Max in-flight iterations (≥ 1)</span></td></tr>
+    <tr><td>device</td><td>int</td><td><span class="zh">CUDA 设备号（默认 0）</span><span class="en">CUDA device (default 0)</span></td></tr>
+  </table>
+
+  <div class="example-label">▸ <span class="zh">使用方式（与 SWPipeline API 完全相同）</span><span class="en">Usage (identical API to SWPipeline)</span></div>
+<pre><code><span style="color:var(--purple)">from</span> dataflow_pipeline <span style="color:var(--purple)">import</span> DataFlowPipeline
+
+plan = PipelinePlan(
+    schedule={
+        t_h2d:   TaskSchedule(stream=memcpy_stream),        <span style="color:var(--text-dim)"># stage 被忽略</span>
+        t_dist:  TaskSchedule(stream=dist_stream, globally_ordered=<span style="color:var(--green)">True</span>),
+        t_fwd:   TaskSchedule(),
+        t_bwd:   TaskSchedule(),
+    },
+    intra_iter_deps=[(t_dist, t_h2d), (t_fwd, t_dist), (t_bwd, t_fwd)],
+    inter_iter_deps=[(t_fwd, t_bwd)],  <span style="color:var(--text-dim)"># Forward(i) 等 Backward(i-1)</span>
+)
+pipe = DataFlowPipeline(plan, max_depth=5, device=0)
+
+<span style="color:var(--text-dim)"># 公共 API 与 SWPipeline 完全一致</span>
+data_iter = pipe.fill_pipeline(dataloader)
+<span style="color:var(--purple)">while</span> <span style="color:var(--green)">True</span>:
+    <span style="color:var(--purple)">try</span>:
+        idx = pipe.progress(data_iter)
+    <span style="color:var(--purple)">except</span> StopIteration:
+        <span style="color:var(--purple)">break</span></code></pre>
+
+  <p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/dataflow_pipeline.py">dataflow_pipeline.py</a></p>
+</div>
+
+<!-- DataFlowPipeline 发射条件 -->
+<h3 id="df-fire-conditions"><span class="zh">发射条件</span><span class="en">Fire Conditions</span></h3>
+<div class="api-card">
+<div class="api-desc">
+<span class="zh"><p>一个 task 只有在<strong>全部 5 个条件</strong>同时满足时才会被发射（入队到 worker）：</p></span>
+<span class="en"><p>A task is fired (enqueued to worker) only when <strong>all 5 conditions</strong> are met simultaneously:</p></span>
+</div>
+<table class="param-table" style="font-size:13px">
+<tr><th>#</th><th><span class="zh">条件</span><span class="en">Condition</span></th><th><span class="zh">含义</span><span class="en">Meaning</span></th></tr>
+<tr><td>1</td><td><code>(task, iter) ∉ fired</code></td><td><span class="zh">该 task 在该迭代尚未发射</span><span class="en">Not already fired for this iteration</span></td></tr>
+<tr><td>2</td><td><code>pending[task] &lt; max_depth</code></td><td><span class="zh">该 task 在飞计数未达上限</span><span class="en">Per-task in-flight count below limit</span></td></tr>
+<tr><td>3</td><td><code>iter ∈ contexts</code></td><td><span class="zh">IterContext 已创建（batch 已获取）</span><span class="en">IterContext exists (batch fetched)</span></td></tr>
+<tr><td>4</td><td><span class="zh"><code>intra_deps</code> 全部完成</span><span class="en">All <code>intra_deps</code> done</span></td><td><span class="zh"><code>(dep, iter) ∈ task_done</code> 对所有 intra dep</span><span class="en"><code>(dep, iter) ∈ task_done</code> for all intra deps</span></td></tr>
+<tr><td>5</td><td><span class="zh"><code>inter_deps</code> 全部完成</span><span class="en">All <code>inter_deps</code> done</span></td><td><span class="zh"><code>(dep, iter−1) ∈ task_done</code> 对所有 inter dep</span><span class="en"><code>(dep, iter−1) ∈ task_done</code> for all inter deps</span></td></tr>
+</table>
+<p style="color:var(--text-muted);font-size:0.88rem;margin-top:8px;">
+<span class="zh">"完成" 的判定：<code>_submit_task()</code> 末尾调用 <code>_after_task_complete()</code> hook，将 <code>(task_name, iter_idx)</code> 加入 <code>_task_done</code> 集合。这意味着 CUDA kernel 已 launch（event 已 record），CPU 侧 signal 已 set。</span>
+<span class="en">"Done" means: <code>_submit_task()</code> calls the <code>_after_task_complete()</code> hook at the end, adding <code>(task_name, iter_idx)</code> to the <code>_task_done</code> set. This means the CUDA kernel has been launched (event recorded) and CPU signal set.</span>
+</p>
+</div>
+
+<!-- _try_fire_task -->
+<h3 id="df-try-fire">_try_fire_task</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="name">_try_fire_task</span><span class="punct">(</span><span class="param">task_name</span><span class="punct">:</span> <span class="type">str</span><span class="punct">,</span> <span class="param">iter_idx</span><span class="punct">:</span> <span class="type">int</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">bool</span></div>
+  <div class="api-desc">
+    <span class="zh">检查上述 5 个条件，若全部满足则标记为 <code>fired</code>、增加 <code>pending</code> 计数并入队到对应 thread group 的 worker queue。必须在持有 <code>_fire_lock</code> 时调用。</span>
+    <span class="en">Checks all 5 conditions above. If all met, marks as <code>fired</code>, increments <code>pending</code> count, and enqueues to the corresponding thread group's worker queue. Must be called while holding <code>_fire_lock</code>.</span>
+  </div>
+</div>
+
+<!-- _try_advance -->
+<h3 id="df-try-advance">_try_advance</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="name">_try_advance</span><span class="punct">(</span><span class="param">data_iter</span><span class="punct">:</span> <span class="type">Optional[Iterator]</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">创建新的 <code>IterContext</code>（获取 batch），上限为 <code>max_depth</code> 个在飞迭代。每创建一个新 context，立即对所有 task 调用 <code>_try_fire_task()</code>。无依赖的 task（如 H2D）会立即连续发射（burst）。</span>
+    <span class="en">Creates new <code>IterContext</code> objects (fetches batches), bounded by <code>max_depth</code> in-flight iterations. After each new context, calls <code>_try_fire_task()</code> for every task. Dependency-free tasks (e.g. H2D) fire immediately in burst.</span>
+  </div>
+</div>
+
+<!-- _sweep_fire -->
+<h3 id="df-sweep-fire">_sweep_fire</h3>
+<div class="api-card internal">
+  <span class="badge-internal api-badge">Internal</span>
+  <div class="api-sig"><span class="name">_sweep_fire</span><span class="punct">(</span><span class="punct">)</span> <span class="punct">→</span> <span class="type">None</span></div>
+  <div class="api-desc">
+    <span class="zh">在退休释放 buffer 槽位后调用，重新尝试所有活跃迭代中尚未发射的 task。之前因 <code>pending &gt;= max_depth</code> 被阻塞的 task 在 pending 计数下降后可以成功发射。</span>
+    <span class="en">Called after retirement frees buffer slots. Retries all unfired tasks across live iterations. Tasks previously blocked by <code>pending &gt;= max_depth</code> may now succeed after the pending count drops.</span>
+  </div>
+</div>
+
+<!-- DataFlowPipeline vs SWPipeline -->
+<h3><span class="zh">与 SWPipeline 的关键差异</span><span class="en">Key Differences from SWPipeline</span></h3>
+<div class="api-card">
+<table class="param-table" style="font-size:13px">
+<tr>
+  <th style="min-width:130px"><span class="zh">维度</span><span class="en">Dimension</span></th>
+  <th>SWPipeline</th>
+  <th>DataFlowPipeline</th>
+</tr>
+<tr>
+  <td><strong><span class="zh">调度模型</span><span class="en">Scheduling</span></strong></td>
+  <td><span class="zh">Clock-driven (period 节拍)</span><span class="en">Clock-driven (period tick)</span></td>
+  <td><span class="zh">Data-flow (依赖触发)</span><span class="en">Data-flow (dependency trigger)</span></td>
+</tr>
+<tr>
+  <td><strong>stage</strong></td>
+  <td><span class="zh">必需 — 决定 <code>iter_idx</code></span><span class="en">Required — determines <code>iter_idx</code></span></td>
+  <td><span class="zh">忽略</span><span class="en">Ignored</span></td>
+</tr>
+<tr>
+  <td><strong><code>num_slots</code></strong></td>
+  <td><code>depth = max(stage)+1</code></td>
+  <td><code>max_depth</code> <span class="zh">（构造参数）</span><span class="en">(constructor arg)</span></td>
+</tr>
+<tr>
+  <td><strong><code>_do_fill</code></strong></td>
+  <td><span class="zh"><code>depth</code> 个 period 逐步填充</span><span class="en"><code>depth</code> periods sequentially</span></td>
+  <td><span class="zh">burst — <code>_try_advance</code> 连续创建 context</span><span class="en">burst — <code>_try_advance</code> creates contexts</span></td>
+</tr>
+<tr>
+  <td><strong><code>_do_retire</code></strong></td>
+  <td><code>_enqueue_period(next)</code></td>
+  <td><code>_try_advance + _sweep_fire</code></td>
+</tr>
+<tr>
+  <td><strong><code>_after_task_complete</code></strong></td>
+  <td>no-op</td>
+  <td><span class="zh">触发 downstream intra/inter tasks</span><span class="en">fires downstream intra/inter tasks</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">死锁分析</span><span class="en">Deadlock</span></strong></td>
+  <td><span class="zh">静态可证（stage 图 + ready-first）</span><span class="en">Statically provable</span></td>
+  <td><span class="zh">需证 bounded buffer 无死锁</span><span class="en">Must prove bounded buffer safety</span></td>
+</tr>
+</table>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
 <h2 id="internals"><span class="zh">内部机制</span><span class="en">Internals</span></h2>
 <!-- ════════════════════════════════════════════ -->
 
@@ -1902,6 +2162,243 @@ _cache_val(jt)         → (_CACHE_TAG, "o", JaggedTensor, {attr: _cache_val(v) 
 <hr class="divider">
 
 <!-- ════════════════════════════════════════════ -->
+<h2 id="exec-model"><span class="zh">执行模型：同步 vs 异步流水线</span><span class="en">Execution Model: Synchronous vs Asynchronous Pipeline</span></h2>
+<!-- ════════════════════════════════════════════ -->
+
+<div class="callout callout-info">
+<span class="zh">流水线的执行模型决定了"task 何时被发射"。框架提供两种调度策略：<strong>SWPipeline</strong>（同步 / clock-driven）和 <strong>DataFlowPipeline</strong>（异步 / data-flow），共享 <code>_PipelineBase</code> 基础设施，公共 API 完全相同。本节对比两种设计的原理、优劣和适用场景。</span>
+<span class="en">The execution model determines <em>when</em> a task fires. The framework provides two scheduling strategies: <strong>SWPipeline</strong> (synchronous / clock-driven) and <strong>DataFlowPipeline</strong> (asynchronous / data-flow), sharing <code>_PipelineBase</code> infrastructure with an identical public API. This section compares the two designs.</span>
+</div>
+
+<!-- ── Synchronous ── -->
+<h3 id="sync-model"><span class="zh">同步流水线（Clock-Driven）— 当前实现</span><span class="en">Synchronous Pipeline (Clock-Driven) — Current Implementation</span></h3>
+
+<div class="api-card">
+<div class="api-desc">
+<span class="zh"><p>同步模型以 <strong>period</strong> 为节拍，每个 period 恰好提交所有 task 各一次。<code>progress()</code> 是时钟：退休一个 iteration → 入队下一个 period → 窗口固定为 <code>depth</code> 个 period。</p>
+
+<p>即使 H2D 没有任何依赖，也必须等 <code>progress()</code> 入队它所在的 period 才能开始。Task 的发射由 <strong>period 节拍</strong>控制，而非依赖就绪状态。</p></span>
+
+<span class="en"><p>The synchronous model advances in <strong>periods</strong>. Each period submits every task exactly once. <code>progress()</code> is the clock: retire one iteration → enqueue next period → window fixed at <code>depth</code> periods.</p>
+
+<p>Even if H2D has zero dependencies, it must wait for <code>progress()</code> to enqueue its period. Task firing is driven by the <strong>period clock</strong>, not dependency readiness.</p></span>
+</div>
+
+<pre><code><span style="color:var(--text-dim)"># _enqueue_period — 同步模型的核心: 一个 period 提交所有 task</span>
+<span style="color:var(--purple)">def</span> _enqueue_period(self, period, data_iter):
+    <span style="color:var(--purple)">for</span> task <span style="color:var(--purple)">in</span> self._enqueue_order:
+        iter_idx = period - stage[task]
+        queue.put((iter_idx, task))   <span style="color:var(--text-dim)"># 按 period 节拍提交</span>
+
+<span style="color:var(--purple)">def</span> progress(self, data_iter):
+    retire(oldest)                    <span style="color:var(--text-dim)"># ① 退休最老的 iteration</span>
+    _enqueue_period(next_period)      <span style="color:var(--text-dim)"># ② 入队下一个 period</span>
+    <span style="color:var(--purple)">return</span> oldest                     <span style="color:var(--text-dim)"># 窗口 = depth 个 period</span></code></pre>
+</div>
+
+<div class="api-card">
+<h4><span class="zh">时序图：SparseDist (depth=3)</span><span class="en">Timeline: SparseDist (depth=3)</span></h4>
+<pre><code><span style="color:var(--text-dim)">Period    H2D(memcpy)     InputDist(data_dist)     FWD+BWD+OPT(default)
+          ─────────       ──────────────────       ────────────────────
+ P0       <span style="color:var(--green)">█ iter0</span>
+ P1       <span style="color:var(--green)">█ iter1</span>          <span style="color:var(--orange)">█ iter0</span>
+ P2       <span style="color:var(--green)">█ iter2</span>          <span style="color:var(--orange)">█ iter1</span>                  <span style="color:var(--purple)">████ iter0</span>
+ P3       <span style="color:var(--green)">█ iter3</span>          <span style="color:var(--orange)">█ iter2</span>                  <span style="color:var(--purple)">████ iter1</span>
+ P4       <span style="color:var(--green)">█ iter4</span>          <span style="color:var(--orange)">█ iter3</span>                  <span style="color:var(--purple)">████ iter2</span>
+          ↑                                        ↑
+ H2D 很快完成后空闲，                          瓶颈，100% 利用率
+ 等下一个 progress() 才能发射下一个 H2D</span></code></pre>
+
+<p><span class="zh"><strong>观察:</strong> H2D(1ms) 在每个 period 中只工作 1ms，剩余 9ms 空闲等待 period 节拍。这不影响稳态吞吐（瓶颈是 FWD+BWD），但意味着 H2D 无法提前缓冲数据来吸收偶发的 PCIe 延迟抖动。</span>
+<span class="en"><strong>Observation:</strong> H2D (1ms) works only 1ms per period, idle for 9ms waiting for the period clock. This doesn't affect steady-state throughput (bottleneck is FWD+BWD), but means H2D cannot pre-buffer data to absorb occasional PCIe latency jitter.</span></p>
+</div>
+
+<!-- ── Asynchronous ── -->
+<h3 id="async-model"><span class="zh">异步流水线（Data-Flow）— DataFlowPipeline</span><span class="en">Asynchronous Pipeline (Data-Flow) — DataFlowPipeline</span></h3>
+
+<div class="api-card">
+<div class="api-desc">
+<span class="zh"><p>异步模型中，每个 task 在<strong>所有依赖完成 + buffer 有空位</strong>时立即发射，不受 period 节拍约束。这是硬件设计中的 <strong>elastic pipeline</strong>（带 FIFO 缓冲的异步流水线）。</p>
+
+<p>H2D 没有依赖 → 只要 buffer 有空位就持续发射。InputDist 依赖 H2D → H2D(i) 完成后立即发射 InputDist(i)，无需等下一个 period。</p></span>
+
+<span class="en"><p>In the async model, each task fires as soon as <strong>all dependencies are met + buffer slot available</strong>, independent of any period clock. This is the <strong>elastic pipeline</strong> from hardware design (async pipeline with FIFO buffers).</p>
+
+<p>H2D has no dependencies → fires continuously as long as buffer has space. InputDist depends on H2D → fires immediately when H2D(i) completes, no waiting for next period.</p></span>
+</div>
+
+<pre><code><span style="color:var(--text-dim)"># DataFlowPipeline 的实际实现 (dataflow_pipeline.py)</span>
+<span style="color:var(--purple)">class</span> DataFlowPipeline(_PipelineBase):
+    <span style="color:var(--purple)">def</span> _after_task_complete(self, task_name, iter_idx):
+        <span style="color:var(--text-dim)">"""_submit_task() 末尾的 hook — 触发下游 task"""</span>
+        <span style="color:var(--purple)">with</span> self._fire_lock:
+            self._task_done.add((task_name, iter_idx))
+            <span style="color:var(--purple)">for</span> ds <span style="color:var(--purple)">in</span> self._downstream_intra[task_name]:
+                self._try_fire_task(ds, iter_idx)       <span style="color:var(--text-dim)"># 同迭代下游</span>
+            <span style="color:var(--purple)">for</span> ds <span style="color:var(--purple)">in</span> self._downstream_inter[task_name]:
+                self._try_fire_task(ds, iter_idx + 1)   <span style="color:var(--text-dim)"># 下一迭代下游</span>
+
+    <span style="color:var(--purple)">def</span> _try_fire_task(self, task_name, iter_idx):
+        <span style="color:var(--text-dim)">"""5 条件全满足时才入队 worker"""</span>
+        <span style="color:var(--purple)">if</span> (task_name, iter_idx) <span style="color:var(--purple)">in</span> self._fired: <span style="color:var(--purple)">return</span>
+        <span style="color:var(--purple)">if</span> self._task_pending[task_name] >= self.max_depth: <span style="color:var(--purple)">return</span>
+        <span style="color:var(--purple)">if</span> iter_idx <span style="color:var(--purple)">not in</span> self._contexts: <span style="color:var(--purple)">return</span>
+        <span style="color:var(--purple)">for</span> dep <span style="color:var(--purple)">in</span> intra_deps[task_name]:
+            <span style="color:var(--purple)">if</span> (dep, iter_idx) <span style="color:var(--purple)">not in</span> self._task_done: <span style="color:var(--purple)">return</span>
+        <span style="color:var(--text-dim)"># ... inter_iter_deps 同理 ...</span>
+        self._fired.add((task_name, iter_idx))
+        self._task_pending[task_name] += 1
+        queue.put((iter_idx, task_def))              <span style="color:var(--text-dim)"># 入队!</span></code></pre>
+</div>
+
+<div class="api-card">
+<h4><span class="zh">时序图：SparseDist + 异步 H2D (buffer=5)</span><span class="en">Timeline: SparseDist + Async H2D (buffer=5)</span></h4>
+<pre><code><span style="color:var(--text-dim)">Time      H2D(memcpy)     InputDist(data_dist)     FWD+BWD+OPT(default)
+          ─────────       ──────────────────       ────────────────────
+ t0       <span style="color:var(--green)">█0 █1 █2 █3 █4</span>                                                     ← H2D 连续发射 5 个
+ t1                       <span style="color:var(--orange)">█ iter0</span>                                          ← H2D(0) 完成即触发
+ t2       <span style="color:var(--green)">█5</span>              <span style="color:var(--orange)">█ iter1</span>                  <span style="color:var(--purple)">████ iter0</span>
+ t3       <span style="color:var(--green)">█6</span>              <span style="color:var(--orange)">█ iter2</span>                  <span style="color:var(--purple)">████ iter1</span>
+          ↑                                        ↑
+ H2D 跑在前面，                                  瓶颈不变
+ 缓冲了多个 batch                                  但 jitter 被缓冲吸收</span></code></pre>
+
+<p><span class="zh"><strong>关键区别:</strong> H2D 在 t0 就完成了 5 个 batch 的传输（连续发射），而非每个 period 才传输一个。当 H2D 偶尔遇到 PCIe 延迟抖动（如 5ms），InputDist 可以直接从 buffer 获取已就绪的 batch，GPU 计算不受影响。</span>
+<span class="en"><strong>Key difference:</strong> H2D transfers 5 batches at t0 (burst), not one per period. When H2D occasionally hits PCIe jitter (e.g. 5ms), InputDist grabs an already-ready batch from the buffer, keeping GPU compute unaffected.</span></p>
+</div>
+
+<!-- ── Tradeoff ── -->
+<h3 id="exec-model-tradeoff"><span class="zh">对比与取舍</span><span class="en">Comparison &amp; Tradeoffs</span></h3>
+
+<div class="callout callout-warn">
+<span class="zh"><strong>稳态吞吐定理:</strong> 无论同步还是异步模型，稳态吞吐 = <code>1 / T<sub>bottleneck</sub></code>。异步模型 <strong>不能</strong> 提高稳态吞吐 —— 瓶颈 task（通常是 Forward+Backward）决定上限。异步模型的价值在于<strong>减少非稳态损失</strong>。</span>
+<span class="en"><strong>Steady-state theorem:</strong> Regardless of sync or async, steady-state throughput = <code>1 / T<sub>bottleneck</sub></code>. The async model <strong>cannot</strong> improve steady-state throughput — the bottleneck task (typically Forward+Backward) sets the ceiling. The value of async lies in <strong>reducing non-steady-state losses</strong>.</span>
+</div>
+
+<table class="param-table" style="font-size:13px">
+<tr>
+  <th style="min-width:140px"><span class="zh">维度</span><span class="en">Dimension</span></th>
+  <th><span class="zh">同步 (Clock-Driven)</span><span class="en">Synchronous</span></th>
+  <th><span class="zh">异步 (Data-Flow)</span><span class="en">Asynchronous</span></th>
+</tr>
+<tr>
+  <td><strong><span class="zh">发射条件</span><span class="en">Fire condition</span></strong></td>
+  <td><code>progress()</code> <span class="zh">入队 period 后</span><span class="en">enqueues period</span></td>
+  <td><span class="zh">依赖就绪 + buffer 有空位</span><span class="en">deps ready + buffer available</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">稳态吞吐</span><span class="en">Steady throughput</span></strong></td>
+  <td>1 / T<sub>bottleneck</sub></td>
+  <td>1 / T<sub>bottleneck</sub> <span class="zh">（相同）</span><span class="en">(same)</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">Jitter 容忍</span><span class="en">Jitter tolerance</span></strong></td>
+  <td><span class="zh">无 — 非瓶颈 task 的抖动直接传导</span><span class="en">None — non-bottleneck jitter propagates</span></td>
+  <td><span class="zh">有界 buffer 吸收抖动</span><span class="en">Bounded buffer absorbs jitter</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">Pipeline 填充</span><span class="en">Pipeline fill</span></strong></td>
+  <td><code>depth</code> <span class="zh">个 period 逐步填充</span><span class="en">periods to fill</span></td>
+  <td><span class="zh">快速 burst — 无依赖 task 立即连续发射</span><span class="en">Fast burst — dependency-free tasks fire immediately</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">Buffer 数量</span><span class="en">Buffer count</span></strong></td>
+  <td><code>depth</code> <span class="zh">（确定性）</span><span class="en">(deterministic)</span></td>
+  <td><span class="zh">最多 <code>max_buffer</code>（可配置上限）</span><span class="en">Up to <code>max_buffer</code> (configurable cap)</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">内存可预测性</span><span class="en">Memory predictability</span></strong></td>
+  <td><span class="zh">✓ 完全确定</span><span class="en">✓ Fully deterministic</span></td>
+  <td><span class="zh">✗ 取决于运行时抖动</span><span class="en">✗ Depends on runtime jitter</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">死锁分析</span><span class="en">Deadlock analysis</span></strong></td>
+  <td><span class="zh">✓ 静态可证（stage 图 + ready-first）</span><span class="en">✓ Statically provable (stage graph + ready-first)</span></td>
+  <td><span class="zh">✗ 需证 bounded buffer 不死锁</span><span class="en">✗ Must prove bounded buffer deadlock-freedom</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">实现复杂度</span><span class="en">Complexity</span></strong></td>
+  <td><span class="zh"><code>_enqueue_period</code> — 简单循环</span><span class="en"><code>_enqueue_period</code> — simple loop</span></td>
+  <td><span class="zh">per-task 触发器 + 反压 + buffer 管理</span><span class="en">per-task triggers + back-pressure + buffer mgmt</span></td>
+</tr>
+<tr>
+  <td><strong><span class="zh">退化条件</span><span class="en">Degeneracy</span></strong></td>
+  <td>—</td>
+  <td><code>max_buffer = 1</code> <span class="zh">→ 退化为同步模型</span><span class="en">→ degenerates to synchronous</span></td>
+</tr>
+</table>
+
+<div class="api-card">
+<h4><span class="zh">异步模型的三个价值场景</span><span class="en">Three Value Scenarios for Async Model</span></h4>
+<div class="api-desc">
+<span class="zh"><ol>
+<li><strong>吸收 Jitter（最大价值）:</strong> H2D 的 PCIe 延迟和 InputDist 的 all-to-all 网络延迟均有不可预测的波动。同步模型下这些波动直接传导为 GPU 空闲；异步模型用 buffer 吸收，将随机延迟与 GPU 计算解耦。</li>
+<li><strong>更快的 Pipeline 填充:</strong> 同步模型需要 <code>depth</code> 个 <code>progress()</code> 调用才能填满流水线。异步模型中 H2D 等无依赖 task 可以 burst 式连续发射，显著缩短启动延迟。</li>
+<li><strong>异构资源解耦:</strong> H2D（DMA 引擎）、InputDist（NIC）、Forward（GPU SM）是不同的物理资源。同步模型强制它们以相同节拍工作；异步模型让它们各自以最大速率运行，通过 FIFO 自然解耦。</li>
+</ol></span>
+<span class="en"><ol>
+<li><strong>Absorbing jitter (greatest value):</strong> H2D's PCIe latency and InputDist's all-to-all network latency both have unpredictable variance. In the sync model this variance directly becomes GPU idle time; async buffers absorb it, decoupling random delays from GPU compute.</li>
+<li><strong>Faster pipeline fill:</strong> The sync model needs <code>depth</code> <code>progress()</code> calls to fill the pipeline. In the async model, dependency-free tasks like H2D can burst-fire, significantly reducing startup latency.</li>
+<li><strong>Heterogeneous resource decoupling:</strong> H2D (DMA engine), InputDist (NIC), and Forward (GPU SM) are different physical resources. The sync model forces them into lock-step; the async model lets each run at maximum rate, naturally decoupled through FIFOs.</li>
+</ol></span>
+</div>
+</div>
+
+<div class="callout callout-warn">
+<span class="zh"><strong>核心矛盾 — 显存:</strong> 推荐系统中 GPU 显存极度紧张（大规模 Embedding 表占据了大部分显存）。异步模型需要更多 buffer 槽位 → 更多显存。收益（吸收 jitter）和代价（挤占 Embedding 表空间）之间需要 profiling 数据指导 trade-off。
+<br><br>
+<strong>判断标准:</strong> 如果 nsys profile 显示非瓶颈 task 的延迟抖动导致了显著的 GPU stall（例如 H2D 偶尔 5ms 导致 Forward 空等），则值得引入有界 buffer。如果 GPU 利用率已接近 100%，异步模型不会带来额外收益。</span>
+<span class="en"><strong>Core tension — GPU memory:</strong> In recommendation systems GPU memory is extremely tight (large embedding tables consume most of it). The async model needs more buffer slots → more memory. The benefit (absorbing jitter) must be weighed against the cost (stealing memory from embedding tables), guided by profiling data.
+<br><br>
+<strong>Decision criterion:</strong> If nsys profiles show non-bottleneck task jitter causing significant GPU stalls (e.g. H2D occasionally 5ms causing Forward to idle), bounded buffers are worthwhile. If GPU utilization is already near 100%, async brings no additional benefit.</span>
+</div>
+
+<div class="api-card">
+<h4><span class="zh">如何选择</span><span class="en">How to Choose</span></h4>
+<div class="api-desc">
+<span class="zh"><p>两种模型已通过 <code>_PipelineBase</code> 共享基础设施，公共 API（<code>fill_pipeline</code> / <code>progress</code> / <code>drain</code> / <code>run</code>）完全相同，切换只需更换构造函数：</p>
+
+<pre><code><span style="color:var(--text-dim)"># 同步:</span> pipe = SWPipeline(plan, device=0)
+<span style="color:var(--text-dim)"># 异步:</span> pipe = DataFlowPipeline(plan, max_depth=5, device=0)</code></pre>
+
+<p><strong>推荐 SWPipeline（同步）</strong>当：</p>
+<ol>
+<li><strong>显存紧张:</strong> buffer 数量 = <code>depth</code>，完全确定，无运行时惊喜</li>
+<li><strong>需要可证明的死锁自由:</strong> <a href="#ready-first">ready-first</a> 算法在静态 stage 图上证明无死锁</li>
+<li><strong>需要可预测的调试:</strong> <code>print_schedule()</code> 精确输出每个 period 的 task-iteration 映射</li>
+</ol>
+
+<p><strong>推荐 DataFlowPipeline（异步）</strong>当：</p>
+<ol>
+<li><strong>nsys 显示 jitter 导致 GPU stall:</strong> 非瓶颈 task（H2D、InputDist）的延迟抖动传导为 GPU 空闲</li>
+<li><strong>需要更快的 pipeline 填充:</strong> 无依赖 task burst 式发射，缩短启动延迟</li>
+<li><strong>异构资源需要解耦:</strong> DMA/NIC/GPU SM 各自以最大速率运行</li>
+</ol></span>
+
+<span class="en"><p>Both models share infrastructure via <code>_PipelineBase</code> with identical public API (<code>fill_pipeline</code> / <code>progress</code> / <code>drain</code> / <code>run</code>). Switching requires only a constructor change:</p>
+
+<pre><code><span style="color:var(--text-dim)"># Sync:</span> pipe = SWPipeline(plan, device=0)
+<span style="color:var(--text-dim)"># Async:</span> pipe = DataFlowPipeline(plan, max_depth=5, device=0)</code></pre>
+
+<p><strong>Prefer SWPipeline (sync)</strong> when:</p>
+<ol>
+<li><strong>Memory is tight:</strong> buffer count = <code>depth</code>, fully deterministic, no runtime surprises</li>
+<li><strong>Need provable deadlock freedom:</strong> <a href="#ready-first">ready-first</a> algorithm proves deadlock-freedom on static stage graph</li>
+<li><strong>Need predictable debugging:</strong> <code>print_schedule()</code> precisely shows task-iteration mapping per period</li>
+</ol>
+
+<p><strong>Prefer DataFlowPipeline (async)</strong> when:</p>
+<ol>
+<li><strong>nsys shows jitter-induced GPU stalls:</strong> non-bottleneck task jitter (H2D, InputDist) propagating as GPU idle time</li>
+<li><strong>Need faster pipeline fill:</strong> dependency-free tasks burst-fire, reducing startup latency</li>
+<li><strong>Heterogeneous resources need decoupling:</strong> DMA/NIC/GPU SM each running at maximum rate</li>
+</ol></span>
+</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════ -->
 <h2 id="e2e-example"><span class="zh">端到端示例 — FusedSparseDist</span><span class="en">End-to-End Example — FusedSparseDist</span></h2>
 <!-- ════════════════════════════════════════════ -->
 
@@ -1976,10 +2473,29 @@ pipe.print_schedule(5)
 <span style="color:var(--text-dim)">#    7  InputDistWait      default  data_dist     |  --   i0    i1    i2    i3</span>
 <span style="color:var(--text-dim)">#    8  H2D                default  memcpy        | i0    i1    i2    i3    i4</span></code></pre>
 
+<div class="example-label">▸ <span class="zh">同一 PipelinePlan 用 DataFlowPipeline（无 stage 概念，max_depth=5）</span><span class="en">Same PipelinePlan with DataFlowPipeline (no stage concept, max_depth=5)</span></div>
+<pre><code><span style="color:var(--text-dim)"># 复用完全相同的 plan — DataFlowPipeline 忽略 stage 字段</span>
+<span style="color:var(--purple)">from</span> dataflow_pipeline <span style="color:var(--purple)">import</span> DataFlowPipeline
+
+pipe_df = DataFlowPipeline(plan, max_depth=5, device=0)
+
+<span style="color:var(--text-dim)"># 公共 API 完全一致</span>
+data_iter = pipe_df.fill_pipeline(dataloader)
+<span style="color:var(--purple)">while</span> <span style="color:var(--green)">True</span>:
+    <span style="color:var(--purple)">try</span>:
+        idx = pipe_df.progress(data_iter)
+    <span style="color:var(--purple)">except</span> StopIteration:
+        <span style="color:var(--purple)">break</span>
+
+<span style="color:var(--text-dim)"># 区别：</span>
+<span style="color:var(--text-dim)"># - fill_pipeline 阶段，H2D 会 burst 式连续发射 5 个 batch（无需等 period）</span>
+<span style="color:var(--text-dim)"># - 每个 task 完成后立即触发下游，无 period 节拍约束</span>
+<span style="color:var(--text-dim)"># - max_depth=5 控制反压：最多 5 个迭代同时在飞</span></code></pre>
+
 <hr class="divider">
 
 <p style="text-align:center; color:var(--text-dim); font-size:0.82rem; margin-top:40px;">
-  <span class="zh">基于</span><span class="en">Based on</span> <code>sw_pipeline.py</code> · <a href="sw_pipeline.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
+  <span class="zh">基于</span><span class="en">Based on</span> <code>sw_pipeline.py</code> + <code>dataflow_pipeline.py</code> · <a href="sw_pipeline.html"><span class="zh">← 回到 SWPipeline 总览</span><span class="en">← Back to SWPipeline Overview</span></a>
 </p>
 
 </div><!-- .main -->

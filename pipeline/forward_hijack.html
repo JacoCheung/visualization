@@ -190,51 +190,49 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
 <div class="svg-wrap">
 <div class="svg-header"><span><span class="zh">ShardedModule.forward() 内部结构</span><span class="en">ShardedModule.forward() Internals</span></span></div>
 <div class="svg-container">
-<svg viewBox="0 0 940 360" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="940" height="360" fill="#fafbfc" rx="8"/>
+<svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="900" height="280" fill="#fafbfc" rx="8"/>
   <defs>
     <marker id="a1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
   </defs>
-  <g transform="translate(32 30) scale(1.08 1.35)">
   <!-- Original forward box -->
-  <rect x="30" y="30" width="740" height="70" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
-  <text x="400" y="22" text-anchor="middle" fill="#7c3aed" font-weight="700" font-size="13">ShardedModule.forward(kjt)  — original, unsplit</text>
+  <text x="450" y="28" text-anchor="middle" fill="#7c3aed" font-weight="700" font-size="13">ShardedModule.forward(kjt)  — original, unsplit</text>
+  <rect x="40" y="46" width="820" height="76" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
   <!-- Phase 1 -->
-  <rect x="45" y="45" width="320" height="42" rx="6" fill="#dc2626"/>
-  <text x="205" y="64" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">① input_dist(ctx, kjt)</text>
-  <text x="205" y="79" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="12">AllToAll — NETWORK BOUND</text>
+  <rect x="65" y="64" width="330" height="44" rx="6" fill="#dc2626"/>
+  <text x="230" y="82" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">① input_dist(ctx, kjt)</text>
+  <text x="230" y="98" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10">AllToAll — NETWORK BOUND</text>
   <!-- Arrow -->
-  <line x1="375" y1="66" x2="395" y2="66" stroke="#475569" stroke-width="2" marker-end="url(#a1)"/>
+  <line x1="410" y1="86" x2="445" y2="86" stroke="#475569" stroke-width="2" marker-end="url(#a1)"/>
   <!-- Phase 2 -->
-  <rect x="405" y="45" width="350" height="42" rx="6" fill="#059669"/>
-  <text x="580" y="64" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">② compute_and_output_dist(ctx, data)</text>
-  <text x="580" y="79" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="12">Embedding lookup — GPU BOUND</text>
+  <rect x="465" y="64" width="360" height="44" rx="6" fill="#059669"/>
+  <text x="645" y="82" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">② compute_and_output_dist(ctx, data)</text>
+  <text x="645" y="98" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10">Embedding lookup — GPU BOUND</text>
 
   <!-- Pipelined version -->
-  <text x="400" y="125" text-anchor="middle" fill="#475569" font-size="12" font-weight="700">↓ Pipeline splits this into two stages on different streams ↓</text>
+  <text x="450" y="150" text-anchor="middle" fill="#475569" font-size="12" font-weight="700">↓ Pipeline splits this into two stages on different streams ↓</text>
 
   <!-- Split phase 1 -->
-  <rect x="30" y="148" width="340" height="42" rx="6" fill="#dc2626" opacity=".85"/>
-  <text x="200" y="168" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">① _start_data_dist(batch_i+1)</text>
-  <text x="200" y="183" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12.5">on data_dist_stream — during batch_i fwd/bwd</text>
+  <rect x="50" y="168" width="320" height="44" rx="6" fill="#dc2626" opacity=".85"/>
+  <text x="210" y="186" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">① _start_data_dist(batch_i+1)</text>
+  <text x="210" y="202" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on data_dist_stream — during batch_i fwd/bwd</text>
   <!-- Split phase 2 -->
-  <rect x="430" y="148" width="340" height="42" rx="6" fill="#059669" opacity=".85"/>
-  <text x="600" y="168" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">② PipelinedForward(batch_i)</text>
-  <text x="600" y="183" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12.5">on default_stream — compute_and_output_dist only</text>
+  <rect x="530" y="168" width="320" height="44" rx="6" fill="#059669" opacity=".85"/>
+  <text x="690" y="186" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">② PipelinedForward(batch_i)</text>
+  <text x="690" y="202" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on default_stream — compute_and_output_dist only</text>
 
   <!-- Context bridge -->
-  <rect x="370" y="155" width="60" height="28" rx="14" fill="#2563eb"/>
-  <text x="400" y="173" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Context</text>
+  <rect x="405" y="176" width="90" height="28" rx="14" fill="#2563eb"/>
+  <text x="450" y="194" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Context</text>
   <!-- Arrows -->
-  <line x1="340" y1="169" x2="370" y2="169" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a1)"/>
-  <line x1="430" y1="169" x2="435" y2="169" stroke="#2563eb" stroke-width="1.5"/>
+  <line x1="370" y1="190" x2="405" y2="190" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="495" y1="190" x2="530" y2="190" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a1)"/>
 
   <!-- Labels -->
-  <rect x="30" y="200" width="340" height="20" rx="4" fill="#fef2f2"/>
-  <text x="200" y="214" text-anchor="middle" fill="#dc2626" font-size="12" font-weight="600">batch_i+1 — next batch (pipelined ahead)</text>
-  <rect x="430" y="200" width="340" height="20" rx="4" fill="#ecfdf5"/>
-  <text x="600" y="214" text-anchor="middle" fill="#059669" font-size="12" font-weight="600">batch_i — current batch (forward pass)</text>
-  </g>
+  <rect x="50" y="226" width="320" height="22" rx="4" fill="#fef2f2"/>
+  <text x="210" y="241" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">batch_i+1 — next batch (pipelined ahead)</text>
+  <rect x="530" y="226" width="320" height="22" rx="4" fill="#ecfdf5"/>
+  <text x="690" y="241" text-anchor="middle" fill="#059669" font-size="10" font-weight="600">batch_i — current batch (forward pass)</text>
 </svg>
 </div>
 </div>
@@ -257,94 +255,91 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
   <div class="seq-actor" style="left:89.5%;background:#059669">PipelinedForward</div>
 </div>
 <div class="svg-container">
-<svg viewBox="0 0 1000 860" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="1000" height="860" fill="#fafbfc" rx="8"/>
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="1000" height="700" fill="#fafbfc" rx="8"/>
   <defs>
     <marker id="sa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
     <marker id="sr" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#94a3b8"/></marker>
   </defs>
-  <g transform="translate(20 28) scale(1.08 1.28)">
-
   <!-- Lifelines — colors match actors -->
-  <line x1="100" y1="10" x2="100" y2="600" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="280" y1="10" x2="280" y2="600" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="450" y1="10" x2="450" y2="600" stroke="#2563eb" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="630" y1="10" x2="630" y2="600" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="810" y1="10" x2="810" y2="600" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="120" y1="18" x2="120" y2="670" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="320" y1="18" x2="320" y2="670" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="520" y1="18" x2="520" y2="670" stroke="#2563eb" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="720" y1="18" x2="720" y2="670" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="900" y1="18" x2="900" y2="670" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
 
   <!-- STEP 1: Init-time rewrite (ONE-TIME) -->
-  <rect x="15" y="20" width="870" height="200" rx="8" fill="#faf5ff" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="25" y="38" fill="#7c3aed" font-weight="700" font-size="12">STEP 1: ONE-TIME SETUP  (_rewrite_model, called during fill_pipeline)</text>
+  <rect x="30" y="30" width="930" height="210" rx="8" fill="#faf5ff" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="52" fill="#7c3aed" font-weight="700" font-size="12">STEP 1: ONE-TIME SETUP  (_rewrite_model, called during fill_pipeline)</text>
 
   <!-- 1a: Find ShardedModules -->
-  <rect x="90" y="50" width="20" height="55" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
-  <line x1="110" y1="60" x2="270" y2="60" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="155" y="55" fill="#7c3aed" font-size="12" font-weight="600">named_modules() → find ShardedModule</text>
+  <rect x="110" y="68" width="20" height="68" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
+  <line x1="130" y1="82" x2="310" y2="82" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#sa)"/>
+  <text x="150" y="74" fill="#7c3aed" font-size="11" font-weight="600">named_modules() → find ShardedModule</text>
 
   <!-- 1b: Build ArgInfo -->
-  <rect x="90" y="80" width="20" height="1" fill="none"/>
-  <line x1="110" y1="85" x2="270" y2="85" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
-  <text x="155" y="80" fill="#0891b2" font-size="12">inspect batch → build ArgInfo(input_attrs, is_getitems)</text>
+  <rect x="110" y="108" width="20" height="1" fill="none"/>
+  <line x1="130" y1="114" x2="310" y2="114" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
+  <text x="150" y="106" fill="#0891b2" font-size="11">inspect batch → build ArgInfo(input_attrs, is_getitems)</text>
 
   <!-- 1c: Replace forward -->
-  <rect x="90" y="108" width="20" height="1" fill="none"/>
-  <rect x="270" y="105" width="20" height="40" rx="2" fill="#cffafe" stroke="#0891b2"/>
-  <text x="155" y="118" fill="#dc2626" font-size="12" font-weight="700">module.forward = PipelinedForward(name, args, module, ctx, stream)</text>
-  <line x1="110" y1="120" x2="270" y2="120" stroke="#dc2626" stroke-width="2" marker-end="url(#sa)"/>
+  <rect x="110" y="146" width="20" height="1" fill="none"/>
+  <rect x="310" y="138" width="20" height="54" rx="2" fill="#cffafe" stroke="#0891b2"/>
+  <text x="150" y="145" fill="#dc2626" font-size="11" font-weight="700">module.forward = PipelinedForward(name, args, module, ctx, stream)</text>
+  <line x1="130" y1="154" x2="310" y2="154" stroke="#dc2626" stroke-width="2" marker-end="url(#sa)"/>
 
   <!-- 1d: Arrow to PipelinedForward -->
-  <line x1="290" y1="135" x2="800" y2="135" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
-  <text x="500" y="130" fill="#059669" font-size="12">forward is now a PipelinedForward instance</text>
+  <line x1="330" y1="178" x2="890" y2="178" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
+  <text x="535" y="170" fill="#059669" font-size="11">forward is now a PipelinedForward instance</text>
 
   <!-- Note: ArgInfo -->
-  <rect x="360" y="155" width="420" height="55" rx="6" fill="#fff" stroke="#e2e8f0"/>
-  <text x="375" y="172" fill="#334155" font-size="12" font-weight="700">ArgInfo stores "how to extract KJT from batch":</text>
-  <text x="375" y="188" fill="#475569" font-size="12.5">input_attrs=["", "sparse_features"] → batch.sparse_features</text>
-  <text x="375" y="202" fill="#475569" font-size="12.5">This lets _start_data_dist call input_dist() without going through model()</text>
+  <rect x="395" y="192" width="410" height="58" rx="6" fill="#fff" stroke="#e2e8f0"/>
+  <text x="410" y="212" fill="#334155" font-size="11" font-weight="700">ArgInfo stores "how to extract KJT from batch":</text>
+  <text x="410" y="228" fill="#475569" font-size="10">input_attrs=["", "sparse_features"] → batch.sparse_features</text>
+  <text x="410" y="242" fill="#475569" font-size="10">This lets _start_data_dist call input_dist() without going through model()</text>
 
   <!-- STEP 2: Each iteration — _start_data_dist (on data_dist_stream) -->
-  <rect x="15" y="230" width="870" height="135" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="25" y="248" fill="#ea580c" font-weight="700" font-size="12">STEP 2: EACH ITER — _start_data_dist(batch_i+1)  [on data_dist_stream]</text>
+  <rect x="30" y="265" width="930" height="150" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="287" fill="#ea580c" font-weight="700" font-size="12">STEP 2: EACH ITER — _start_data_dist(batch_i+1)  [on data_dist_stream]</text>
 
-  <rect x="620" y="260" width="20" height="90" rx="2" fill="#ffedd5" stroke="#ea580c"/>
+  <rect x="710" y="300" width="20" height="96" rx="2" fill="#ffedd5" stroke="#ea580c"/>
 
   <!-- 2a: Build args from batch -->
-  <text x="475" y="275" fill="#ea580c" font-size="12" font-weight="600">args = _build_args_kwargs(batch_i+1, forward.args)</text>
-  <line x1="640" y1="280" x2="800" y2="280" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="660" y="275" fill="#059669" font-size="12">reads ArgInfo</text>
+  <text x="470" y="316" fill="#ea580c" font-size="11" font-weight="600">args = _build_args_kwargs(batch_i+1, forward.args)</text>
+  <line x1="730" y1="322" x2="890" y2="322" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
+  <text x="745" y="313" fill="#059669" font-size="10">reads ArgInfo</text>
 
   <!-- 2b: Call input_dist -->
-  <line x1="640" y1="305" x2="270" y2="305" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="355" y="300" fill="#ea580c" font-size="12" font-weight="600">module.input_dist(ctx, *args) → Awaitable</text>
+  <line x1="730" y1="355" x2="310" y2="355" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
+  <text x="430" y="347" fill="#ea580c" font-size="11" font-weight="600">module.input_dist(ctx, *args) → Awaitable</text>
 
   <!-- 2c: Store in context -->
-  <line x1="640" y1="335" x2="440" y2="335" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="450" y="330" fill="#2563eb" font-size="12" font-weight="600">context.input_dist_tensors_requests[name] = awaitable</text>
+  <line x1="730" y1="388" x2="510" y2="388" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sa)"/>
+  <text x="520" y="380" fill="#2563eb" font-size="11" font-weight="600">context.input_dist_tensors_requests[name] = awaitable</text>
 
   <!-- STEP 3: model(batch_i) triggers PipelinedForward -->
-  <rect x="15" y="380" width="870" height="120" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="25" y="398" fill="#059669" font-weight="700" font-size="12">STEP 3: model(batch_i) → PipelinedForward.__call__()  [on default_stream]</text>
+  <rect x="30" y="440" width="930" height="130" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="462" fill="#059669" font-weight="700" font-size="12">STEP 3: model(batch_i) → PipelinedForward.__call__()  [on default_stream]</text>
 
-  <rect x="800" y="410" width="20" height="75" rx="2" fill="#d1fae5" stroke="#059669"/>
+  <rect x="890" y="475" width="20" height="82" rx="2" fill="#d1fae5" stroke="#059669"/>
 
   <!-- 3a: Pop from context -->
-  <line x1="810" y1="425" x2="460" y2="425" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sr)"/>
-  <text x="530" y="420" fill="#2563eb" font-size="12" font-weight="600">request = context.input_dist_tensors_requests.pop(name)</text>
+  <line x1="900" y1="492" x2="530" y2="492" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sr)"/>
+  <text x="595" y="484" fill="#2563eb" font-size="11" font-weight="600">request = context.input_dist_tensors_requests.pop(name)</text>
 
   <!-- 3b: Wait on dist_stream -->
-  <text x="650" y="450" fill="#ea580c" font-size="12">data = request.wait()  [wait on data_dist_stream]</text>
+  <text x="690" y="525" fill="#ea580c" font-size="10">data = request.wait()  [wait on data_dist_stream]</text>
 
   <!-- 3c: compute_and_output_dist -->
-  <line x1="810" y1="470" x2="270" y2="470" stroke="#059669" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="400" y="465" fill="#059669" font-size="12" font-weight="700">module.compute_and_output_dist(ctx, data)</text>
+  <line x1="900" y1="548" x2="310" y2="548" stroke="#059669" stroke-width="1.5" marker-end="url(#sa)"/>
+  <text x="430" y="540" fill="#059669" font-size="11" font-weight="700">module.compute_and_output_dist(ctx, data)</text>
 
   <!-- STEP 4: Result flows back to model -->
-  <rect x="15" y="510" width="870" height="80" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="25" y="528" fill="#334155" font-weight="700" font-size="12">RESULT: model() gets embedding output as if forward() was called normally</text>
-  <text x="35" y="550" fill="#475569" font-size="12.5">• The model graph is unchanged — only ShardedModule.forward is monkey-patched</text>
-  <text x="35" y="568" fill="#475569" font-size="12.5">• All non-ShardedModule layers (dense layers, MLP, etc.) execute normally on default_stream</text>
-  <text x="35" y="586" fill="#475569" font-size="12.5">• The batch_i+1 input_dist was already running during batch_i compute → AllToAll hidden!</text>
-  </g>
+  <rect x="30" y="595" width="930" height="90" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="618" fill="#334155" font-weight="700" font-size="12">RESULT: model() gets embedding output as if forward() was called normally</text>
+  <text x="55" y="640" fill="#475569" font-size="10">• The model graph is unchanged — only ShardedModule.forward is monkey-patched</text>
+  <text x="55" y="656" fill="#475569" font-size="10">• All non-ShardedModule layers (dense layers, MLP, etc.) execute normally on default_stream</text>
+  <text x="55" y="672" fill="#475569" font-size="10">• The batch_i+1 input_dist was already running during batch_i compute → AllToAll hidden!</text>
 </svg>
 </div>
 </div>
@@ -374,99 +369,96 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
 <div class="svg-wrap">
 <div class="svg-header"><span><span class="zh">Context 数据流</span><span class="en">Context Data Flow</span></span><span class="hint">TrainPipelineContext vs PrefetchTrainPipelineContext</span></div>
 <div class="svg-container">
-<svg viewBox="0 0 980 760" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="980" height="760" fill="#fafbfc" rx="8"/>
+<svg viewBox="0 0 1000 580" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="1000" height="580" fill="#fafbfc" rx="8"/>
   <defs>
     <marker id="ca" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
     <marker id="cb" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#2563eb"/></marker>
     <marker id="cg" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#059669"/></marker>
     <marker id="cr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#dc2626"/></marker>
   </defs>
-  <g transform="translate(18 24) scale(1.04 1.28)">
-
   <!-- ===== BASE PIPELINE (TrainPipelineContext) ===== -->
-  <text x="20" y="22" fill="#2563eb" font-weight="700" font-size="13">TrainPipelineContext — Base Pipeline</text>
+  <text x="40" y="30" fill="#2563eb" font-weight="700" font-size="13">TrainPipelineContext — Base Pipeline</text>
 
   <!-- Context box -->
-  <rect x="280" y="40" width="340" height="180" rx="10" fill="#fff" stroke="#2563eb" stroke-width="2"/>
-  <rect x="280" y="40" width="340" height="24" rx="10" fill="#2563eb"/>
-  <rect x="280" y="56" width="340" height="8" fill="#2563eb"/>
-  <text x="450" y="58" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">TrainPipelineContext</text>
+  <rect x="320" y="52" width="360" height="210" rx="10" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+  <rect x="320" y="52" width="360" height="28" rx="10" fill="#2563eb"/>
+  <rect x="320" y="72" width="360" height="8" fill="#2563eb"/>
+  <text x="500" y="71" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">TrainPipelineContext</text>
 
   <!-- Fields -->
-  <rect x="295" y="75" width="310" height="20" rx="4" fill="#fef2f2"/>
-  <text x="450" y="89" text-anchor="middle" fill="#dc2626" font-size="12" font-weight="600">input_dist_splits_requests: Dict[str, Awaitable]</text>
-  <rect x="295" y="100" width="310" height="20" rx="4" fill="#dbeafe"/>
-  <text x="450" y="114" text-anchor="middle" fill="#1e40af" font-size="12" font-weight="600">input_dist_tensors_requests: Dict[str, Awaitable]</text>
-  <rect x="295" y="125" width="310" height="20" rx="4" fill="#d1fae5"/>
-  <text x="450" y="139" text-anchor="middle" fill="#065f46" font-size="12" font-weight="600">module_contexts: Dict[str, Multistreamable]</text>
-  <rect x="295" y="150" width="310" height="20" rx="4" fill="#fef9c3"/>
-  <text x="450" y="164" text-anchor="middle" fill="#854d0e" font-size="12" font-weight="600">fused_splits_awaitables: List[(...)]</text>
-  <rect x="295" y="175" width="310" height="20" rx="4" fill="#f5f3ff"/>
-  <text x="450" y="189" text-anchor="middle" fill="#6b21a8" font-size="12" font-weight="600">module_contexts_next_batch: Dict[...]</text>
+  <rect x="340" y="92" width="320" height="22" rx="4" fill="#fef2f2"/>
+  <text x="500" y="107" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">input_dist_splits_requests: Dict[str, Awaitable]</text>
+  <rect x="340" y="122" width="320" height="22" rx="4" fill="#dbeafe"/>
+  <text x="500" y="137" text-anchor="middle" fill="#1e40af" font-size="10" font-weight="600">input_dist_tensors_requests: Dict[str, Awaitable]</text>
+  <rect x="340" y="152" width="320" height="22" rx="4" fill="#d1fae5"/>
+  <text x="500" y="167" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_contexts: Dict[str, Multistreamable]</text>
+  <rect x="340" y="182" width="320" height="22" rx="4" fill="#fef9c3"/>
+  <text x="500" y="197" text-anchor="middle" fill="#854d0e" font-size="10" font-weight="600">fused_splits_awaitables: List[(...)]</text>
+  <rect x="340" y="212" width="320" height="22" rx="4" fill="#f5f3ff"/>
+  <text x="500" y="227" text-anchor="middle" fill="#6b21a8" font-size="10" font-weight="600">module_contexts_next_batch: Dict[...]</text>
 
   <!-- Producer: _start_data_dist -->
-  <rect x="20" y="80" width="200" height="60" rx="8" fill="#ea580c"/>
-  <text x="120" y="103" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">_start_data_dist()</text>
-  <text x="120" y="120" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12">on data_dist_stream</text>
+  <rect x="45" y="112" width="220" height="70" rx="8" fill="#ea580c"/>
+  <text x="155" y="138" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_start_data_dist()</text>
+  <text x="155" y="156" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on data_dist_stream</text>
   <!-- Arrow: producer → context -->
-  <line x1="220" y1="85" x2="295" y2="85" stroke="#dc2626" stroke-width="1.5" marker-end="url(#cr)"/>
-  <line x1="220" y1="135" x2="295" y2="135" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
-  <text x="240" y="78" fill="#dc2626" font-size="12">writes splits</text>
-  <text x="240" y="130" fill="#059669" font-size="12">writes ctx</text>
+  <line x1="265" y1="120" x2="340" y2="120" stroke="#dc2626" stroke-width="1.5" marker-end="url(#cr)"/>
+  <line x1="265" y1="170" x2="340" y2="170" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
+  <text x="275" y="112" fill="#dc2626" font-size="10">writes splits</text>
+  <text x="275" y="185" fill="#059669" font-size="10">writes ctx</text>
 
   <!-- Transformer: wait_sparse_data_dist -->
-  <rect x="340" y="230" width="220" height="36" rx="6" fill="#fbbf24"/>
-  <text x="450" y="252" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">wait_sparse_data_dist()</text>
-  <path d="M450,195 L450,230" fill="none" stroke="#854d0e" stroke-width="1.5" marker-end="url(#ca)"/>
-  <text x="460" y="216" fill="#854d0e" font-size="12">fuse + wait → tensors_requests</text>
+  <rect x="395" y="290" width="210" height="42" rx="6" fill="#fbbf24"/>
+  <text x="500" y="316" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">wait_sparse_data_dist()</text>
+  <path d="M500,234 L500,290" fill="none" stroke="#854d0e" stroke-width="1.5" marker-end="url(#ca)"/>
+  <text x="615" y="276" fill="#854d0e" font-size="10">fuse + wait → tensors_requests</text>
 
   <!-- Consumer: PipelinedForward -->
-  <rect x="660" y="80" width="200" height="60" rx="8" fill="#059669"/>
-  <text x="760" y="103" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">PipelinedForward</text>
-  <text x="760" y="120" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12">on default_stream</text>
+  <rect x="735" y="112" width="220" height="70" rx="8" fill="#059669"/>
+  <text x="845" y="138" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PipelinedForward</text>
+  <text x="845" y="156" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on default_stream</text>
   <!-- Arrow: context → consumer -->
-  <line x1="605" y1="110" x2="660" y2="110" stroke="#2563eb" stroke-width="1.5" marker-end="url(#cb)"/>
-  <line x1="605" y1="135" x2="660" y2="135" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
-  <text x="610" y="105" fill="#2563eb" font-size="12">pops tensors_req</text>
-  <text x="610" y="150" fill="#059669" font-size="12">pops module_ctx</text>
+  <line x1="660" y1="132" x2="735" y2="132" stroke="#2563eb" stroke-width="1.5" marker-end="url(#cb)"/>
+  <line x1="660" y1="164" x2="735" y2="164" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
+  <text x="668" y="124" fill="#2563eb" font-size="10">pops tensors_req</text>
+  <text x="668" y="178" fill="#059669" font-size="10">pops module_ctx</text>
 
   <!-- ===== PREFETCH PIPELINE ===== -->
-  <text x="20" y="300" fill="#059669" font-weight="700" font-size="13">PrefetchTrainPipelineContext — Adds Prefetch Layer</text>
+  <text x="40" y="368" fill="#059669" font-weight="700" font-size="13">PrefetchTrainPipelineContext — Adds Prefetch Layer</text>
 
   <!-- Prefetch context box (extends base) -->
-  <rect x="200" y="315" width="500" height="90" rx="10" fill="#fff" stroke="#059669" stroke-width="2"/>
-  <rect x="200" y="315" width="500" height="24" rx="10" fill="#059669"/>
-  <rect x="200" y="331" width="500" height="8" fill="#059669"/>
-  <text x="450" y="333" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">PrefetchTrainPipelineContext  (extends TrainPipelineContext)</text>
+  <rect x="220" y="382" width="560" height="116" rx="10" fill="#fff" stroke="#059669" stroke-width="2"/>
+  <rect x="220" y="382" width="560" height="28" rx="10" fill="#059669"/>
+  <rect x="220" y="402" width="560" height="8" fill="#059669"/>
+  <text x="500" y="401" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PrefetchTrainPipelineContext  (extends TrainPipelineContext)</text>
 
-  <rect x="215" y="350" width="230" height="20" rx="4" fill="#bbf7d0"/>
-  <text x="330" y="364" text-anchor="middle" fill="#065f46" font-size="12.5" font-weight="600">module_input_post_prefetch</text>
-  <rect x="455" y="350" width="230" height="20" rx="4" fill="#a7f3d0"/>
-  <text x="570" y="364" text-anchor="middle" fill="#065f46" font-size="12.5" font-weight="600">module_contexts_post_prefetch</text>
-  <text x="450" y="393" text-anchor="middle" fill="#475569" font-size="12">(inherits all base fields above)</text>
+  <rect x="245" y="428" width="250" height="24" rx="4" fill="#bbf7d0"/>
+  <text x="370" y="444" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_input_post_prefetch</text>
+  <rect x="505" y="428" width="250" height="24" rx="4" fill="#a7f3d0"/>
+  <text x="630" y="444" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_contexts_post_prefetch</text>
+  <text x="500" y="478" text-anchor="middle" fill="#475569" font-size="10">(inherits all base fields above)</text>
 
   <!-- Prefetch flow -->
-  <rect x="20" y="425" width="200" height="40" rx="6" fill="#0891b2"/>
-  <text x="120" y="442" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_prefetch_embeddings()</text>
-  <text x="120" y="457" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12">on prefetch_stream</text>
+  <rect x="40" y="425" width="160" height="60" rx="6" fill="#0891b2"/>
+  <text x="120" y="448" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_prefetch_embeddings()</text>
+  <text x="120" y="466" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on prefetch_stream</text>
 
-  <line x1="220" y1="440" x2="310" y2="370" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ca)"/>
-  <text x="225" y="405" fill="#0891b2" font-size="12">pops input_dist_tensors_requests</text>
-  <text x="225" y="418" fill="#0891b2" font-size="12">→ wait() + prefetch()</text>
-  <text x="225" y="431" fill="#0891b2" font-size="12">→ stores into post_prefetch</text>
+  <line x1="200" y1="455" x2="320" y2="440" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ca)"/>
+  <text x="210" y="406" fill="#0891b2" font-size="10">pops input_dist_tensors_requests</text>
+  <text x="210" y="420" fill="#0891b2" font-size="10">→ wait() + prefetch()</text>
+  <text x="210" y="434" fill="#0891b2" font-size="10">→ stores into post_prefetch</text>
 
-  <rect x="680" y="425" width="200" height="50" rx="6" fill="#16a34a"/>
-  <text x="780" y="445" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PrefetchPipelinedFwd</text>
-  <text x="780" y="462" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="12">pops from post_prefetch</text>
-  <text x="780" y="475" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="12" font-weight="600">→ ZERO WAIT!</text>
+  <rect x="800" y="425" width="165" height="60" rx="6" fill="#16a34a"/>
+  <text x="882" y="447" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PrefetchPipelinedFwd</text>
+  <text x="882" y="465" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">pops from post_prefetch</text>
+  <text x="882" y="479" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10" font-weight="600">→ ZERO WAIT!</text>
 
-  <line x1="605" y1="370" x2="680" y2="440" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ca)"/>
+  <line x1="780" y1="442" x2="800" y2="442" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ca)"/>
 
   <!-- Key insight box -->
-  <rect x="20" y="490" width="860" height="22" rx="4" fill="#eff6ff" stroke="#bfdbfe"/>
-  <text x="450" y="505" text-anchor="middle" fill="#1e40af" font-size="12"><tspan font-weight="700">Key:</tspan> Base pipeline waits for AllToAll in forward(). Prefetch pipeline waits in a background stage → forward has zero AllToAll latency.</text>
-  </g>
+  <rect x="40" y="520" width="920" height="28" rx="4" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="500" y="538" text-anchor="middle" fill="#1e40af" font-size="10"><tspan font-weight="700">Key:</tspan> Base pipeline waits for AllToAll in forward(). Prefetch pipeline waits in a background stage → forward has zero AllToAll latency.</text>
 </svg>
 </div>
 </div>
@@ -593,88 +585,86 @@ graph = tracer.<span class="fn">trace</span>(model, concrete_args)
   <div class="seq-actor" style="left:90.0%;background:#059669">ShardedModule</div>
 </div>
 <div class="svg-container">
-<svg viewBox="0 0 1000 740" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="1000" height="740" fill="#fafbfc" rx="8"/>
+<svg viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="1000" height="540" fill="#fafbfc" rx="8"/>
   <defs>
     <marker id="fa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
     <marker id="fr" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#94a3b8"/></marker>
   </defs>
-  <g transform="translate(20 22) scale(1.08 1.34)">
   <!-- Lifelines -->
-  <line x1="95" y1="5" x2="95" y2="460" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="275" y1="5" x2="275" y2="460" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="455" y1="5" x2="455" y2="460" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="640" y1="5" x2="640" y2="460" stroke="#be185d" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="815" y1="5" x2="815" y2="460" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="120" y1="20" x2="120" y2="500" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="320" y1="20" x2="320" y2="500" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="520" y1="20" x2="520" y2="500" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="720" y1="20" x2="720" y2="500" stroke="#be185d" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="900" y1="20" x2="900" y2="500" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
 
   <!-- Activations -->
-  <rect x="88" y="15" width="14" height="440" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
-  <rect x="268" y="45" width="14" height="180" rx="2" fill="#cffafe" stroke="#0891b2"/>
-  <rect x="448" y="120" width="14" height="105" rx="2" fill="#ffedd5" stroke="#ea580c"/>
-  <rect x="633" y="245" width="14" height="110" rx="2" fill="#fce7f3" stroke="#be185d"/>
-  <rect x="808" y="370" width="14" height="60" rx="2" fill="#d1fae5" stroke="#059669"/>
+  <rect x="113" y="34" width="14" height="456" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
+  <rect x="313" y="84" width="14" height="210" rx="2" fill="#cffafe" stroke="#0891b2"/>
+  <rect x="513" y="174" width="14" height="120" rx="2" fill="#ffedd5" stroke="#ea580c"/>
+  <rect x="713" y="334" width="14" height="120" rx="2" fill="#fce7f3" stroke="#be185d"/>
+  <rect x="893" y="468" width="14" height="52" rx="2" fill="#d1fae5" stroke="#059669"/>
 
   <!-- Step 1: Unwrap model -->
-  <text x="110" y="30" fill="#7c3aed" font-size="12" font-weight="600">unwrap: DMP → DDP → Float16 → Module</text>
+  <text x="145" y="54" fill="#7c3aed" font-size="11" font-weight="600">unwrap: DMP → DDP → Float16 → Module</text>
 
   <!-- Step 2: _get_leaf_module_names -->
-  <line x1="102" y1="55" x2="268" y2="55" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="125" y="50" fill="#0891b2" font-size="12">_get_leaf_module_names(model)</text>
+  <line x1="127" y1="92" x2="313" y2="92" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
+  <text x="150" y="84" fill="#0891b2" font-size="11">_get_leaf_module_names(model)</text>
 
   <!-- Step 2 detail -->
-  <rect x="290" y="65" width="250" height="45" rx="4" fill="#ecfeff" stroke="#0891b2"/>
-  <text x="300" y="80" fill="#155e75" font-size="12">Shallow traversal: find modules adjacent</text>
-  <text x="300" y="93" fill="#155e75" font-size="12">to ShardedModule → mark siblings as leaf</text>
-  <text x="300" y="106" fill="#155e75" font-size="12">Result: trace INTO parent, NOT into leaves</text>
+  <rect x="350" y="106" width="290" height="60" rx="4" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="365" y="126" fill="#155e75" font-size="10">Shallow traversal: find modules adjacent</text>
+  <text x="365" y="140" fill="#155e75" font-size="10">to ShardedModule → mark siblings as leaf</text>
+  <text x="365" y="154" fill="#155e75" font-size="10">Result: trace INTO parent, NOT into leaves</text>
 
   <!-- Step 3: Tracer.trace -->
-  <line x1="102" y1="130" x2="268" y2="130" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="120" y="125" fill="#0891b2" font-size="12" font-weight="600">Tracer.trace(model, concrete_args)</text>
+  <line x1="127" y1="190" x2="313" y2="190" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
+  <text x="145" y="182" fill="#0891b2" font-size="11" font-weight="600">Tracer.trace(model, concrete_args)</text>
 
   <!-- Step 3 detail: symbolic execution -->
-  <rect x="290" y="140" width="280" height="56" rx="4" fill="#fff7ed" stroke="#ea580c"/>
-  <text x="300" y="156" fill="#9a3412" font-size="12.5" font-weight="700">Symbolic execution (no real data!):</text>
-  <text x="300" y="170" fill="#9a3412" font-size="12">• proxy_buffer_attributes = False</text>
-  <text x="300" y="184" fill="#9a3412" font-size="12">• ShardedModule → is_leaf = True → records call_module node</text>
+  <rect x="350" y="206" width="300" height="68" rx="4" fill="#fff7ed" stroke="#ea580c"/>
+  <text x="365" y="226" fill="#9a3412" font-size="11" font-weight="700">Symbolic execution (no real data!):</text>
+  <text x="365" y="242" fill="#9a3412" font-size="10">• proxy_buffer_attributes = False</text>
+  <text x="365" y="258" fill="#9a3412" font-size="10">• ShardedModule → is_leaf = True → records call_module node</text>
 
   <!-- Arrow: trace → graph -->
-  <line x1="282" y1="200" x2="448" y2="200" stroke="#ea580c" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="310" y="215" fill="#ea580c" font-size="12">returns FX Graph</text>
+  <line x1="327" y1="282" x2="513" y2="282" stroke="#ea580c" stroke-width="1.5" marker-end="url(#fa)"/>
+  <text x="370" y="298" fill="#ea580c" font-size="10">returns FX Graph</text>
 
   <!-- Step 4: Iterate graph nodes -->
-  <text x="420" y="240" fill="#ea580c" font-size="12" font-weight="600">for node in graph.nodes:</text>
+  <text x="475" y="316" fill="#ea580c" font-size="11" font-weight="600">for node in graph.nodes:</text>
 
   <!-- Step 5: Check node -->
-  <rect x="350" y="248" width="220" height="40" rx="4" fill="#fef9c3" stroke="#ca8a04"/>
-  <text x="460" y="263" text-anchor="middle" fill="#854d0e" font-size="12.5" font-weight="700">node.op == "call_module"</text>
-  <text x="460" y="278" text-anchor="middle" fill="#854d0e" font-size="12.5">node.target in sharded_modules?</text>
+  <rect x="405" y="326" width="250" height="48" rx="4" fill="#fef9c3" stroke="#ca8a04"/>
+  <text x="530" y="346" text-anchor="middle" fill="#854d0e" font-size="11" font-weight="700">node.op == "call_module"</text>
+  <text x="530" y="362" text-anchor="middle" fill="#854d0e" font-size="11">node.target in sharded_modules?</text>
 
   <!-- Step 6: _get_node_args -->
-  <line x1="462" y1="290" x2="633" y2="290" stroke="#be185d" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="475" y="285" fill="#be185d" font-size="12" font-weight="600">_get_node_args(node)</text>
+  <line x1="530" y1="386" x2="713" y2="386" stroke="#be185d" stroke-width="1.5" marker-end="url(#fa)"/>
+  <text x="548" y="378" fill="#be185d" font-size="11" font-weight="600">_get_node_args(node)</text>
 
   <!-- _get_node_args detail -->
-  <rect x="655" y="250" width="220" height="100" rx="4" fill="#fce7f3" stroke="#be185d"/>
-  <text x="665" y="268" fill="#9d174d" font-size="12.5" font-weight="700">Walk graph backward from node.args:</text>
-  <text x="665" y="284" fill="#9d174d" font-size="12">• "placeholder" → batch itself</text>
-  <text x="665" y="298" fill="#9d174d" font-size="12">• "call_function getattr" → attr name</text>
-  <text x="665" y="312" fill="#9d174d" font-size="12">• "call_function __getitem__" → index</text>
-  <text x="665" y="326" fill="#9d174d" font-size="12">→ ArgInfo(["", "sparse_features"])</text>
-  <text x="665" y="342" fill="#9d174d" font-size="12">  meaning: batch.sparse_features</text>
+  <rect x="750" y="332" width="195" height="112" rx="4" fill="#fce7f3" stroke="#be185d"/>
+  <text x="764" y="352" fill="#9d174d" font-size="11" font-weight="700">Walk graph backward from node.args:</text>
+  <text x="764" y="370" fill="#9d174d" font-size="10">• "placeholder" → batch itself</text>
+  <text x="764" y="386" fill="#9d174d" font-size="10">• "call_function getattr" → attr name</text>
+  <text x="764" y="402" fill="#9d174d" font-size="10">• "call_function __getitem__" → index</text>
+  <text x="764" y="418" fill="#9d174d" font-size="10">→ ArgInfo(["", "sparse_features"])</text>
+  <text x="764" y="434" fill="#9d174d" font-size="10">  meaning: batch.sparse_features</text>
 
   <!-- Return ArgInfo -->
-  <line x1="633" y1="360" x2="102" y2="360" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#fr)"/>
-  <text x="300" y="355" fill="#94a3b8" font-size="12">returns arg_info_list</text>
+  <line x1="713" y1="454" x2="127" y2="454" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#fr)"/>
+  <text x="355" y="446" fill="#94a3b8" font-size="10">returns arg_info_list</text>
 
   <!-- Step 7: Replace forward -->
-  <line x1="102" y1="385" x2="808" y2="385" stroke="#059669" stroke-width="2" marker-end="url(#fa)"/>
-  <text x="300" y="380" fill="#dc2626" font-size="12" font-weight="700">module.forward = PipelinedForward(name, arg_info_list, module, ctx, stream)</text>
+  <line x1="127" y1="478" x2="893" y2="478" stroke="#059669" stroke-width="2" marker-end="url(#fa)"/>
+  <text x="310" y="470" fill="#dc2626" font-size="11" font-weight="700">module.forward = PipelinedForward(name, arg_info_list, module, ctx, stream)</text>
 
   <!-- Result note -->
-  <rect x="30" y="420" width="840" height="45" rx="6" fill="#fff" stroke="#e2e8f0"/>
-  <text x="45" y="438" fill="#334155" font-size="12"><tspan font-weight="700">Result:</tspan> ShardedModule.forward no longer calls input_dist(). It's now a PipelinedForward that picks up</text>
-  <text x="45" y="454" fill="#334155" font-size="12">pre-computed results from TrainPipelineContext. The original forward is saved in _original_forwards for restore.</text>
-  </g>
+  <rect x="40" y="494" width="910" height="32" rx="6" fill="#fff" stroke="#e2e8f0"/>
+  <text x="54" y="509" fill="#334155" font-size="10"><tspan font-weight="700">Result:</tspan> ShardedModule.forward no longer calls input_dist(). It's now a PipelinedForward that picks up</text>
+  <text x="54" y="521" fill="#334155" font-size="10">pre-computed results from TrainPipelineContext. The original forward is saved in _original_forwards for restore.</text>
 </svg>
 </div>
 </div>
@@ -771,60 +761,57 @@ data.<span class="fn">record_stream</span>(current_stream)
 <div class="svg-wrap">
 <div class="svg-header"><span><span class="zh">三级拆分 — ShardedModule.forward() 的完整分解</span><span class="en">Three-Level Split — Full Decomposition of ShardedModule.forward()</span></span></div>
 <div class="svg-container">
-<svg viewBox="0 0 980 420" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="980" height="420" fill="#fafbfc" rx="8"/>
+<svg viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="960" height="320" fill="#fafbfc" rx="8"/>
   <defs>
     <marker id="pa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
   </defs>
-  <g transform="translate(20 26) scale(1.04 1.32)">
-
   <!-- Original -->
-  <text x="20" y="22" fill="#64748b" font-weight="700" font-size="13">ORIGINAL (no pipeline):</text>
-  <rect x="20" y="32" width="860" height="36" rx="6" fill="#475569"/>
-  <text x="450" y="55" text-anchor="middle" fill="#fff" font-weight="700">ShardedModule.forward(kjt) = input_dist + compute_and_output_dist</text>
+  <text x="40" y="28" fill="#64748b" font-weight="700" font-size="13">ORIGINAL (no pipeline):</text>
+  <rect x="40" y="42" width="880" height="44" rx="6" fill="#475569"/>
+  <text x="480" y="69" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">ShardedModule.forward(kjt) = input_dist + compute_and_output_dist</text>
 
   <!-- 2-stage split -->
-  <text x="20" y="90" fill="#2563eb" font-weight="700" font-size="13">BASE PIPELINE (2-stage split):</text>
-  <rect x="20" y="100" width="330" height="36" rx="6" fill="#dc2626"/>
-  <text x="185" y="123" text-anchor="middle" fill="#fff" font-weight="700" font-size="12.5">_start_data_dist → input_dist</text>
-  <text x="185" y="143" text-anchor="middle" fill="#dc2626" font-size="12">data_dist_stream (batch_i+1)</text>
-  <rect x="380" y="100" width="90" height="36" rx="18" fill="#2563eb"/>
-  <text x="425" y="123" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Context</text>
-  <rect x="500" y="100" width="380" height="36" rx="6" fill="#059669"/>
-  <text x="690" y="117" text-anchor="middle" fill="#fff" font-weight="700" font-size="12.5">PipelinedForward → wait + compute</text>
-  <text x="690" y="143" text-anchor="middle" fill="#059669" font-size="12">default_stream (batch_i) — still waits for AllToAll</text>
-  <line x1="350" y1="118" x2="380" y2="118" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="470" y1="118" x2="500" y2="118" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <text x="40" y="110" fill="#2563eb" font-weight="700" font-size="13">BASE PIPELINE (2-stage split):</text>
+  <rect x="40" y="124" width="290" height="40" rx="6" fill="#dc2626"/>
+  <text x="185" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_start_data_dist → input_dist</text>
+  <text x="185" y="180" text-anchor="middle" fill="#dc2626" font-size="10">data_dist_stream (batch_i+1)</text>
+  <rect x="375" y="124" width="90" height="40" rx="18" fill="#2563eb"/>
+  <text x="420" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Context</text>
+  <rect x="510" y="124" width="410" height="40" rx="6" fill="#059669"/>
+  <text x="715" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PipelinedForward → wait + compute</text>
+  <text x="715" y="180" text-anchor="middle" fill="#059669" font-size="10">default_stream (batch_i) — still waits for AllToAll</text>
+  <line x1="330" y1="144" x2="375" y2="144" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <line x1="465" y1="144" x2="510" y2="144" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
 
   <!-- 3-stage split -->
-  <text x="20" y="175" fill="#059669" font-weight="700" font-size="13">PREFETCH PIPELINE (3-stage split):</text>
-  <rect x="20" y="185" width="240" height="36" rx="6" fill="#dc2626"/>
-  <text x="140" y="207" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_start_data_dist</text>
-  <text x="140" y="228" text-anchor="middle" fill="#dc2626" font-size="12">data_dist_stream</text>
+  <text x="40" y="214" fill="#059669" font-weight="700" font-size="13">PREFETCH PIPELINE (3-stage split):</text>
+  <rect x="40" y="228" width="190" height="40" rx="6" fill="#dc2626"/>
+  <text x="135" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_start_data_dist</text>
+  <text x="135" y="264" text-anchor="middle" fill="#dc2626" font-size="10">data_dist_stream</text>
 
-  <rect x="270" y="185" width="60" height="36" rx="18" fill="#2563eb"/>
-  <text x="300" y="207" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Ctx</text>
+  <rect x="255" y="228" width="70" height="40" rx="18" fill="#2563eb"/>
+  <text x="290" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Ctx</text>
 
-  <rect x="340" y="185" width="260" height="36" rx="6" fill="#0891b2"/>
-  <text x="470" y="207" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_prefetch_embeddings</text>
-  <text x="470" y="228" text-anchor="middle" fill="#0891b2" font-size="12">prefetch_stream — wait + prefetch()</text>
+  <rect x="350" y="228" width="280" height="40" rx="6" fill="#0891b2"/>
+  <text x="490" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_prefetch_embeddings</text>
+  <text x="490" y="264" text-anchor="middle" fill="#0891b2" font-size="10">prefetch_stream — wait + prefetch()</text>
 
-  <rect x="610" y="185" width="60" height="36" rx="18" fill="#2563eb"/>
-  <text x="640" y="207" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Ctx</text>
+  <rect x="655" y="228" width="70" height="40" rx="18" fill="#2563eb"/>
+  <text x="690" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Ctx</text>
 
-  <rect x="680" y="185" width="200" height="36" rx="6" fill="#16a34a"/>
-  <text x="780" y="207" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PrefetchPipelinedFwd</text>
-  <text x="780" y="228" text-anchor="middle" fill="#16a34a" font-size="12">default_stream — ZERO WAIT!</text>
+  <rect x="750" y="228" width="170" height="40" rx="6" fill="#16a34a"/>
+  <text x="835" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PrefetchPipelinedFwd</text>
+  <text x="835" y="264" text-anchor="middle" fill="#16a34a" font-size="10">default_stream — ZERO WAIT!</text>
 
-  <line x1="260" y1="203" x2="270" y2="203" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="330" y1="203" x2="340" y2="203" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="600" y1="203" x2="610" y2="203" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="670" y1="203" x2="680" y2="203" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <line x1="230" y1="248" x2="255" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <line x1="325" y1="248" x2="350" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <line x1="630" y1="248" x2="655" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <line x1="725" y1="248" x2="750" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
 
   <!-- Overlap note -->
-  <rect x="20" y="255" width="860" height="18" rx="4" fill="#ecfdf5" stroke="#a7f3d0"/>
-  <text x="450" y="268" text-anchor="middle" fill="#065f46" font-size="12">Each stage runs on a different CUDA stream → all three stages from different batches overlap in time!</text>
-  </g>
+  <rect x="40" y="286" width="880" height="22" rx="4" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="480" y="301" text-anchor="middle" fill="#065f46" font-size="10">Each stage runs on a different CUDA stream → all three stages from different batches overlap in time!</text>
 </svg>
 </div>
 </div>
@@ -843,61 +830,59 @@ data.<span class="fn">record_stream</span>(current_stream)
 <div class="svg-wrap">
 <div class="svg-header"><span><span class="zh">Prefetch Pipeline 稳态时间线（3 batch in-flight）</span><span class="en">Prefetch Pipeline Steady-State Timeline (3 batches in-flight)</span></span></div>
 <div class="svg-container">
-<svg viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="13">
-  <rect width="1000" height="430" fill="#fafbfc" rx="8"/>
-  <g transform="translate(28 24) scale(1.05 1.28)">
+<svg viewBox="0 0 960 340" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
+  <rect width="960" height="340" fill="#fafbfc" rx="8"/>
 
   <!-- Time axis -->
-  <line x1="160" y1="275" x2="870" y2="275" stroke="#94a3b8" stroke-width="1"/>
-  <text x="510" y="295" text-anchor="middle" fill="#94a3b8" font-size="12">time →</text>
+  <line x1="190" y1="300" x2="900" y2="300" stroke="#94a3b8" stroke-width="1"/>
+  <text x="545" y="322" text-anchor="middle" fill="#94a3b8" font-size="11">time →</text>
 
   <!-- Stream labels -->
-  <text x="15" y="50" fill="#dc2626" font-weight="700" font-size="12">memcpy_stream</text>
-  <text x="15" y="100" fill="#ea580c" font-weight="700" font-size="12">data_dist_stream</text>
-  <text x="15" y="150" fill="#0891b2" font-weight="700" font-size="12">prefetch_stream</text>
-  <text x="15" y="200" fill="#059669" font-weight="700" font-size="12">default_stream</text>
-  <text x="15" y="250" fill="#475569" font-weight="700" font-size="12">CPU thread</text>
+  <text x="24" y="60" fill="#dc2626" font-weight="700" font-size="11">memcpy_stream</text>
+  <text x="24" y="110" fill="#ea580c" font-weight="700" font-size="11">data_dist_stream</text>
+  <text x="24" y="160" fill="#0891b2" font-weight="700" font-size="11">prefetch_stream</text>
+  <text x="24" y="210" fill="#059669" font-weight="700" font-size="11">default_stream</text>
+  <text x="24" y="260" fill="#475569" font-weight="700" font-size="11">CPU thread</text>
 
   <!-- Gridlines -->
-  <line x1="160" y1="30" x2="160" y2="265" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="190" y1="40" x2="190" y2="288" stroke="#e2e8f0" stroke-width="1"/>
 
   <!-- ======= progress(batch_i) ======= -->
   <!-- memcpy: batch_i+2 H2D -->
-  <rect x="400" y="37" width="120" height="24" rx="4" fill="#fecaca" stroke="#dc2626"/>
-  <text x="460" y="53" text-anchor="middle" fill="#dc2626" font-size="12" font-weight="600">H2D batch_i+2</text>
+  <rect x="430" y="50" width="130" height="28" rx="4" fill="#fecaca" stroke="#dc2626"/>
+  <text x="495" y="68" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">H2D batch_i+2</text>
 
   <!-- data_dist: batch_i+1 input_dist (AllToAll) - was done in prev step -->
-  <rect x="170" y="87" width="200" height="24" rx="4" fill="#fed7aa" stroke="#ea580c"/>
-  <text x="270" y="103" text-anchor="middle" fill="#ea580c" font-size="12" font-weight="600">input_dist batch_i+1 (AllToAll)</text>
+  <rect x="210" y="100" width="230" height="28" rx="4" fill="#fed7aa" stroke="#ea580c"/>
+  <text x="325" y="118" text-anchor="middle" fill="#ea580c" font-size="10" font-weight="600">input_dist batch_i+1 (AllToAll)</text>
 
   <!-- prefetch: batch_i wait + prefetch -->
-  <rect x="170" y="137" width="150" height="24" rx="4" fill="#a5f3fc" stroke="#0891b2"/>
-  <text x="245" y="153" text-anchor="middle" fill="#0891b2" font-size="12" font-weight="600">prefetch batch_i</text>
+  <rect x="210" y="150" width="170" height="28" rx="4" fill="#a5f3fc" stroke="#0891b2"/>
+  <text x="295" y="168" text-anchor="middle" fill="#0891b2" font-size="10" font-weight="600">prefetch batch_i</text>
 
   <!-- default: batch_i forward + backward -->
-  <rect x="330" y="187" width="100" height="24" rx="4" fill="#bbf7d0" stroke="#059669"/>
-  <text x="380" y="203" text-anchor="middle" fill="#059669" font-size="12" font-weight="600">fwd batch_i</text>
-  <rect x="440" y="187" width="150" height="24" rx="4" fill="#fde68a" stroke="#ca8a04"/>
-  <text x="515" y="203" text-anchor="middle" fill="#854d0e" font-size="12" font-weight="600">bwd + optim batch_i</text>
+  <rect x="390" y="200" width="110" height="28" rx="4" fill="#bbf7d0" stroke="#059669"/>
+  <text x="445" y="218" text-anchor="middle" fill="#059669" font-size="10" font-weight="600">fwd batch_i</text>
+  <rect x="515" y="200" width="175" height="28" rx="4" fill="#fde68a" stroke="#ca8a04"/>
+  <text x="602" y="218" text-anchor="middle" fill="#854d0e" font-size="10" font-weight="600">bwd + optim batch_i</text>
 
   <!-- data_dist: batch_i+2 starts after batch_i+1 done -->
-  <rect x="600" y="87" width="200" height="24" rx="4" fill="#fed7aa" stroke="#ea580c" opacity=".6"/>
-  <text x="700" y="103" text-anchor="middle" fill="#ea580c" font-size="12">input_dist batch_i+2</text>
+  <rect x="650" y="100" width="210" height="28" rx="4" fill="#fed7aa" stroke="#ea580c" opacity=".6"/>
+  <text x="755" y="118" text-anchor="middle" fill="#ea580c" font-size="10">input_dist batch_i+2</text>
 
   <!-- prefetch: batch_i+1 -->
-  <rect x="600" y="137" width="150" height="24" rx="4" fill="#a5f3fc" stroke="#0891b2" opacity=".6"/>
-  <text x="675" y="153" text-anchor="middle" fill="#0891b2" font-size="12">prefetch batch_i+1</text>
+  <rect x="650" y="150" width="170" height="28" rx="4" fill="#a5f3fc" stroke="#0891b2" opacity=".6"/>
+  <text x="735" y="168" text-anchor="middle" fill="#0891b2" font-size="10">prefetch batch_i+1</text>
 
   <!-- CPU: orchestrates -->
-  <rect x="170" y="237" width="50" height="24" rx="4" fill="#e2e8f0"/><text x="195" y="253" text-anchor="middle" fill="#475569" font-size="12">wait</text>
-  <rect x="225" y="237" width="80" height="24" rx="4" fill="#e2e8f0"/><text x="265" y="253" text-anchor="middle" fill="#475569" font-size="12">sdd i+2</text>
-  <rect x="310" y="237" width="50" height="24" rx="4" fill="#e2e8f0"/><text x="335" y="253" text-anchor="middle" fill="#475569" font-size="12">fwd</text>
-  <rect x="365" y="237" width="70" height="24" rx="4" fill="#e2e8f0"/><text x="400" y="253" text-anchor="middle" fill="#475569" font-size="12">prefetch</text>
+  <rect x="210" y="250" width="60" height="28" rx="4" fill="#e2e8f0"/><text x="240" y="268" text-anchor="middle" fill="#475569" font-size="10">wait</text>
+  <rect x="278" y="250" width="90" height="28" rx="4" fill="#e2e8f0"/><text x="323" y="268" text-anchor="middle" fill="#475569" font-size="10">sdd i+2</text>
+  <rect x="376" y="250" width="60" height="28" rx="4" fill="#e2e8f0"/><text x="406" y="268" text-anchor="middle" fill="#475569" font-size="10">fwd</text>
+  <rect x="444" y="250" width="84" height="28" rx="4" fill="#e2e8f0"/><text x="486" y="268" text-anchor="middle" fill="#475569" font-size="10">prefetch</text>
 
   <!-- Overlap brackets -->
-  <rect x="330" y="30" width="260" height="195" rx="6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,3" opacity=".5"/>
-  <text x="460" y="25" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700">All 4 streams active simultaneously</text>
-  </g>
+  <rect x="355" y="42" width="305" height="210" rx="6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,3" opacity=".5"/>
+  <text x="507" y="36" text-anchor="middle" fill="#7c3aed" font-size="11" font-weight="700">All 4 streams active simultaneously</text>
 </svg>
 </div>
 </div>

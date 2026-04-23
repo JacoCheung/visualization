@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,136 +7,117 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7}
-a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
+a{color:#2563eb;text-decoration:none}
+a:hover{text-decoration:underline}
 code{font-family:'SF Mono',Consolas,'Courier New',monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:3px;color:#0f172a}
-pre{font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.6;overflow-x:auto;white-space:pre}
+pre{font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.6;overflow-x:auto}
 
-header{background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 50%,#2563eb 100%);color:#fff;padding:28px 0 22px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+header{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;padding:28px 0 22px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.15)}
 header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
-header p{font-size:12px;color:rgba(255,255,255,.6);margin-top:4px}
+header p{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px}
+header .gh{display:inline-block;margin-top:8px;padding:4px 14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px;color:#fff;transition:background .15s}
+header .gh:hover{background:rgba(255,255,255,.22);text-decoration:none}
 
-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:0;z-index:50;overflow-x:auto;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;align-items:center;height:48px}
+nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;position:sticky;top:0;z-index:50;overflow-x:auto;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;align-items:center}
 .nav-links{overflow-x:auto;white-space:nowrap;flex:1}
 .nav-links a{display:inline-block;padding:10px 16px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;transition:all .15s}
 .nav-links a:hover{color:#1e293b;text-decoration:none}
-.nav-links a.active{color:#7c3aed;border-bottom-color:#7c3aed}
-.lang-btn{flex-shrink:0;margin-left:auto;padding:5px 14px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer}
-.lang-btn:hover{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.nav-links a.active{color:#2563eb;border-bottom-color:#2563eb}
+.lang-btn{flex-shrink:0;margin-left:auto;padding:5px 14px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer;transition:all .15s;white-space:nowrap}
+.lang-btn:hover{background:#2563eb;color:#fff;border-color:#2563eb}
 
 body.lang-en .zh{display:none!important}
 body.lang-zh .en{display:none!important}
 
-.container{max-width:1280px;margin:0 auto;padding:0 24px 88px}
+.container{max-width:1200px;margin:0 auto;padding:0 24px 80px}
 
-.phase-banner{margin:36px 0 24px;padding:18px 24px;border-radius:10px;border-left:4px solid}
-.phase-banner h2{font-size:17px;font-weight:700;margin-bottom:4px}
+.phase-banner{margin:36px 0 20px;padding:18px 24px;border-radius:10px;border-left:4px solid}
+.phase-banner h2{font-size:18px;font-weight:700;margin-bottom:4px}
 .phase-banner p{font-size:13px;opacity:.75}
-.pb-core{background:#faf5ff;border-color:#7c3aed;color:#4c1d95}
-.pb-ctx{background:#eff6ff;border-color:#2563eb;color:#1e40af}
-.pb-rewrite{background:#fff7ed;border-color:#ea580c;color:#9a3412}
-.pb-prefetch{background:#ecfdf5;border-color:#059669;color:#065f46}
-.pb-summary{background:#fef2f2;border-color:#dc2626;color:#991b1b}
+.phase-banner.why{background:#f5f3ff;border-color:#7c3aed;color:#4c1d95}
+.phase-banner.cls{background:#eff6ff;border-color:#2563eb;color:#1e40af}
+.phase-banner.rewrite{background:#ecfdf5;border-color:#059669;color:#065f46}
+.phase-banner.wait{background:#fff7ed;border-color:#ea580c;color:#9a3412}
+.phase-banner.fuse{background:#fef2f2;border-color:#dc2626;color:#991b1b}
 
-section{margin-bottom:52px;scroll-margin-top:76px}
-section h3{font-size:16px;font-weight:700;color:#4c1d95;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #ddd6fe;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;color:#fff;letter-spacing:.3px;background:#7c3aed}
+section{margin-bottom:40px;scroll-margin-top:70px}
+section h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+section h3 .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;color:#fff;letter-spacing:.3px}
+
 .desc{font-size:13.5px;color:#334155;margin-bottom:14px}
-.desc ul{padding-left:20px;margin:6px 0}.desc li{margin-bottom:4px}.desc strong{color:#0f172a}
+.desc ul,.desc ol{padding-left:20px;margin:6px 0}
+.desc li{margin-bottom:4px}
+.desc strong{color:#0f172a}
+.desc p{margin-bottom:8px}
 
-/* SVG diagram wrapper */
-.svg-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:12px}
-.svg-wrap:has(.seq-body){overflow:visible}
+.svg-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin:12px 0}
 .svg-header{background:#f8fafc;padding:8px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
 .svg-header span{font-size:11px;font-weight:600;color:#64748b}
 .svg-header .hint{font-size:10px;color:#94a3b8}
-.svg-container{overflow:auto;max-height:700px;padding:12px;text-align:center;position:relative}
-.svg-container svg{display:block;width:100%;height:auto;margin:0 auto}
+.svg-container{overflow:auto;padding:14px;text-align:center;position:relative}
+.svg-container svg{display:block;margin:0 auto;max-width:100%;height:auto}
 
-/* Sequence diagram with sticky actors */
-.seq-body{padding:0;position:relative}
-.seq-actors{position:sticky;top:48px;z-index:10;background:rgba(250,251,252,.97);backdrop-filter:blur(4px);border-bottom:1px solid #e2e8f0;height:44px;margin:0}
-.seq-actor{position:absolute;top:6px;transform:translateX(-50%);padding:7px 14px;border-radius:6px;color:#fff;font-weight:700;font-size:11.5px;text-align:center;font-family:'SF Mono',Consolas,monospace;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12)}
-
-.callout{padding:14px 18px;border-radius:8px;font-size:13px;margin:12px 0}
+.callout{padding:14px 18px;border-radius:8px;font-size:13px;margin:12px 0;line-height:1.65}
 .callout-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .callout-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
 .callout-tip{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.callout strong{display:block;margin-bottom:4px;font-size:13.5px}
 
-.code-block{background:#1e293b;border-radius:8px;padding:16px 20px;font-size:12px;line-height:1.7;color:#e2e8f0;overflow-x:auto;margin:12px 0}
-.code-block .kw{color:#c4b5fd}.code-block .fn{color:#67e8f9}.code-block .cm{color:#64748b}.code-block .st{color:#86efac}.code-block .ty{color:#fbbf24}
-
-.src-link{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#7c3aed;margin-top:4px}
-.src-link::before{content:'📄'}
-
-.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0}
-.tbl th,.tbl td{padding:8px 12px;border:1px solid #e2e8f0;text-align:left}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.tbl th,.tbl td{padding:9px 12px;border:1px solid #e2e8f0;text-align:left;vertical-align:top}
 .tbl th{background:#f8fafc;font-weight:700;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
 .tbl td code{background:#f1f5f9;font-size:11px}
 
-.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
-@media(max-width:800px){.compare-grid{grid-template-columns:1fr}}
-.compare-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.compare-card h4{font-size:13px;font-weight:700;padding:4px 10px;border-radius:6px;display:inline-block;margin-bottom:10px}
+.code-block{background:#1e293b;border-radius:8px;padding:14px 18px;font-size:12px;line-height:1.7;color:#e2e8f0;overflow-x:auto;margin:12px 0;font-family:'SF Mono',Consolas,monospace}
+.code-block .kw{color:#c4b5fd}
+.code-block .fn{color:#67e8f9}
+.code-block .cm{color:#64748b;font-style:italic}
+.code-block .st{color:#86efac}
+.code-block .ty{color:#fbbf24}
+.code-block .mk{color:#f87171;font-weight:700}
+
+.xref-bar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.xref-bar a{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:11.5px;font-weight:600;color:#475569;transition:all .15s}
+.xref-bar a:hover{background:#2563eb;color:#fff;border-color:#2563eb;text-decoration:none}
+.xref-bar a::before{content:'📄';margin-right:2px}
 
 footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
 
 /* Floating TOC */
-.ftoc{position:fixed;right:20px;top:140px;z-index:100;font-size:12px;width:240px}
-.ftoc-toggle{width:36px;height:36px;border-radius:50%;background:#4c1d95;color:#fff;border:none;cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .2s,background .2s;position:absolute;top:0;right:0}
-.ftoc-toggle:hover{background:#6d28d9;transform:scale(1.08)}
+.ftoc{position:fixed;right:20px;top:120px;z-index:100;font-size:12px;width:220px}
+.ftoc-toggle{width:36px;height:36px;border-radius:50%;background:#1e293b;color:#fff;border:none;cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .2s,background .2s;position:absolute;top:0;right:0}
+.ftoc-toggle:hover{background:#334155;transform:scale(1.08)}
 .ftoc.collapsed .ftoc-toggle{display:flex}
-.ftoc-panel{width:100%;max-height:calc(100vh - 180px);background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden;transition:transform .2s ease,opacity .15s ease;transform-origin:top right}
+.ftoc-panel{width:100%;max-height:calc(100vh - 160px);background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden;transition:transform .2s ease,opacity .15s ease;transform-origin:top right}
 .ftoc.collapsed .ftoc-panel{transform:scale(.9);opacity:0;pointer-events:none}
-.ftoc-head{background:#faf5ff;padding:8px 14px;border-bottom:1px solid #e9d5ff;display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none}
-.ftoc-head span{font-weight:700;color:#4c1d95;font-size:12px}
-.ftoc-head button{background:transparent;border:none;color:#7c3aed;font-size:16px;line-height:1;cursor:pointer}
-.ftoc-list{list-style:none;overflow-y:auto;max-height:calc(100vh - 230px);padding:4px 0}
+.ftoc-head{background:#f8fafc;padding:8px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none}
+.ftoc-head span{font-weight:700;color:#334155;font-size:12px}
+.ftoc-head button{background:transparent;border:none;color:#64748b;font-size:14px;line-height:1;cursor:pointer}
+.ftoc-list{list-style:none;overflow-y:auto;max-height:calc(100vh - 210px);padding:4px 0}
 .ftoc-list li a{display:block;padding:6px 14px;color:#475569;text-decoration:none;transition:background .1s,color .1s;border-left:3px solid transparent}
-.ftoc-list li a:hover{background:#f5f3ff;color:#1e293b;text-decoration:none}
-.ftoc-list li a.cur{color:#7c3aed;border-left-color:#7c3aed;background:#faf5ff;font-weight:600}
+.ftoc-list li a:hover{background:#f1f5f9;color:#1e293b;text-decoration:none}
+.ftoc-list li a.cur{color:#2563eb;border-left-color:#2563eb;background:#eff6ff;font-weight:600}
 .ftoc-list li a .toc-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;color:#fff;margin-right:5px;vertical-align:1px}
-@media(max-width:1200px){.ftoc{top:auto;bottom:18px;right:18px;width:220px}}
-@media(max-width:720px){.ftoc{right:12px;bottom:12px;width:auto}.ftoc-panel{width:min(320px,calc(100vw - 24px))}}
-
-/* Site-wide navigation */
-.site-nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:36px;gap:0;overflow-x:auto;white-space:nowrap}
-.site-nav a{display:inline-block;padding:6px 14px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.55);transition:color .15s;text-decoration:none}
-.site-nav a:hover{color:#fff;text-decoration:none}
-.site-nav a.here{color:#c4b5fd}
-.site-nav .home{color:rgba(255,255,255,.8);font-weight:800;margin-right:8px;font-size:12px}
-.xref-bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-.xref-bar a{display:inline-block;padding:5px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:11.5px;font-weight:600;color:#475569;transition:all .15s}
-.xref-bar a:hover{background:#7c3aed;color:#fff;border-color:#7c3aed;text-decoration:none}
+@media(max-width:1280px){.ftoc{display:none}}
 </style>
 </head>
 <body class="lang-en">
 
-<div class="site-nav">
-  <a class="home" href="index.html">Pipeline Docs</a>
-  <a href="pipeline_init.html">Pipeline Init</a>
-  <a href="forward_hijack.html">Forward Hijack</a>
-  <a href="context_lifecycle.html">Context Lifecycle</a>
-  <a href="runtime_timeline.html">Runtime Timeline</a>
-  <a href="sw_pipeline_overview.html">SWPipeline</a>
-  <a href="sw_pipeline_api.html">SWPipeline API</a>
-</div>
-
 <header>
-  <h1>Forward Hijack — Splitting ShardedModule.forward()</h1>
-  <p>NVIDIA recsys-examples · The core mechanism behind TorchRec pipeline overlapping</p>
+  <h1>Forward Hijack — <span class="zh">TorchRec Pipeline 如何拆分 forward()</span><span class="en">How TorchRec Pipeline Splits forward()</span></h1>
+  <p>NVIDIA recsys-examples · <code style="background:rgba(255,255,255,.12);color:#fff">_rewrite_model</code> · <code style="background:rgba(255,255,255,.12);color:#fff">BaseForward</code></p>
+  <a class="gh" href="https://github.com/NVIDIA/recsys-examples" target="_blank">⭐ GitHub</a>
 </header>
 
 <nav id="nav">
   <div class="nav-links">
-    <a href="#problem">Problem</a>
-    <a href="#split">The Split</a>
-    <a href="#context">Context Bridge</a>
-    <a href="#rewrite">_rewrite_model</a>
-    <a href="#pipelined-fwd">PipelinedForward</a>
-    <a href="#prefetch">Prefetch Layer</a>
-    <a href="#timeline">Timeline</a>
+    <a href="#problem"><span class="zh">问题</span><span class="en">Why Split?</span></a>
+    <a href="#classes"><span class="zh">类层级</span><span class="en">Class Hierarchy</span></a>
+    <a href="#split"><span class="zh">_rewrite_model</span><span class="en">_rewrite_model</span></a>
+    <a href="#waits"><span class="zh">两次 wait</span><span class="en">Two .wait()s</span></a>
+    <a href="#fuse"><span class="zh">Splits 融合</span><span class="en">Splits Fusing</span></a>
   </div>
-  <button class="lang-btn" id="langBtn" onclick="toggleLang()">中文</button>
+  <button id="langBtn" class="lang-btn" onclick="toggleLang()">中文</button>
 </nav>
 
 <div class="ftoc" id="ftoc">
@@ -146,13 +127,11 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
       <button onclick="document.getElementById('ftoc').classList.add('collapsed')" title="Collapse">✕</button>
     </div>
     <ul class="ftoc-list" id="ftocList">
-      <li><a href="#problem"><span class="toc-tag" style="background:#7c3aed">01</span>Problem</a></li>
-      <li><a href="#split"><span class="toc-tag" style="background:#6d28d9">02</span>The Split</a></li>
-      <li><a href="#context"><span class="toc-tag" style="background:#2563eb">03</span>Context Bridge</a></li>
-      <li><a href="#rewrite"><span class="toc-tag" style="background:#ea580c">04</span>_rewrite_model</a></li>
-      <li><a href="#pipelined-fwd"><span class="toc-tag" style="background:#059669">05</span>PipelinedForward</a></li>
-      <li><a href="#prefetch"><span class="toc-tag" style="background:#0d9488">06</span>Prefetch Layer</a></li>
-      <li><a href="#timeline"><span class="toc-tag" style="background:#dc2626">07</span>Timeline</a></li>
+      <li><a href="#problem"><span class="toc-tag" style="background:#7c3aed">01</span>Why Split?</a></li>
+      <li><a href="#classes"><span class="toc-tag" style="background:#2563eb">02</span>Class Hierarchy</a></li>
+      <li><a href="#split"><span class="toc-tag" style="background:#059669">03</span>_rewrite_model</a></li>
+      <li><a href="#waits"><span class="toc-tag" style="background:#ea580c">04</span>Two .wait()s</a></li>
+      <li><a href="#fuse"><span class="toc-tag" style="background:#dc2626">05</span>Splits Fusing</a></li>
     </ul>
   </div>
   <button class="ftoc-toggle" onclick="this.parentElement.classList.remove('collapsed')" title="Expand TOC">☰</button>
@@ -160,789 +139,927 @@ footer{text-align:center;padding:30px;font-size:11px;color:#94a3b8;border-top:1p
 
 <div class="container">
 
-<!-- ═══════════ PROBLEM ═══════════ -->
+<!-- ═══════════════════════════ §1  PROBLEM  ═══════════════════════════ -->
 <section id="problem">
-<div class="phase-banner pb-core">
-  <h2><span class="zh">问题 — 为什么需要拆分 forward?</span><span class="en">The Problem — Why Split forward()?</span></h2>
-</div>
+  <div class="phase-banner why">
+    <h2><span class="zh">§1 为什么要拆分 forward?</span><span class="en">§1 Why Split forward()?</span></h2>
+    <p><span class="zh">ShardedModule.forward() 内部串行运行两段 AllToAll——pipeline 的核心价值就是把它们拆开</span><span class="en">ShardedModule.forward() runs two AllToAll stages back-to-back — pipeline's whole job is to split them.</span></p>
+  </div>
 
-<div class="desc">
-<span class="zh">
-  <p>在 TorchRec 的分布式推荐系统中，<code>ShardedModule</code>（如 ShardedEBC）的 <code>forward()</code> 内部包含两个截然不同的阶段：</p>
-  <ol>
-    <li><strong>input_dist(ctx, kjt)</strong> — 执行 <strong>AllToAll 通信</strong>，将 KJT（KeyedJaggedTensor）按 sharding plan 分发到各 rank</li>
-    <li><strong>compute_and_output_dist(ctx, data)</strong> — 执行 <strong>本地 embedding 查找</strong>，然后将结果 AllToAll 回传</li>
-  </ol>
-  <p>如果不做拆分，<code>model(batch_i)</code> 的 forward 过程会串行执行这两步，而 AllToAll 通信（~毫秒级）会阻塞 GPU 计算。</p>
-  <p><strong>核心思想</strong>：把 <code>input_dist</code> 从 batch_i 的 forward 中"剥离"出来，提前到 <strong>batch_(i-1) 的 forward/backward 期间</strong>，在一个<strong>独立的 CUDA stream</strong> 上异步执行。这样 AllToAll 通信就被 GPU 计算完全遮盖了。</p>
-</span>
-<span class="en">
-  <p>In TorchRec's distributed recommendation system, a <code>ShardedModule</code> (e.g., ShardedEBC) has a <code>forward()</code> that internally performs two distinct phases:</p>
-  <ol>
-    <li><strong>input_dist(ctx, kjt)</strong> — Executes <strong>AllToAll communication</strong>, distributing KJT (KeyedJaggedTensor) to ranks per the sharding plan</li>
-    <li><strong>compute_and_output_dist(ctx, data)</strong> — Performs <strong>local embedding lookup</strong>, then AllToAll redistributes results</li>
-  </ol>
-  <p>Without splitting, <code>model(batch_i)</code> runs these sequentially, and AllToAll (~milliseconds) blocks GPU compute.</p>
-  <p><strong>Core idea</strong>: Extract <code>input_dist</code> from batch_i's forward, move it to execute <strong>during batch_(i-1)'s forward/backward</strong> on a <strong>separate CUDA stream</strong>. This fully hides AllToAll latency behind GPU compute.</p>
-</span>
-</div>
+  <div class="desc">
+    <span class="zh">
+      <p>TorchRec 的 <code>ShardedModule.forward()</code> 默认实现里藏着两段通信：</p>
+      <ol>
+        <li><strong>input_dist</strong>——把本 rank 的 KJT 按 sharding plan 做 AllToAll，分发到每个 shard 所在的 rank</li>
+        <li><strong>compute_and_output_dist</strong>——本地 embedding lookup + 再一次 AllToAll 回传结果</li>
+      </ol>
+      <p>Native 串行下，主线程只能等 input_dist 的 NCCL 完成才能启动后续 GPU 计算，AllToAll 的毫秒级延迟完全暴露在关键路径上。</p>
+      <p><strong>拆分核心思路</strong>：把 <code>input_dist</code> 从 <code>batch_i</code> 的 forward 里剥离，提前到 <code>batch_(i-1)</code> 的 fwd/bwd 期间跑，且用一条<strong>独立 CUDA stream</strong>。这样 AllToAll 被 GPU 计算完全覆盖。</p>
+    </span>
+    <span class="en">
+      <p>TorchRec's default <code>ShardedModule.forward()</code> hides two NCCL collectives:</p>
+      <ol>
+        <li><strong>input_dist</strong> — AllToAll the local KJT per the sharding plan so each rank receives the keys it owns</li>
+        <li><strong>compute_and_output_dist</strong> — local embedding lookup + another AllToAll to ship results back</li>
+      </ol>
+      <p>Native runs both serially; the main thread blocks on input_dist's NCCL before any downstream GPU work can start. Milliseconds of AllToAll latency land directly on the critical path.</p>
+      <p><strong>Core idea</strong>: extract <code>input_dist</code> out of <code>batch_i</code>'s forward and run it during <code>batch_(i-1)</code>'s fwd/bwd on an <strong>independent CUDA stream</strong>. AllToAll is now fully hidden behind GPU compute.</p>
+    </span>
+  </div>
 
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">ShardedModule.forward() 内部结构</span><span class="en">ShardedModule.forward() Internals</span></span></div>
-<div class="svg-container">
-<svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="900" height="280" fill="#fafbfc" rx="8"/>
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">Native vs Pipelined forward</span><span class="en">Native vs Pipelined forward</span></span>
+      <span class="hint">block diagram</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg" width="960" height="300">
   <defs>
-    <marker id="a1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .lbl{font-size:13px;fill:#fff;font-weight:700}
+      .sub{font-size:9px;fill:rgba(255,255,255,.78)}
+      .ttl{font-size:13px;font-weight:700;fill:#1e293b}
+      .tag{font-size:10px;fill:#475569}
+    </style>
+    <marker id="ar1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#475569"/>
+    </marker>
+    <filter id="shd"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
   </defs>
-  <!-- Original forward box -->
-  <text x="450" y="28" text-anchor="middle" fill="#7c3aed" font-weight="700" font-size="13">ShardedModule.forward(kjt)  — original, unsplit</text>
-  <rect x="40" y="46" width="820" height="76" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
-  <!-- Phase 1 -->
-  <rect x="65" y="64" width="330" height="44" rx="6" fill="#dc2626"/>
-  <text x="230" y="82" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">① input_dist(ctx, kjt)</text>
-  <text x="230" y="98" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10">AllToAll — NETWORK BOUND</text>
-  <!-- Arrow -->
-  <line x1="410" y1="86" x2="445" y2="86" stroke="#475569" stroke-width="2" marker-end="url(#a1)"/>
-  <!-- Phase 2 -->
-  <rect x="465" y="64" width="360" height="44" rx="6" fill="#059669"/>
-  <text x="645" y="82" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">② compute_and_output_dist(ctx, data)</text>
-  <text x="645" y="98" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10">Embedding lookup — GPU BOUND</text>
+  <rect width="960" height="300" fill="#fafbfc"/>
 
-  <!-- Pipelined version -->
-  <text x="450" y="150" text-anchor="middle" fill="#475569" font-size="12" font-weight="700">↓ Pipeline splits this into two stages on different streams ↓</text>
+  <!-- Native row -->
+  <text x="30" y="28" class="ttl">Native  — ShardedModule.forward(kjt)</text>
+  <text x="30" y="44" class="tag">main thread blocks on every NCCL · zero overlap</text>
 
-  <!-- Split phase 1 -->
-  <rect x="50" y="168" width="320" height="44" rx="6" fill="#dc2626" opacity=".85"/>
-  <text x="210" y="186" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">① _start_data_dist(batch_i+1)</text>
-  <text x="210" y="202" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on data_dist_stream — during batch_i fwd/bwd</text>
-  <!-- Split phase 2 -->
-  <rect x="530" y="168" width="320" height="44" rx="6" fill="#059669" opacity=".85"/>
-  <text x="690" y="186" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">② PipelinedForward(batch_i)</text>
-  <text x="690" y="202" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on default_stream — compute_and_output_dist only</text>
+  <g filter="url(#shd)">
+    <rect x="30" y="60" width="420" height="50" rx="8" fill="#dc2626"/>
+    <text x="240" y="82" text-anchor="middle" class="lbl">① input_dist(ctx, kjt)</text>
+    <text x="240" y="98" text-anchor="middle" class="sub">AllToAll — NETWORK BOUND</text>
+    <line x1="456" y1="85" x2="492" y2="85" stroke="#475569" stroke-width="2" marker-end="url(#ar1)"/>
+    <rect x="498" y="60" width="432" height="50" rx="8" fill="#059669"/>
+    <text x="714" y="82" text-anchor="middle" class="lbl">② compute_and_output_dist(ctx, data)</text>
+    <text x="714" y="98" text-anchor="middle" class="sub">embedding lookup — GPU BOUND</text>
+  </g>
 
-  <!-- Context bridge -->
-  <rect x="405" y="176" width="90" height="28" rx="14" fill="#2563eb"/>
-  <text x="450" y="194" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Context</text>
-  <!-- Arrows -->
-  <line x1="370" y1="190" x2="405" y2="190" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a1)"/>
-  <line x1="495" y1="190" x2="530" y2="190" stroke="#2563eb" stroke-width="1.5" marker-end="url(#a1)"/>
+  <!-- Divider -->
+  <text x="480" y="148" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">↓ Pipeline splits into two tasks on different streams ↓</text>
 
-  <!-- Labels -->
-  <rect x="50" y="226" width="320" height="22" rx="4" fill="#fef2f2"/>
-  <text x="210" y="241" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">batch_i+1 — next batch (pipelined ahead)</text>
-  <rect x="530" y="226" width="320" height="22" rx="4" fill="#ecfdf5"/>
-  <text x="690" y="241" text-anchor="middle" fill="#059669" font-size="10" font-weight="600">batch_i — current batch (forward pass)</text>
+  <!-- Pipelined row -->
+  <text x="30" y="182" class="ttl">Pipelined  — forward is hijacked</text>
+  <text x="30" y="198" class="tag">① runs ahead on data_dist_stream · ② reads context on default_stream</text>
+
+  <g filter="url(#shd)">
+    <rect x="30" y="212" width="370" height="52" rx="8" fill="#dc2626" opacity="0.88"/>
+    <text x="215" y="234" text-anchor="middle" class="lbl">① _start_data_dist(batch_i+1)</text>
+    <text x="215" y="250" text-anchor="middle" class="sub">on data_dist_stream — during batch_i fwd/bwd</text>
+
+    <!-- Context pill (widened to fit label) -->
+    <rect x="410" y="218" width="150" height="40" rx="20" fill="#2563eb"/>
+    <text x="485" y="242" text-anchor="middle" class="lbl" style="font-size:12px">TrainPipelineContext</text>
+
+    <!-- Arrow left→pill -->
+    <line x1="402" y1="238" x2="410" y2="238" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ar1)"/>
+    <!-- Arrow pill→right -->
+    <line x1="560" y1="238" x2="578" y2="238" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ar1)"/>
+
+    <rect x="580" y="212" width="350" height="52" rx="8" fill="#059669" opacity="0.88"/>
+    <text x="755" y="234" text-anchor="middle" class="lbl">② PipelinedForward.__call__(batch_i)</text>
+    <text x="755" y="250" text-anchor="middle" class="sub">reads context · skips input_dist</text>
+  </g>
+
+  <!-- Batch labels -->
+  <rect x="30" y="272" width="370" height="20" rx="4" fill="#fef2f2"/>
+  <text x="215" y="286" text-anchor="middle" font-size="10" font-weight="600" fill="#dc2626">batch_(i+1) — next batch, pipelined ahead</text>
+  <rect x="580" y="272" width="350" height="20" rx="4" fill="#ecfdf5"/>
+  <text x="755" y="286" text-anchor="middle" font-size="10" font-weight="600" fill="#059669">batch_(i) — current batch, forward pass</text>
 </svg>
-</div>
-</div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <strong><span class="zh">⚠️ 副作用</span><span class="en">⚠️ Side effects you'll meet</span></strong>
+    <span class="zh">
+      <ul>
+        <li>用户代码里 <code>self.shared_ebc(batch.feats_sparse)</code> 的参数表达式会被 <strong>evaluate 一遍但结果被忽略</strong>——真实输入从 context 取。</li>
+        <li>forward 被替换后<strong>不能直接 eval</strong>——要先把原始 forward 恢复（或别走这条路径）。</li>
+      </ul>
+    </span>
+    <span class="en">
+      <ul>
+        <li>User code like <code>self.shared_ebc(batch.feats_sparse)</code> still <strong>evaluates the arg expression</strong>, but the result is thrown away — the real input comes from context.</li>
+        <li>With the hijacked forward, plain <code>model.eval()</code> without restoring is unsafe — the patched forward always expects a populated context.</li>
+      </ul>
+    </span>
+  </div>
 </section>
 
-<!-- ═══════════ THE SPLIT ═══════════ -->
+<!-- ═══════════════════════════ §2  CLASS HIERARCHY  ═══════════════════════════ -->
+<section id="classes">
+  <div class="phase-banner cls">
+    <h2><span class="zh">§2 BaseForward 类继承</span><span class="en">§2 BaseForward Class Hierarchy</span></h2>
+    <p><span class="zh">3 种 pipeline 变体对应 3 种 forward 替换类——各自的 wait 时机不同</span><span class="en">3 pipeline variants · 3 forward-replacement classes · 3 different wait-timing strategies.</span></p>
+  </div>
+
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">BaseForward 继承关系图</span><span class="en">BaseForward Inheritance</span></span>
+      <span class="hint">class diagram</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 940 380" xmlns="http://www.w3.org/2000/svg" width="940" height="380">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .cls-name{font-size:13px;font-weight:700;fill:#fff}
+      .cls-role{font-size:9.5px;fill:#475569}
+      .cls-wait{font-size:12px;fill:#065f46;font-weight:700}
+      .cls-note{font-size:10.5px;fill:#475569}
+    </style>
+    <marker id="inh" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0,0 11,6 0,12" fill="#fff" stroke="#475569" stroke-width="1.5"/>
+    </marker>
+    <filter id="sh2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+  <rect width="940" height="380" fill="#fafbfc"/>
+
+  <!-- Root: BaseForward -->
+  <g filter="url(#sh2)">
+    <rect x="340" y="22" width="260" height="82" rx="8" fill="#fff" stroke="#64748b" stroke-width="1.8"/>
+    <rect x="340" y="22" width="260" height="26" rx="8" fill="#64748b"/>
+    <rect x="340" y="39" width="260" height="9" fill="#64748b"/>
+    <text x="470" y="40" text-anchor="middle" class="cls-name">BaseForward[TForwardContext]</text>
+    <line x1="340" y1="68" x2="600" y2="68" stroke="#cbd5e1"/>
+    <text x="352" y="62" class="cls-role">+ name · args · module · context · stream</text>
+    <text x="352" y="85" class="cls-role" style="font-style:italic">abstract __call__(*input) → Awaitable</text>
+    <text x="352" y="99" class="cls-role" style="fill:#94a3b8">torchrec-generic; no pipeline knowledge</text>
+  </g>
+
+  <!-- Child 1: PipelinedForward -->
+  <g filter="url(#sh2)">
+    <rect x="40" y="200" width="240" height="108" rx="8" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+    <rect x="40" y="200" width="240" height="26" rx="8" fill="#2563eb"/>
+    <rect x="40" y="217" width="240" height="9" fill="#2563eb"/>
+    <text x="160" y="218" text-anchor="middle" class="cls-name">PipelinedForward</text>
+    <line x1="40" y1="246" x2="280" y2="246" stroke="#dbeafe"/>
+    <text x="52" y="240" class="cls-role">pop: input_dist_tensors_requests</text>
+    <text x="52" y="260" class="cls-wait">★ wait #2 INSIDE __call__</text>
+    <text x="52" y="276" class="cls-role">→ compute_and_output_dist</text>
+    <text x="52" y="296" class="cls-role" style="fill:#2563eb;font-weight:700">TrainPipelineSparseDist</text>
+  </g>
+
+  <!-- Child 2: PrefetchPipelinedForward -->
+  <g filter="url(#sh2)">
+    <rect x="350" y="200" width="240" height="108" rx="8" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+    <rect x="350" y="200" width="240" height="26" rx="8" fill="#059669"/>
+    <rect x="350" y="217" width="240" height="9" fill="#059669"/>
+    <text x="470" y="218" text-anchor="middle" class="cls-name">PrefetchPipelinedForward</text>
+    <line x1="350" y1="246" x2="590" y2="246" stroke="#d1fae5"/>
+    <text x="362" y="240" class="cls-role">pop: module_input_post_prefetch</text>
+    <text x="362" y="260" class="cls-wait" style="fill:#059669">✓ zero .wait() in __call__</text>
+    <text x="362" y="276" class="cls-role">→ compute_and_output_dist</text>
+    <text x="362" y="296" class="cls-role" style="fill:#059669;font-weight:700">PrefetchTrainPipelineSparseDist</text>
+  </g>
+
+  <!-- Child 3: SplitPrefetchPipelinedForward -->
+  <g filter="url(#sh2)">
+    <rect x="660" y="200" width="240" height="108" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+    <rect x="660" y="200" width="240" height="26" rx="8" fill="#7c3aed"/>
+    <rect x="660" y="217" width="240" height="9" fill="#7c3aed"/>
+    <text x="780" y="218" text-anchor="middle" class="cls-name">SplitPrefetchPipelined</text>
+    <line x1="660" y1="246" x2="900" y2="246" stroke="#ede9fe"/>
+    <text x="672" y="240" class="cls-role">pop: self._cached_awaitable</text>
+    <text x="672" y="260" class="cls-wait" style="fill:#7c3aed">★ split across two tasks</text>
+    <text x="672" y="276" class="cls-role">→ two-phase via _IdempotentAwaitable</text>
+    <text x="672" y="296" class="cls-role" style="fill:#7c3aed;font-weight:700">SWSerialTrainPipeline</text>
+  </g>
+
+  <!-- Inheritance arrows (empty triangle) -->
+  <line x1="160" y1="200" x2="380" y2="110" stroke="#475569" stroke-width="1.5" marker-end="url(#inh)"/>
+  <line x1="470" y1="200" x2="470" y2="110" stroke="#475569" stroke-width="1.5" marker-end="url(#inh)"/>
+  <line x1="780" y1="200" x2="560" y2="110" stroke="#475569" stroke-width="1.5" marker-end="url(#inh)"/>
+
+  <text x="245" y="160" font-size="10" fill="#64748b" font-style="italic">extends</text>
+  <text x="478" y="160" font-size="10" fill="#64748b" font-style="italic">extends</text>
+  <text x="655" y="160" font-size="10" fill="#64748b" font-style="italic">extends</text>
+
+  <!-- Footnote -->
+  <text x="40" y="354" class="cls-note">
+    <tspan font-weight="700">★ wait #1</tspan> (Splits AllToAll) always happens in <tspan font-family="'SF Mono',Consolas,monospace" font-size="10.5">wait_sparse_data_dist()</tspan> — see §4.
+  </text>
+  <text x="40" y="370" class="cls-note" style="fill:#64748b">
+    wait #2 (Tensors AllToAll) is where the 3 variants diverge: inline vs. moved to prefetch vs. cached awaitable.
+  </text>
+</svg>
+    </div>
+  </div>
+
+  <div class="desc" style="margin-top:6px">
+    <span class="zh"><p>每个 class box 的三条元数据——<strong>pop 来源</strong>、<strong>__call__ 里 wait 去留</strong>、<strong>用哪个 Pipeline</strong>——对应 §4 三种不同的 wait 时机策略。</p></span>
+    <span class="en"><p>Each class box's three metadata lines — <strong>pop source</strong>, <strong>wait inside __call__</strong>, <strong>which Pipeline uses it</strong> — correspond to the three wait-timing strategies in §4.</p></span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ §3  _REWRITE_MODEL  ═══════════════════════════ -->
 <section id="split">
-<div class="phase-banner pb-core">
-  <h2><span class="zh">拆分手术 — 4 个关键步骤</span><span class="en">The Split — 4 Key Steps</span></h2>
-</div>
+  <div class="phase-banner rewrite">
+    <h2><span class="zh">§3 _rewrite_model 的拆分手术</span><span class="en">§3 The _rewrite_model Split Surgery</span></h2>
+    <p><span class="zh">5 步 FX 追踪 + 猴子补丁，TrainPipelineContext 是新旧两端之间的黑板</span><span class="en">5-step FX trace + monkey patch; TrainPipelineContext is the blackboard between the two halves.</span></p>
+  </div>
 
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">Forward 拆分的完整流程</span><span class="en">Complete Forward-Split Flow</span></span><span class="hint">_rewrite_model → _start_data_dist → PipelinedForward</span></div>
-<div class="seq-body">
-<div class="seq-actors">
-  <div class="seq-actor" style="left:12.8%;background:#7c3aed">_rewrite_model</div>
-  <div class="seq-actor" style="left:32.2%;background:#0891b2">ShardedModule</div>
-  <div class="seq-actor" style="left:50.6%;background:#2563eb">TrainPipelineContext</div>
-  <div class="seq-actor" style="left:70.0%;background:#ea580c">_start_data_dist</div>
-  <div class="seq-actor" style="left:89.5%;background:#059669">PipelinedForward</div>
-</div>
-<div class="svg-container">
-<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="1000" height="700" fill="#fafbfc" rx="8"/>
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">_rewrite_model 5 步流程 + Context 总线</span><span class="en">_rewrite_model 5-step Flow + Context Bus</span></span>
+      <span class="hint">flow diagram</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 980 420" xmlns="http://www.w3.org/2000/svg" width="980" height="420">
   <defs>
-    <marker id="sa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
-    <marker id="sr" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#94a3b8"/></marker>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .step-lbl{font-size:12px;font-weight:700;fill:#fff}
+      .step-n{font-size:9px;font-weight:700;fill:rgba(255,255,255,.78)}
+      .sec-ttl{font-size:13px;font-weight:700;fill:#1e293b}
+      .arr-lbl{font-size:9.5px}
+    </style>
+    <marker id="rma" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#475569"/>
+    </marker>
+    <marker id="rmw" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#dc2626"/>
+    </marker>
+    <marker id="rmr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#2563eb"/>
+    </marker>
+    <filter id="sh3"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
   </defs>
-  <!-- Lifelines — colors match actors -->
-  <line x1="120" y1="18" x2="120" y2="670" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="320" y1="18" x2="320" y2="670" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="520" y1="18" x2="520" y2="670" stroke="#2563eb" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="720" y1="18" x2="720" y2="670" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="900" y1="18" x2="900" y2="670" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
+  <rect width="980" height="420" fill="#fafbfc"/>
 
-  <!-- STEP 1: Init-time rewrite (ONE-TIME) -->
-  <rect x="30" y="30" width="930" height="210" rx="8" fill="#faf5ff" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="45" y="52" fill="#7c3aed" font-weight="700" font-size="12">STEP 1: ONE-TIME SETUP  (_rewrite_model, called during fill_pipeline)</text>
+  <!-- Phase A: One-time rewrite (top) -->
+  <text x="30" y="28" class="sec-ttl">A · One-time rewrite (inside <tspan font-family="'SF Mono',Consolas,monospace" font-size="11">fill_pipeline</tspan>)</text>
 
-  <!-- 1a: Find ShardedModules -->
-  <rect x="110" y="68" width="20" height="68" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
-  <line x1="130" y1="82" x2="310" y2="82" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="150" y="74" fill="#7c3aed" font-size="11" font-weight="600">named_modules() → find ShardedModule</text>
+  <g filter="url(#sh3)">
+    <!-- Step 1 -->
+    <rect x="30" y="44" width="170" height="52" rx="8" fill="#7c3aed"/>
+    <text x="115" y="63" text-anchor="middle" class="step-n">STEP 1</text>
+    <text x="115" y="80" text-anchor="middle" class="step-lbl">Unwrap DMP/DDP</text>
+    <!-- Step 2 -->
+    <rect x="216" y="44" width="170" height="52" rx="8" fill="#7c3aed"/>
+    <text x="301" y="63" text-anchor="middle" class="step-n">STEP 2</text>
+    <text x="301" y="80" text-anchor="middle" class="step-lbl">Collect ShardedModule</text>
+    <!-- Step 3 -->
+    <rect x="402" y="44" width="170" height="52" rx="8" fill="#7c3aed"/>
+    <text x="487" y="63" text-anchor="middle" class="step-n">STEP 3</text>
+    <text x="487" y="80" text-anchor="middle" class="step-lbl">FX trace (leaf = SM)</text>
+    <!-- Step 4 -->
+    <rect x="588" y="44" width="170" height="52" rx="8" fill="#7c3aed"/>
+    <text x="673" y="63" text-anchor="middle" class="step-n">STEP 4</text>
+    <text x="673" y="80" text-anchor="middle" class="step-lbl">Build ArgInfo list</text>
+    <!-- Step 5 -->
+    <rect x="774" y="44" width="170" height="52" rx="8" fill="#dc2626"/>
+    <text x="859" y="63" text-anchor="middle" class="step-n">STEP 5</text>
+    <text x="859" y="80" text-anchor="middle" class="step-lbl">Swap .forward</text>
+  </g>
 
-  <!-- 1b: Build ArgInfo -->
-  <rect x="110" y="108" width="20" height="1" fill="none"/>
-  <line x1="130" y1="114" x2="310" y2="114" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
-  <text x="150" y="106" fill="#0891b2" font-size="11">inspect batch → build ArgInfo(input_attrs, is_getitems)</text>
+  <!-- Arrows between steps -->
+  <line x1="200" y1="70" x2="214" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#rma)"/>
+  <line x1="386" y1="70" x2="400" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#rma)"/>
+  <line x1="572" y1="70" x2="586" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#rma)"/>
+  <line x1="758" y1="70" x2="772" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#rma)"/>
 
-  <!-- 1c: Replace forward -->
-  <rect x="110" y="146" width="20" height="1" fill="none"/>
-  <rect x="310" y="138" width="20" height="54" rx="2" fill="#cffafe" stroke="#0891b2"/>
-  <text x="150" y="145" fill="#dc2626" font-size="11" font-weight="700">module.forward = PipelinedForward(name, args, module, ctx, stream)</text>
-  <line x1="130" y1="154" x2="310" y2="154" stroke="#dc2626" stroke-width="2" marker-end="url(#sa)"/>
+  <!-- Outcome label -->
+  <text x="859" y="118" text-anchor="middle" font-size="10" fill="#dc2626" font-style="italic">module.forward is now PipelinedForward</text>
 
-  <!-- 1d: Arrow to PipelinedForward -->
-  <line x1="330" y1="178" x2="890" y2="178" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#sa)"/>
-  <text x="535" y="170" fill="#059669" font-size="11">forward is now a PipelinedForward instance</text>
+  <!-- Phase B: Each-iter dance (middle) -->
+  <text x="30" y="172" class="sec-ttl">B · Each iter — writers and readers of the context</text>
 
-  <!-- Note: ArgInfo -->
-  <rect x="395" y="192" width="410" height="58" rx="6" fill="#fff" stroke="#e2e8f0"/>
-  <text x="410" y="212" fill="#334155" font-size="11" font-weight="700">ArgInfo stores "how to extract KJT from batch":</text>
-  <text x="410" y="228" fill="#475569" font-size="10">input_attrs=["", "sparse_features"] → batch.sparse_features</text>
-  <text x="410" y="242" fill="#475569" font-size="10">This lets _start_data_dist call input_dist() without going through model()</text>
+  <!-- Context bus -->
+  <g filter="url(#sh3)">
+    <rect x="30" y="192" width="914" height="56" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.8"/>
+    <rect x="30" y="192" width="914" height="22" rx="10" fill="#2563eb"/>
+    <rect x="30" y="208" width="914" height="6" fill="#2563eb"/>
+    <text x="487" y="208" text-anchor="middle" class="step-lbl">TrainPipelineContext  —  shared blackboard</text>
+    <text x="487" y="236" text-anchor="middle" font-size="10.5" fill="#1e40af" font-family="'SF Mono',Consolas,monospace">input_dist_splits_requests · fused_splits_awaitables · input_dist_tensors_requests · module_contexts</text>
+  </g>
 
-  <!-- STEP 2: Each iteration — _start_data_dist (on data_dist_stream) -->
-  <rect x="30" y="265" width="930" height="150" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="45" y="287" fill="#ea580c" font-weight="700" font-size="12">STEP 2: EACH ITER — _start_data_dist(batch_i+1)  [on data_dist_stream]</text>
+  <!-- Writer/reader boxes below -->
+  <g filter="url(#sh3)">
+    <!-- Writer: _start_data_dist -->
+    <rect x="50" y="310" width="220" height="60" rx="8" fill="#fff" stroke="#dc2626" stroke-width="1.5"/>
+    <text x="160" y="332" text-anchor="middle" font-size="13" font-weight="700" fill="#dc2626">_start_data_dist</text>
+    <text x="160" y="348" text-anchor="middle" font-size="9" fill="#64748b">runs on data_dist_stream</text>
+    <text x="160" y="362" text-anchor="middle" font-size="9.5" fill="#991b1b" font-family="'SF Mono',Consolas,monospace">writes splits_requests</text>
 
-  <rect x="710" y="300" width="20" height="96" rx="2" fill="#ffedd5" stroke="#ea580c"/>
+    <!-- Mixed: wait_sparse_data_dist -->
+    <rect x="378" y="310" width="220" height="60" rx="8" fill="#fff" stroke="#0891b2" stroke-width="1.5"/>
+    <text x="488" y="332" text-anchor="middle" font-size="13" font-weight="700" fill="#0891b2">wait_sparse_data_dist</text>
+    <text x="488" y="348" text-anchor="middle" font-size="9" fill="#64748b">★ wait #1 (splits AllToAll)</text>
+    <text x="488" y="362" text-anchor="middle" font-size="9.5" fill="#0e7490" font-family="'SF Mono',Consolas,monospace">reads splits · writes tensors</text>
 
-  <!-- 2a: Build args from batch -->
-  <text x="470" y="316" fill="#ea580c" font-size="11" font-weight="600">args = _build_args_kwargs(batch_i+1, forward.args)</text>
-  <line x1="730" y1="322" x2="890" y2="322" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="745" y="313" fill="#059669" font-size="10">reads ArgInfo</text>
+    <!-- Reader: PipelinedForward -->
+    <rect x="706" y="310" width="220" height="60" rx="8" fill="#fff" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="816" y="332" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">PipelinedForward.__call__</text>
+    <text x="816" y="348" text-anchor="middle" font-size="9" fill="#64748b">★ wait #2 · on default_stream</text>
+    <text x="816" y="362" text-anchor="middle" font-size="9.5" fill="#1e40af" font-family="'SF Mono',Consolas,monospace">reads tensors_requests</text>
+  </g>
 
-  <!-- 2b: Call input_dist -->
-  <line x1="730" y1="355" x2="310" y2="355" stroke="#ea580c" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="430" y="347" fill="#ea580c" font-size="11" font-weight="600">module.input_dist(ctx, *args) → Awaitable</text>
+  <!-- Arrows from step 5 into bus -->
+  <line x1="859" y1="96" x2="859" y2="188" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#rmw)"/>
+  <text x="867" y="140" font-size="10" fill="#dc2626">installs PipelinedForward</text>
 
-  <!-- 2c: Store in context -->
-  <line x1="730" y1="388" x2="510" y2="388" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="520" y="380" fill="#2563eb" font-size="11" font-weight="600">context.input_dist_tensors_requests[name] = awaitable</text>
+  <!-- Writer arrow up -->
+  <line x1="160" y1="308" x2="160" y2="252" stroke="#dc2626" stroke-width="1.8" marker-end="url(#rmw)"/>
+  <text x="168" y="282" font-size="9.5" fill="#dc2626">write</text>
 
-  <!-- STEP 3: model(batch_i) triggers PipelinedForward -->
-  <rect x="30" y="440" width="930" height="130" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="45" y="462" fill="#059669" font-weight="700" font-size="12">STEP 3: model(batch_i) → PipelinedForward.__call__()  [on default_stream]</text>
+  <!-- Mixed arrows -->
+  <line x1="476" y1="308" x2="476" y2="252" stroke="#dc2626" stroke-width="1.5" marker-end="url(#rmw)"/>
+  <text x="441" y="282" font-size="9.5" fill="#dc2626" text-anchor="end">read →</text>
+  <line x1="500" y1="252" x2="500" y2="308" stroke="#2563eb" stroke-width="1.5" marker-end="url(#rmr)"/>
+  <text x="508" y="282" font-size="9.5" fill="#2563eb">← write</text>
 
-  <rect x="890" y="475" width="20" height="82" rx="2" fill="#d1fae5" stroke="#059669"/>
+  <!-- Reader arrow up -->
+  <line x1="816" y1="252" x2="816" y2="308" stroke="#2563eb" stroke-width="1.8" marker-end="url(#rmr)"/>
+  <text x="824" y="282" font-size="9.5" fill="#2563eb">read</text>
 
-  <!-- 3a: Pop from context -->
-  <line x1="900" y1="492" x2="530" y2="492" stroke="#2563eb" stroke-width="1.5" marker-end="url(#sr)"/>
-  <text x="595" y="484" fill="#2563eb" font-size="11" font-weight="600">request = context.input_dist_tensors_requests.pop(name)</text>
-
-  <!-- 3b: Wait on dist_stream -->
-  <text x="690" y="525" fill="#ea580c" font-size="10">data = request.wait()  [wait on data_dist_stream]</text>
-
-  <!-- 3c: compute_and_output_dist -->
-  <line x1="900" y1="548" x2="310" y2="548" stroke="#059669" stroke-width="1.5" marker-end="url(#sa)"/>
-  <text x="430" y="540" fill="#059669" font-size="11" font-weight="700">module.compute_and_output_dist(ctx, data)</text>
-
-  <!-- STEP 4: Result flows back to model -->
-  <rect x="30" y="595" width="930" height="90" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="45" y="618" fill="#334155" font-weight="700" font-size="12">RESULT: model() gets embedding output as if forward() was called normally</text>
-  <text x="55" y="640" fill="#475569" font-size="10">• The model graph is unchanged — only ShardedModule.forward is monkey-patched</text>
-  <text x="55" y="656" fill="#475569" font-size="10">• All non-ShardedModule layers (dense layers, MLP, etc.) execute normally on default_stream</text>
-  <text x="55" y="672" fill="#475569" font-size="10">• The batch_i+1 input_dist was already running during batch_i compute → AllToAll hidden!</text>
+  <!-- Footnote -->
+  <text x="30" y="402" font-size="10.5" fill="#64748b">
+    Red = writes to context · Blue = reads from context · the bus carries awaitables across pipeline stages.
+  </text>
 </svg>
-</div>
-</div>
-</div>
+    </div>
+  </div>
+
+  <div class="desc">
+    <span class="zh"><p><code>ArgInfo</code> 是 Step 4 的产物——一条"从 batch 到 sharded 模块参数"的访问路径。简化示例：</p></span>
+    <span class="en"><p><code>ArgInfo</code> is Step 4's output — a recorded access path from <code>batch</code> to the sharded-module arg. Stripped example:</p></span>
+  </div>
+
+  <div class="code-block"><pre><span class="cm"># User wrote:  self.shared_ebc(batch.sparse_features)
+# FX trace recovers this access path into ArgInfo ↓</span>
+<span class="kw">ArgInfo</span>(
+    input_attrs    = [<span class="st">""</span>, <span class="st">"sparse_features"</span>],  <span class="cm"># getattr chain from batch</span>
+    is_getitems    = [<span class="ty">False</span>, <span class="ty">False</span>],
+    postproc_modules = [<span class="ty">None</span>, <span class="ty">None</span>],
+    constants      = [<span class="ty">None</span>, <span class="ty">None</span>],
+    name           = <span class="ty">None</span>,                     <span class="cm"># positional arg</span>
+)
+<span class="cm"># Later, _start_data_dist replays this on batch_i+1:
+#     batch_i+1 -> getattr "sparse_features" -> ShardedModule.input_dist(...)</span></pre></div>
+
+  <table class="tbl">
+    <tr>
+      <th><span class="zh">Context 字段</span><span class="en">Context field</span></th>
+      <th><span class="zh">写入方</span><span class="en">Written by</span></th>
+      <th><span class="zh">读取方</span><span class="en">Read by</span></th>
+    </tr>
+    <tr>
+      <td><code>input_dist_splits_requests</code></td>
+      <td><code>_start_data_dist</code></td>
+      <td><code>_fuse_input_dist_splits</code></td>
+    </tr>
+    <tr>
+      <td><code>fused_splits_awaitables</code></td>
+      <td><code>_fuse_input_dist_splits</code></td>
+      <td><code>wait_sparse_data_dist</code></td>
+    </tr>
+    <tr>
+      <td><code>input_dist_tensors_requests</code></td>
+      <td><code>wait_sparse_data_dist</code></td>
+      <td><code>PipelinedForward.__call__</code></td>
+    </tr>
+    <tr>
+      <td><code>module_contexts</code></td>
+      <td><code>_start_data_dist</code></td>
+      <td><code>PipelinedForward.__call__</code></td>
+    </tr>
+    <tr>
+      <td><code>module_input_post_prefetch</code></td>
+      <td><code>_prefetch</code> (Prefetch variant)</td>
+      <td><code>PrefetchPipelinedForward.__call__</code></td>
+    </tr>
+    <tr>
+      <td><code>module_contexts_post_prefetch</code></td>
+      <td><code>_prefetch</code> (Prefetch variant)</td>
+      <td><code>PrefetchPipelinedForward.__call__</code></td>
+    </tr>
+  </table>
+
+  <div class="callout callout-warn">
+    <strong><span class="zh">⚠️ 模型必须 FX-traceable</span><span class="en">⚠️ Model must be FX-traceable</span></strong>
+    <span class="zh">FX trace 会穿过 <code>ShardedModule</code> 的所有非-leaf 祖先——途中任何一段动态 Python 逻辑（<code>{**proxy}</code>、<code>len(proxy)</code>、Python-level <code>if</code>/<code>for</code> 依赖 tensor 值）都会让 trace 失败。要么把那段代码改 FX-friendly，要么用 <code>@torch.fx.wrap</code> 把它包成黑盒。</span>
+    <span class="en">The FX trace walks through every non-leaf ancestor of a <code>ShardedModule</code>. Any dynamic Python along the way — <code>{**proxy}</code>, <code>len(proxy)</code>, value-dependent <code>if</code>/<code>for</code> — breaks the trace. Either rewrite that code to be FX-friendly, or wrap it with <code>@torch.fx.wrap</code> to hide it behind an opaque call_function node.</span>
+  </div>
 </section>
 
-<!-- ═══════════ CONTEXT BRIDGE ═══════════ -->
-<section id="context">
-<div class="phase-banner pb-ctx">
-  <h2><span class="zh">Context — 拆分后的桥梁</span><span class="en">Context — The Bridge Between Split Halves</span></h2>
-</div>
+<!-- ═══════════════════════════ §4  TWO WAITS  ═══════════════════════════ -->
+<section id="waits">
+  <div class="phase-banner wait">
+    <h2><span class="zh">§4 两次 .wait()：Native vs Pipelined</span><span class="en">§4 Two .wait()s: Native vs Pipelined</span></h2>
+    <p><span class="zh">ShardedModule.input_dist() 返回 <code>Awaitable[Awaitable[X]]</code>——这个双层类型就是为 pipeline 拆分而设计的"留白"</span><span class="en">ShardedModule.input_dist() returns <code>Awaitable[Awaitable[X]]</code> — the double layer is the seam pipeline uses to split work.</span></p>
+  </div>
 
-<div class="desc">
-<span class="zh">
-  <p><code>TrainPipelineContext</code> 是拆分手术的关键：它是 <code>_start_data_dist()</code> 的输出端和 <code>PipelinedForward.__call__()</code> 的输入端之间的共享状态。</p>
-</span>
-<div class="xref-bar">
-<a href="context_lifecycle.html#class-diagram">完整 Context 类层次图 →</a>
-<a href="context_lifecycle.html#torchrec-types">TorchRec 核心类型深度解析 →</a>
-<a href="context_lifecycle.html#lifecycle-base">Context 生命周期序列图 →</a>
-</div>
-<span class="en">
-  <p><code>TrainPipelineContext</code> is the key to the split: it's the shared state between the output of <code>_start_data_dist()</code> and the input of <code>PipelinedForward.__call__()</code>.</p>
-</span>
-</div>
-
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">Context 数据流</span><span class="en">Context Data Flow</span></span><span class="hint">TrainPipelineContext vs PrefetchTrainPipelineContext</span></div>
-<div class="svg-container">
-<svg viewBox="0 0 1000 580" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="1000" height="580" fill="#fafbfc" rx="8"/>
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">wait #1 / wait #2 的去处对比</span><span class="en">Where wait #1 and wait #2 live</span></span>
+      <span class="hint">sequence diagram · side-by-side</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 980 500" xmlns="http://www.w3.org/2000/svg" width="980" height="500">
   <defs>
-    <marker id="ca" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
-    <marker id="cb" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#2563eb"/></marker>
-    <marker id="cg" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#059669"/></marker>
-    <marker id="cr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#dc2626"/></marker>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .col-ttl{font-size:13px;font-weight:700}
+      .ptcp{font-size:11px;font-weight:700;fill:#fff}
+      .mono{font-family:'SF Mono',Consolas,monospace;font-size:10px;fill:#475569}
+      .mono-r{font-family:'SF Mono',Consolas,monospace;font-size:10px;fill:#9ca3af}
+      .star{font-size:12.5px;font-weight:700;fill:#dc2626}
+      .star-g{font-size:12.5px;font-weight:700;fill:#059669}
+    </style>
+    <marker id="w-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#1e293b"/>
+    </marker>
+    <marker id="w-r" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#9ca3af"/>
+    </marker>
+    <marker id="w-red" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#dc2626"/>
+    </marker>
+    <marker id="w-grn" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#059669"/>
+    </marker>
+    <filter id="sh4"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
   </defs>
-  <!-- ===== BASE PIPELINE (TrainPipelineContext) ===== -->
-  <text x="40" y="30" fill="#2563eb" font-weight="700" font-size="13">TrainPipelineContext — Base Pipeline</text>
+  <rect width="980" height="500" fill="#fafbfc"/>
 
-  <!-- Context box -->
-  <rect x="320" y="52" width="360" height="210" rx="10" fill="#fff" stroke="#2563eb" stroke-width="2"/>
-  <rect x="320" y="52" width="360" height="28" rx="10" fill="#2563eb"/>
-  <rect x="320" y="72" width="360" height="8" fill="#2563eb"/>
-  <text x="500" y="71" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">TrainPipelineContext</text>
+  <!-- Column divider -->
+  <line x1="488" y1="10" x2="488" y2="492" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>
 
-  <!-- Fields -->
-  <rect x="340" y="92" width="320" height="22" rx="4" fill="#fef2f2"/>
-  <text x="500" y="107" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">input_dist_splits_requests: Dict[str, Awaitable]</text>
-  <rect x="340" y="122" width="320" height="22" rx="4" fill="#dbeafe"/>
-  <text x="500" y="137" text-anchor="middle" fill="#1e40af" font-size="10" font-weight="600">input_dist_tensors_requests: Dict[str, Awaitable]</text>
-  <rect x="340" y="152" width="320" height="22" rx="4" fill="#d1fae5"/>
-  <text x="500" y="167" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_contexts: Dict[str, Multistreamable]</text>
-  <rect x="340" y="182" width="320" height="22" rx="4" fill="#fef9c3"/>
-  <text x="500" y="197" text-anchor="middle" fill="#854d0e" font-size="10" font-weight="600">fused_splits_awaitables: List[(...)]</text>
-  <rect x="340" y="212" width="320" height="22" rx="4" fill="#f5f3ff"/>
-  <text x="500" y="227" text-anchor="middle" fill="#6b21a8" font-size="10" font-weight="600">module_contexts_next_batch: Dict[...]</text>
+  <!-- Column titles -->
+  <text x="244" y="24" text-anchor="middle" class="col-ttl" fill="#dc2626">Native — two waits back-to-back</text>
+  <text x="732" y="24" text-anchor="middle" class="col-ttl" fill="#059669">Pipelined — waits split across stages</text>
 
-  <!-- Producer: _start_data_dist -->
-  <rect x="45" y="112" width="220" height="70" rx="8" fill="#ea580c"/>
-  <text x="155" y="138" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">_start_data_dist()</text>
-  <text x="155" y="156" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on data_dist_stream</text>
-  <!-- Arrow: producer → context -->
-  <line x1="265" y1="120" x2="340" y2="120" stroke="#dc2626" stroke-width="1.5" marker-end="url(#cr)"/>
-  <line x1="265" y1="170" x2="340" y2="170" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
-  <text x="275" y="112" fill="#dc2626" font-size="10">writes splits</text>
-  <text x="275" y="185" fill="#059669" font-size="10">writes ctx</text>
-
-  <!-- Transformer: wait_sparse_data_dist -->
-  <rect x="395" y="290" width="210" height="42" rx="6" fill="#fbbf24"/>
-  <text x="500" y="316" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">wait_sparse_data_dist()</text>
-  <path d="M500,234 L500,290" fill="none" stroke="#854d0e" stroke-width="1.5" marker-end="url(#ca)"/>
-  <text x="615" y="276" fill="#854d0e" font-size="10">fuse + wait → tensors_requests</text>
-
-  <!-- Consumer: PipelinedForward -->
-  <rect x="735" y="112" width="220" height="70" rx="8" fill="#059669"/>
-  <text x="845" y="138" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PipelinedForward</text>
-  <text x="845" y="156" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on default_stream</text>
-  <!-- Arrow: context → consumer -->
-  <line x1="660" y1="132" x2="735" y2="132" stroke="#2563eb" stroke-width="1.5" marker-end="url(#cb)"/>
-  <line x1="660" y1="164" x2="735" y2="164" stroke="#059669" stroke-width="1.5" marker-end="url(#cg)"/>
-  <text x="668" y="124" fill="#2563eb" font-size="10">pops tensors_req</text>
-  <text x="668" y="178" fill="#059669" font-size="10">pops module_ctx</text>
-
-  <!-- ===== PREFETCH PIPELINE ===== -->
-  <text x="40" y="368" fill="#059669" font-weight="700" font-size="13">PrefetchTrainPipelineContext — Adds Prefetch Layer</text>
-
-  <!-- Prefetch context box (extends base) -->
-  <rect x="220" y="382" width="560" height="116" rx="10" fill="#fff" stroke="#059669" stroke-width="2"/>
-  <rect x="220" y="382" width="560" height="28" rx="10" fill="#059669"/>
-  <rect x="220" y="402" width="560" height="8" fill="#059669"/>
-  <text x="500" y="401" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">PrefetchTrainPipelineContext  (extends TrainPipelineContext)</text>
-
-  <rect x="245" y="428" width="250" height="24" rx="4" fill="#bbf7d0"/>
-  <text x="370" y="444" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_input_post_prefetch</text>
-  <rect x="505" y="428" width="250" height="24" rx="4" fill="#a7f3d0"/>
-  <text x="630" y="444" text-anchor="middle" fill="#065f46" font-size="10" font-weight="600">module_contexts_post_prefetch</text>
-  <text x="500" y="478" text-anchor="middle" fill="#475569" font-size="10">(inherits all base fields above)</text>
-
-  <!-- Prefetch flow -->
-  <rect x="40" y="425" width="160" height="60" rx="6" fill="#0891b2"/>
-  <text x="120" y="448" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_prefetch_embeddings()</text>
-  <text x="120" y="466" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">on prefetch_stream</text>
-
-  <line x1="200" y1="455" x2="320" y2="440" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ca)"/>
-  <text x="210" y="406" fill="#0891b2" font-size="10">pops input_dist_tensors_requests</text>
-  <text x="210" y="420" fill="#0891b2" font-size="10">→ wait() + prefetch()</text>
-  <text x="210" y="434" fill="#0891b2" font-size="10">→ stores into post_prefetch</text>
-
-  <rect x="800" y="425" width="165" height="60" rx="6" fill="#16a34a"/>
-  <text x="882" y="447" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PrefetchPipelinedFwd</text>
-  <text x="882" y="465" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="10">pops from post_prefetch</text>
-  <text x="882" y="479" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10" font-weight="600">→ ZERO WAIT!</text>
-
-  <line x1="780" y1="442" x2="800" y2="442" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ca)"/>
-
-  <!-- Key insight box -->
-  <rect x="40" y="520" width="920" height="28" rx="4" fill="#eff6ff" stroke="#bfdbfe"/>
-  <text x="500" y="538" text-anchor="middle" fill="#1e40af" font-size="10"><tspan font-weight="700">Key:</tspan> Base pipeline waits for AllToAll in forward(). Prefetch pipeline waits in a background stage → forward has zero AllToAll latency.</text>
-</svg>
-</div>
-</div>
-
-<table class="tbl">
-<tr>
-  <th><span class="zh">字段</span><span class="en">Field</span></th>
-  <th><span class="zh">写入者</span><span class="en">Writer</span></th>
-  <th><span class="zh">读取者</span><span class="en">Reader</span></th>
-  <th><span class="zh">含义</span><span class="en">Meaning</span></th>
-</tr>
-<tr>
-  <td><code>input_dist_splits_requests</code></td>
-  <td><code>_start_data_dist</code></td>
-  <td><code>_fuse_input_dist_splits</code></td>
-  <td><span class="zh">AllToAll splits phase 的 awaitable（第一阶段通信）</span><span class="en">AllToAll splits phase awaitable (first comm phase)</span></td>
-</tr>
-<tr>
-  <td><code>fused_splits_awaitables</code></td>
-  <td><code>_fuse_input_dist_splits</code></td>
-  <td><code>wait_sparse_data_dist</code></td>
-  <td><span class="zh">融合后的 splits awaitable（按 PG 分组）</span><span class="en">Fused splits awaitable (grouped by PG)</span></td>
-</tr>
-<tr>
-  <td><code>input_dist_tensors_requests</code></td>
-  <td><code>wait_sparse_data_dist</code></td>
-  <td><code>PipelinedForward</code> / <code>_prefetch_embeddings</code></td>
-  <td><span class="zh">AllToAll tensors phase 的 awaitable（第二阶段通信）</span><span class="en">AllToAll tensors phase awaitable (second comm phase)</span></td>
-</tr>
-<tr>
-  <td><code>module_contexts</code></td>
-  <td><code>wait_sparse_data_dist</code></td>
-  <td><code>PipelinedForward</code> / <code>_prefetch_embeddings</code></td>
-  <td><span class="zh">ShardedModule 的上下文（包含 sharding 元数据）</span><span class="en">ShardedModule context (sharding metadata)</span></td>
-</tr>
-<tr>
-  <td><code>module_input_post_prefetch</code></td>
-  <td><code>_prefetch_embeddings</code></td>
-  <td><code>PrefetchPipelinedForward</code></td>
-  <td><span class="zh">prefetch 后的 KJT 数据（已完成通信+预取）</span><span class="en">Post-prefetch KJT data (comm complete + prefetched)</span></td>
-</tr>
-<tr>
-  <td><code>module_contexts_post_prefetch</code></td>
-  <td><code>_prefetch_embeddings</code></td>
-  <td><code>PrefetchPipelinedForward</code></td>
-  <td><span class="zh">prefetch 后的模块上下文</span><span class="en">Post-prefetch module context</span></td>
-</tr>
-</table>
-</section>
-
-<!-- ═══════════ _rewrite_model ═══════════ -->
-<section id="rewrite">
-<div class="phase-banner pb-rewrite">
-  <h2><span class="zh">_rewrite_model — Forward 替换的两条路径</span><span class="en">_rewrite_model — Two Paths for Forward Replacement</span></h2>
-</div>
-
-<div class="desc">
-<span class="zh">
-  <p><code>_rewrite_model</code> 有两条代码路径。<strong>默认路径</strong>使用 <code>torch.fx.Tracer</code> 进行符号追踪，分析计算图中 ShardedModule 的调用方式。<strong>Hack 路径</strong>（当前实际使用）直接在 batch 中查找 KJT 属性，跳过 FX 追踪。</p>
-</span>
-<span class="en">
-  <p><code>_rewrite_model</code> has two code paths. The <strong>default path</strong> uses <code>torch.fx.Tracer</code> for symbolic tracing, analyzing how ShardedModules are called in the computation graph. The <strong>hack path</strong> (currently active) directly finds KJT attributes in the batch, bypassing FX tracing.</p>
-</span>
-</div>
-
-<div class="compare-grid">
-<div class="compare-card" style="border-color:#ea580c">
-<h4 style="background:#fff7ed;color:#ea580c">Path A: mod_with_trace() — torch.fx Symbolic Trace</h4>
-<div class="code-block"><span class="cm"># 1. Determine trace depth — only trace up to ShardedModule</span>
-leaf_modules = <span class="fn">_get_leaf_module_names</span>(model)
-
-<span class="cm"># 2. Custom Tracer: ShardedModule/FSDP are leaf nodes</span>
-tracer = <span class="fn">Tracer</span>(leaf_modules=leaf_modules)
-graph = tracer.<span class="fn">trace</span>(model, concrete_args)
-
-<span class="cm"># 3. For each call_module node that targets a ShardedModule:</span>
-<span class="kw">for</span> node <span class="kw">in</span> graph.nodes:
-    <span class="kw">if</span> node.op == <span class="st">"call_module"</span> <span class="kw">and</span> node.target <span class="kw">in</span> sharded_modules:
-        <span class="cm"># 4. Extract ArgInfo by walking the FX graph backward</span>
-        arg_info_list = <span class="fn">_get_node_args</span>(model, node, ...)
-        <span class="cm"># ArgInfo captures: batch.attr1.attr2 → input_attrs=["attr1","attr2"]</span>
-
-        <span class="cm"># 5. Replace forward</span>
-        child.forward = <span class="fn">PipelinedForward</span>(
-            node.target, arg_info_list, child, context, dist_stream
-        )</div>
-</div>
-<div class="compare-card" style="border-color:#16a34a">
-<h4 style="background:#ecfdf5;color:#16a34a">Path B: mod_directly() — Direct KJT Lookup (Active)</h4>
-<div class="code-block"><span class="cm"># 1. Scan batch.__dict__ for KeyedJaggedTensor attribute</span>
-<span class="kw">for</span> attr_name, attr_value <span class="kw">in</span> batch.__dict__.items():
-    <span class="kw">if</span> isinstance(attr_value, KeyedJaggedTensor):
-        kjt_name = attr_name  <span class="cm"># e.g. "sparse_features"</span>
-
-<span class="cm"># 2. For each ShardedModule, build ArgInfo directly</span>
-<span class="kw">for</span> n, module <span class="kw">in</span> sharded_modules.items():
-    module.forward = <span class="fn">PipelinedForward</span>(
-        n,
-        [<span class="fn">ArgInfo</span>(
-            input_attrs=[<span class="st">""</span>, kjt_name],  <span class="cm"># batch → batch.sparse_features</span>
-            is_getitems=[<span class="ty">False</span>, <span class="ty">False</span>],
-            name=<span class="ty">None</span>,
-            postproc_modules=[<span class="ty">None</span>, <span class="ty">None</span>],
-            constants=[<span class="ty">None</span>, <span class="ty">None</span>],
-        )],
-        module, context, dist_stream,
-    )</div>
-</div>
-</div>
-
-<div class="callout callout-info">
-<span class="zh"><strong>为什么需要 ArgInfo?</strong> 在 pipeline 中，<code>_start_data_dist()</code> 需要在 <code>model(batch)</code> 之前就调用 <code>ShardedModule.input_dist()</code>。但 <code>input_dist</code> 需要从 batch 中提取 KJT 参数——这在原始 model graph 中是由 <code>getattr</code> 链完成的。ArgInfo 记录了这条提取路径，让 <code>_build_args_kwargs(batch, forward.args)</code> 能够独立于模型 forward 来提取参数。</span>
-<span class="en"><strong>Why ArgInfo?</strong> In the pipeline, <code>_start_data_dist()</code> must call <code>ShardedModule.input_dist()</code> before <code>model(batch)</code>. But <code>input_dist</code> needs KJT args extracted from the batch — originally done by <code>getattr</code> chains in the model graph. ArgInfo records this extraction path so <code>_build_args_kwargs(batch, forward.args)</code> can extract args independently of the model forward.</span>
-</div>
-
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">torch.fx 追踪原理</span><span class="en">torch.fx Tracing Principle</span></span><span class="hint">mod_with_trace() — symbolic execution</span></div>
-<div class="seq-body">
-<div class="seq-actors">
-  <div class="seq-actor" style="left:12.3%;background:#7c3aed">_rewrite_model</div>
-  <div class="seq-actor" style="left:31.7%;background:#0891b2">torch.fx.Tracer</div>
-  <div class="seq-actor" style="left:51.1%;background:#ea580c">FX Graph</div>
-  <div class="seq-actor" style="left:71.1%;background:#be185d">_get_node_args</div>
-  <div class="seq-actor" style="left:90.0%;background:#059669">ShardedModule</div>
-</div>
-<div class="svg-container">
-<svg viewBox="0 0 1000 540" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="1000" height="540" fill="#fafbfc" rx="8"/>
-  <defs>
-    <marker id="fa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
-    <marker id="fr" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#94a3b8"/></marker>
-  </defs>
+  <!-- ================= LEFT COLUMN (Native) ================= -->
+  <!-- Participants -->
+  <g filter="url(#sh4)">
+    <rect x="30" y="42" width="110" height="36" rx="6" fill="#7c3aed"/>
+    <text x="85" y="64" text-anchor="middle" class="ptcp">user code</text>
+    <rect x="178" y="42" width="140" height="36" rx="6" fill="#0891b2"/>
+    <text x="248" y="64" text-anchor="middle" class="ptcp">ShardedModule</text>
+    <rect x="340" y="42" width="130" height="36" rx="6" fill="#ea580c"/>
+    <text x="405" y="64" text-anchor="middle" class="ptcp">input_dist</text>
+  </g>
   <!-- Lifelines -->
-  <line x1="120" y1="20" x2="120" y2="500" stroke="#7c3aed" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="320" y1="20" x2="320" y2="500" stroke="#0891b2" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="520" y1="20" x2="520" y2="500" stroke="#ea580c" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="720" y1="20" x2="720" y2="500" stroke="#be185d" stroke-width="1" stroke-dasharray="5,4"/>
-  <line x1="900" y1="20" x2="900" y2="500" stroke="#059669" stroke-width="1" stroke-dasharray="5,4"/>
+  <line x1="85" y1="78" x2="85" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="248" y1="78" x2="248" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="405" y1="78" x2="405" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
 
-  <!-- Activations -->
-  <rect x="113" y="34" width="14" height="456" rx="2" fill="#ede9fe" stroke="#7c3aed"/>
-  <rect x="313" y="84" width="14" height="210" rx="2" fill="#cffafe" stroke="#0891b2"/>
-  <rect x="513" y="174" width="14" height="120" rx="2" fill="#ffedd5" stroke="#ea580c"/>
-  <rect x="713" y="334" width="14" height="120" rx="2" fill="#fce7f3" stroke="#be185d"/>
-  <rect x="893" y="468" width="14" height="52" rx="2" fill="#d1fae5" stroke="#059669"/>
+  <!-- msg: user → SM.forward(batch) -->
+  <line x1="92" y1="110" x2="240" y2="110" stroke="#1e293b" stroke-width="1.5" marker-end="url(#w-a)"/>
+  <text x="166" y="104" text-anchor="middle" class="mono">model(batch)</text>
 
-  <!-- Step 1: Unwrap model -->
-  <text x="145" y="54" fill="#7c3aed" font-size="11" font-weight="600">unwrap: DMP → DDP → Float16 → Module</text>
+  <!-- msg: SM → input_dist -->
+  <line x1="256" y1="146" x2="397" y2="146" stroke="#1e293b" stroke-width="1.5" marker-end="url(#w-a)"/>
+  <text x="326" y="140" text-anchor="middle" class="mono">input_dist(ctx, kjt)</text>
 
-  <!-- Step 2: _get_leaf_module_names -->
-  <line x1="127" y1="92" x2="313" y2="92" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="150" y="84" fill="#0891b2" font-size="11">_get_leaf_module_names(model)</text>
+  <!-- return: outer awaitable -->
+  <line x1="397" y1="180" x2="256" y2="180" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#w-r)"/>
+  <text x="326" y="174" text-anchor="middle" class="mono-r">Awaitable[Awaitable[X]]</text>
 
-  <!-- Step 2 detail -->
-  <rect x="350" y="106" width="290" height="60" rx="4" fill="#ecfeff" stroke="#0891b2"/>
-  <text x="365" y="126" fill="#155e75" font-size="10">Shallow traversal: find modules adjacent</text>
-  <text x="365" y="140" fill="#155e75" font-size="10">to ShardedModule → mark siblings as leaf</text>
-  <text x="365" y="154" fill="#155e75" font-size="10">Result: trace INTO parent, NOT into leaves</text>
+  <!-- Self-loop wait #1 -->
+  <path d="M 248 210 L 276 210 L 276 234 L 250 234" stroke="#dc2626" stroke-width="2" fill="none" marker-end="url(#w-red)"/>
+  <text x="284" y="218" class="star">★ .wait()  (#1 splits)</text>
 
-  <!-- Step 3: Tracer.trace -->
-  <line x1="127" y1="190" x2="313" y2="190" stroke="#0891b2" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="145" y="182" fill="#0891b2" font-size="11" font-weight="600">Tracer.trace(model, concrete_args)</text>
+  <!-- Self-loop wait #2 -->
+  <path d="M 248 262 L 276 262 L 276 286 L 250 286" stroke="#dc2626" stroke-width="2" fill="none" marker-end="url(#w-red)"/>
+  <text x="284" y="270" class="star">★ .wait()  (#2 tensors)</text>
 
-  <!-- Step 3 detail: symbolic execution -->
-  <rect x="350" y="206" width="300" height="68" rx="4" fill="#fff7ed" stroke="#ea580c"/>
-  <text x="365" y="226" fill="#9a3412" font-size="11" font-weight="700">Symbolic execution (no real data!):</text>
-  <text x="365" y="242" fill="#9a3412" font-size="10">• proxy_buffer_attributes = False</text>
-  <text x="365" y="258" fill="#9a3412" font-size="10">• ShardedModule → is_leaf = True → records call_module node</text>
+  <!-- Warn block -->
+  <rect x="40" y="312" width="430" height="54" rx="6" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="52" y="330" font-size="11" font-weight="700" fill="#991b1b">Both waits run serially on the main thread.</text>
+  <text x="52" y="346" font-size="10.5" fill="#991b1b">→ AllToAll latency is ENTIRELY exposed.</text>
+  <text x="52" y="360" font-size="10.5" fill="#991b1b">→ No opportunity to overlap with fwd/bwd of prior batch.</text>
 
-  <!-- Arrow: trace → graph -->
-  <line x1="327" y1="282" x2="513" y2="282" stroke="#ea580c" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="370" y="298" fill="#ea580c" font-size="10">returns FX Graph</text>
+  <!-- Return to user -->
+  <line x1="240" y1="402" x2="92" y2="402" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#w-r)"/>
+  <text x="166" y="396" text-anchor="middle" class="mono-r">embedding output</text>
 
-  <!-- Step 4: Iterate graph nodes -->
-  <text x="475" y="316" fill="#ea580c" font-size="11" font-weight="600">for node in graph.nodes:</text>
+  <text x="85" y="442" text-anchor="middle" font-size="10.5" fill="#475569" font-style="italic">"<tspan font-family="'SF Mono',Consolas,monospace">self.input_dist(...).wait().wait()</tspan>" — types.py:1245</text>
 
-  <!-- Step 5: Check node -->
-  <rect x="405" y="326" width="250" height="48" rx="4" fill="#fef9c3" stroke="#ca8a04"/>
-  <text x="530" y="346" text-anchor="middle" fill="#854d0e" font-size="11" font-weight="700">node.op == "call_module"</text>
-  <text x="530" y="362" text-anchor="middle" fill="#854d0e" font-size="11">node.target in sharded_modules?</text>
+  <!-- ================= RIGHT COLUMN (Pipelined) ================= -->
+  <!-- Participants -->
+  <g filter="url(#sh4)">
+    <rect x="506" y="42" width="105" height="36" rx="6" fill="#dc2626"/>
+    <text x="558" y="64" text-anchor="middle" class="ptcp">_start_data_</text>
+    <rect x="621" y="42" width="120" height="36" rx="6" fill="#0891b2"/>
+    <text x="681" y="64" text-anchor="middle" class="ptcp">wait_sparse_</text>
+    <rect x="751" y="42" width="80" height="36" rx="6" fill="#2563eb"/>
+    <text x="791" y="64" text-anchor="middle" class="ptcp">context</text>
+    <rect x="841" y="42" width="115" height="36" rx="6" fill="#059669"/>
+    <text x="898" y="64" text-anchor="middle" class="ptcp">PipelinedFwd</text>
+  </g>
+  <!-- Lifelines -->
+  <line x1="558" y1="78" x2="558" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="681" y1="78" x2="681" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="791" y1="78" x2="791" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="898" y1="78" x2="898" y2="470" stroke="#d1d5db" stroke-dasharray="6,4"/>
 
-  <!-- Step 6: _get_node_args -->
-  <line x1="530" y1="386" x2="713" y2="386" stroke="#be185d" stroke-width="1.5" marker-end="url(#fa)"/>
-  <text x="548" y="378" fill="#be185d" font-size="11" font-weight="600">_get_node_args(node)</text>
+  <!-- Stage 1: _start_data_dist writes splits -->
+  <line x1="566" y1="110" x2="783" y2="110" stroke="#dc2626" stroke-width="1.5" marker-end="url(#w-red)"/>
+  <text x="675" y="104" text-anchor="middle" class="mono" fill="#dc2626">push splits_request</text>
 
-  <!-- _get_node_args detail -->
-  <rect x="750" y="332" width="195" height="112" rx="4" fill="#fce7f3" stroke="#be185d"/>
-  <text x="764" y="352" fill="#9d174d" font-size="11" font-weight="700">Walk graph backward from node.args:</text>
-  <text x="764" y="370" fill="#9d174d" font-size="10">• "placeholder" → batch itself</text>
-  <text x="764" y="386" fill="#9d174d" font-size="10">• "call_function getattr" → attr name</text>
-  <text x="764" y="402" fill="#9d174d" font-size="10">• "call_function __getitem__" → index</text>
-  <text x="764" y="418" fill="#9d174d" font-size="10">→ ArgInfo(["", "sparse_features"])</text>
-  <text x="764" y="434" fill="#9d174d" font-size="10">  meaning: batch.sparse_features</text>
+  <!-- Stage 2: wait_sparse reads splits + wait #1 -->
+  <line x1="783" y1="146" x2="689" y2="146" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#w-r)"/>
+  <text x="736" y="140" text-anchor="middle" class="mono-r">pop splits</text>
 
-  <!-- Return ArgInfo -->
-  <line x1="713" y1="454" x2="127" y2="454" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#fr)"/>
-  <text x="355" y="446" fill="#94a3b8" font-size="10">returns arg_info_list</text>
+  <!-- Wait #1 self-loop -->
+  <path d="M 681 168 L 710 168 L 710 192 L 683 192" stroke="#059669" stroke-width="2" fill="none" marker-end="url(#w-grn)"/>
+  <text x="716" y="176" class="star-g">★ wait #1  (splits)</text>
 
-  <!-- Step 7: Replace forward -->
-  <line x1="127" y1="478" x2="893" y2="478" stroke="#059669" stroke-width="2" marker-end="url(#fa)"/>
-  <text x="310" y="470" fill="#dc2626" font-size="11" font-weight="700">module.forward = PipelinedForward(name, arg_info_list, module, ctx, stream)</text>
+  <!-- write tensors -->
+  <line x1="689" y1="220" x2="783" y2="220" stroke="#dc2626" stroke-width="1.5" marker-end="url(#w-red)"/>
+  <text x="736" y="214" text-anchor="middle" class="mono" fill="#dc2626">push tensors_request</text>
 
-  <!-- Result note -->
-  <rect x="40" y="494" width="910" height="32" rx="6" fill="#fff" stroke="#e2e8f0"/>
-  <text x="54" y="509" fill="#334155" font-size="10"><tspan font-weight="700">Result:</tspan> ShardedModule.forward no longer calls input_dist(). It's now a PipelinedForward that picks up</text>
-  <text x="54" y="521" fill="#334155" font-size="10">pre-computed results from TrainPipelineContext. The original forward is saved in _original_forwards for restore.</text>
+  <!-- PipelinedFwd reads tensors -->
+  <line x1="890" y1="266" x2="799" y2="266" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#w-r)"/>
+  <text x="845" y="260" text-anchor="middle" class="mono-r">pop tensors</text>
+
+  <!-- Wait #2 self-loop on PipelinedForward -->
+  <path d="M 898 288 L 926 288 L 926 312 L 900 312" stroke="#059669" stroke-width="2" fill="none" marker-end="url(#w-grn)"/>
+  <text x="838" y="296" text-anchor="middle" class="star-g">★ wait #2  (tensors)</text>
+
+  <!-- → compute_and_output_dist -->
+  <line x1="890" y1="346" x2="815" y2="346" stroke="#1e293b" stroke-width="1.5" marker-end="url(#w-a)"/>
+  <text x="852" y="340" text-anchor="middle" class="mono">compute_and_output_dist</text>
+
+  <!-- tip block -->
+  <rect x="506" y="376" width="450" height="56" rx="6" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="518" y="394" font-size="11" font-weight="700" fill="#065f46">Each wait runs on a dedicated stream.</text>
+  <text x="518" y="410" font-size="10.5" fill="#065f46">→ wait #1 on data_dist_stream, wait #2 on default_stream</text>
+  <text x="518" y="424" font-size="10.5" fill="#065f46">→ both NCCL latencies hidden behind fwd/bwd of neighbor batches</text>
+
+  <text x="732" y="462" text-anchor="middle" font-size="10.5" fill="#475569" font-style="italic">wait #1 @ train_pipeline.py:435 · wait #2 @ utils.py:519</text>
 </svg>
-</div>
-</div>
-</div>
-<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1309-L1458" target="_blank"><code>utils.py:1309–1458</code></a>  ·  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L678-L712" target="_blank"><code>utils.py:678–712</code></a> (Tracer)  ·  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L1191-L1231" target="_blank"><code>utils.py:1191–1231</code></a> (_get_node_args)</p>
-</section>
+    </div>
+  </div>
 
-<!-- ═══════════ PipelinedForward ═══════════ -->
-<section id="pipelined-fwd">
-<div class="phase-banner pb-core">
-  <h2><span class="zh">PipelinedForward vs PrefetchPipelinedForward</span><span class="en">PipelinedForward vs PrefetchPipelinedForward</span></h2>
-</div>
+  <div class="code-block"><pre><span class="cm"># Native (torchrec/distributed/types.py:1245) — both waits chained:</span>
+<span class="kw">def</span> <span class="fn">forward</span>(<span class="ty">self</span>, *input, **kwargs):
+    ctx = <span class="ty">self</span>.create_context()
+    dist_input = <span class="ty">self</span>.input_dist(ctx, *input, **kwargs).wait().wait()  <span class="mk"># ← wait #1 . wait #2</span>
+    <span class="kw">return</span> <span class="ty">self</span>.compute_and_output_dist(ctx, dist_input)
 
-<div class="desc">
-<span class="zh">
-  <p>这两个类继承自 <code>BaseForward</code>，是 forward 替换的具体实现。它们的 <code>__call__</code> 方法在 <code>model(batch)</code> 时被触发——但不再调用 <code>input_dist</code>，而是从 Context 中取出已经计算好的结果。</p>
-</span>
-<span class="en">
-  <p>Both classes inherit from <code>BaseForward</code> and implement the forward replacement. Their <code>__call__</code> is triggered during <code>model(batch)</code> — but instead of calling <code>input_dist</code>, they retrieve pre-computed results from the Context.</p>
-</span>
-</div>
+<span class="cm"># Pipelined — wait #1 happens in wait_sparse_data_dist:</span>
+<span class="kw">def</span> <span class="fn">wait_sparse_data_dist</span>(<span class="ty">self</span>, context):
+    <span class="kw">for</span> names, awaitable <span class="kw">in</span> context.fused_splits_awaitables:
+        <span class="kw">for</span> name, request <span class="kw">in</span> <span class="fn">zip</span>(names, awaitable.wait()):        <span class="mk"># ← wait #1</span>
+            context.input_dist_tensors_requests[name] = request
 
-<div class="compare-grid">
-<div class="compare-card" style="border-color:#dc2626">
-<h4 style="background:#fef2f2;color:#dc2626">PipelinedForward.__call__()</h4>
-<div class="code-block"><span class="cm"># Called during model(batch_i) on default_stream</span>
+<span class="cm"># ... and wait #2 happens inside PipelinedForward.__call__:</span>
+<span class="kw">def</span> <span class="fn">__call__</span>(<span class="ty">self</span>, *input, **kwargs):
+    request = <span class="ty">self</span>._context.input_dist_tensors_requests.pop(<span class="ty">self</span>._name)
+    <span class="kw">with</span> torch.cuda.stream(<span class="ty">self</span>._stream):
+        data = request.wait()                                            <span class="mk"># ← wait #2</span>
+    <span class="kw">return</span> <span class="ty">self</span>._module.compute_and_output_dist(ctx, data)</pre></div>
 
-<span class="cm"># 1. Pop the awaitable from context (written by _start_data_dist)</span>
-request = self._context.<span class="ty">input_dist_tensors_requests</span>.pop(self._name)
-
-<span class="cm"># 2. Wait for AllToAll to complete (on data_dist_stream)</span>
-<span class="kw">with</span> cuda.stream(self._stream):  <span class="cm"># data_dist_stream</span>
-    data = request.<span class="fn">wait</span>()  <span class="cm"># ← BLOCKING WAIT HERE</span>
-
-<span class="cm"># 3. Transfer data to default_stream</span>
-current_stream.<span class="fn">wait_stream</span>(self._stream)
-data.<span class="fn">record_stream</span>(current_stream)
-
-<span class="cm"># 4. Only do embedding compute (input_dist already done!)</span>
-<span class="kw">return</span> self._module.<span class="fn">compute_and_output_dist</span>(ctx, data)</div>
-</div>
-<div class="compare-card" style="border-color:#059669">
-<h4 style="background:#ecfdf5;color:#059669">PrefetchPipelinedForward.__call__()</h4>
-<div class="code-block"><span class="cm"># Called during model(batch_i) on default_stream</span>
-
-<span class="cm"># 1. Pop ALREADY-PREFETCHED data (written by _prefetch_embeddings)</span>
-data = self._context.<span class="ty">module_input_post_prefetch</span>.pop(self._name)
-ctx  = self._context.<span class="ty">module_contexts_post_prefetch</span>.pop(self._name)
-
-<span class="cm"># 2. Transfer from prefetch_stream to default_stream</span>
-current_stream.<span class="fn">wait_stream</span>(self._stream)
-data.<span class="fn">record_stream</span>(current_stream)
-
-<span class="cm"># 3. Only do embedding compute (NO WAIT AT ALL!)</span>
-<span class="kw">return</span> self._module.<span class="fn">compute_and_output_dist</span>(ctx, data)
-
-<span class="cm"># ↑ The wait() already happened in _prefetch_embeddings</span>
-<span class="cm">#   on a separate prefetch_stream during the previous step</span></div>
-</div>
-</div>
-
-<div class="callout callout-warn">
-<span class="zh"><strong>关键差异</strong>：<code>PipelinedForward</code> 在 forward 时仍需 <code>request.wait()</code> 等待 AllToAll 完成。<code>PrefetchPipelinedForward</code> 的 wait 已经在 <code>_prefetch_embeddings</code>（prefetch_stream 上）中完成了，所以 forward 是真正的零等待。</span>
-<span class="en"><strong>Key difference</strong>: <code>PipelinedForward</code> still needs <code>request.wait()</code> during forward to wait for AllToAll. <code>PrefetchPipelinedForward</code>'s wait already happened in <code>_prefetch_embeddings</code> (on prefetch_stream), so forward is truly zero-wait.</span>
-</div>
-<p class="src-link"><a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L503-L537" target="_blank"><code>utils.py:503–537</code></a> (PipelinedForward)  ·  <a href="https://github.com/NVIDIA/recsys-examples/blob/bb2558de93143ba3192042eb9125f888b1d156a1/examples/commons/pipeline/utils.py#L540-L584" target="_blank"><code>utils.py:540–584</code></a> (PrefetchPipelinedForward)</p>
-</section>
-
-<!-- ═══════════ PREFETCH LAYER ═══════════ -->
-<section id="prefetch">
-<div class="phase-banner pb-prefetch">
-  <h2><span class="zh">Prefetch 层 — 第三次拆分</span><span class="en">Prefetch Layer — The Third Split</span></h2>
-</div>
-
-<div class="desc">
-<span class="zh">
-  <p>对于 DynamicEmb 等支持 <code>prefetch()</code> 的 embedding table，Pipeline 做了第三次拆分：把 <strong>AllToAll 等待 + cache 预热</strong> 也从 forward 中分离出来，移到独立的 <code>prefetch_stream</code> 上：</p>
-  <ul>
-    <li><strong>_start_data_dist</strong> — 启动 AllToAll（data_dist_stream）</li>
-    <li><strong>_prefetch_embeddings</strong> — 等待 AllToAll + 调用 <code>module.prefetch()</code>（prefetch_stream）</li>
-    <li><strong>PrefetchPipelinedForward</strong> — 直接拿预取结果做 <code>compute_and_output_dist</code>（default_stream）</li>
-  </ul>
-</span>
-<span class="en">
-  <p>For embedding tables supporting <code>prefetch()</code> (e.g., DynamicEmb), the pipeline adds a third split: separating <strong>AllToAll wait + cache warm-up</strong> from forward into its own <code>prefetch_stream</code>:</p>
-  <ul>
-    <li><strong>_start_data_dist</strong> — starts AllToAll (data_dist_stream)</li>
-    <li><strong>_prefetch_embeddings</strong> — waits for AllToAll + calls <code>module.prefetch()</code> (prefetch_stream)</li>
-    <li><strong>PrefetchPipelinedForward</strong> — directly uses prefetched results for <code>compute_and_output_dist</code> (default_stream)</li>
-  </ul>
-</span>
-</div>
-
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">三级拆分 — ShardedModule.forward() 的完整分解</span><span class="en">Three-Level Split — Full Decomposition of ShardedModule.forward()</span></span></div>
-<div class="svg-container">
-<svg viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="960" height="320" fill="#fafbfc" rx="8"/>
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">4 路 stream × 3 个 iteration 的完整时序</span><span class="en">4 streams × 3 iterations timeline</span></span>
+      <span class="hint">Gantt swimlane</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 1120 340" xmlns="http://www.w3.org/2000/svg" width="1120" height="340">
   <defs>
-    <marker id="pa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#475569"/></marker>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .lane-lbl{font-size:12px;font-weight:700;fill:#1e293b}
+      .lane-sub{font-size:9px;fill:#64748b}
+      .blk-lbl{font-size:10.5px;font-weight:700;fill:#fff}
+      .gut{font-size:9px;fill:#64748b}
+      .ann{font-size:12px;font-weight:700;fill:#dc2626}
+      .iter-hdr{font-size:13px;font-weight:700;fill:#475569}
+    </style>
   </defs>
-  <!-- Original -->
-  <text x="40" y="28" fill="#64748b" font-weight="700" font-size="13">ORIGINAL (no pipeline):</text>
-  <rect x="40" y="42" width="880" height="44" rx="6" fill="#475569"/>
-  <text x="480" y="69" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">ShardedModule.forward(kjt) = input_dist + compute_and_output_dist</text>
+  <rect width="1120" height="340" fill="#fafbfc"/>
 
-  <!-- 2-stage split -->
-  <text x="40" y="110" fill="#2563eb" font-weight="700" font-size="13">BASE PIPELINE (2-stage split):</text>
-  <rect x="40" y="124" width="290" height="40" rx="6" fill="#dc2626"/>
-  <text x="185" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_start_data_dist → input_dist</text>
-  <text x="185" y="180" text-anchor="middle" fill="#dc2626" font-size="10">data_dist_stream (batch_i+1)</text>
-  <rect x="375" y="124" width="90" height="40" rx="18" fill="#2563eb"/>
-  <text x="420" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Context</text>
-  <rect x="510" y="124" width="410" height="40" rx="6" fill="#059669"/>
-  <text x="715" y="148" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PipelinedForward → wait + compute</text>
-  <text x="715" y="180" text-anchor="middle" fill="#059669" font-size="10">default_stream (batch_i) — still waits for AllToAll</text>
-  <line x1="330" y1="144" x2="375" y2="144" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="465" y1="144" x2="510" y2="144" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <!-- Iter headers -->
+  <text x="306" y="22" text-anchor="middle" class="iter-hdr">iter i-1</text>
+  <text x="622" y="22" text-anchor="middle" class="iter-hdr">iter i</text>
+  <text x="938" y="22" text-anchor="middle" class="iter-hdr">iter i+1</text>
 
-  <!-- 3-stage split -->
-  <text x="40" y="214" fill="#059669" font-weight="700" font-size="13">PREFETCH PIPELINE (3-stage split):</text>
-  <rect x="40" y="228" width="190" height="40" rx="6" fill="#dc2626"/>
-  <text x="135" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_start_data_dist</text>
-  <text x="135" y="264" text-anchor="middle" fill="#dc2626" font-size="10">data_dist_stream</text>
+  <!-- Iter separators -->
+  <line x1="466" y1="30" x2="466" y2="290" stroke="#cbd5e1" stroke-dasharray="4,3"/>
+  <line x1="782" y1="30" x2="782" y2="290" stroke="#cbd5e1" stroke-dasharray="4,3"/>
+  <line x1="150" y1="30" x2="150" y2="290" stroke="#e2e8f0"/>
 
-  <rect x="255" y="228" width="70" height="40" rx="18" fill="#2563eb"/>
-  <text x="290" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Ctx</text>
+  <!-- Lane labels -->
+  <text x="10" y="64" class="lane-lbl">memcpy</text>
+  <text x="10" y="78" class="lane-sub">H2D copy</text>
 
-  <rect x="350" y="228" width="280" height="40" rx="6" fill="#0891b2"/>
-  <text x="490" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">_prefetch_embeddings</text>
-  <text x="490" y="264" text-anchor="middle" fill="#0891b2" font-size="10">prefetch_stream — wait + prefetch()</text>
+  <text x="10" y="124" class="lane-lbl">data_dist</text>
+  <text x="10" y="138" class="lane-sub">input_dist NCCL</text>
 
-  <rect x="655" y="228" width="70" height="40" rx="18" fill="#2563eb"/>
-  <text x="690" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Ctx</text>
+  <text x="10" y="184" class="lane-lbl">prefetch</text>
+  <text x="10" y="198" class="lane-sub">dyn cache warmup</text>
 
-  <rect x="750" y="228" width="170" height="40" rx="6" fill="#16a34a"/>
-  <text x="835" y="251" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">PrefetchPipelinedFwd</text>
-  <text x="835" y="264" text-anchor="middle" fill="#16a34a" font-size="10">default_stream — ZERO WAIT!</text>
+  <text x="10" y="244" class="lane-lbl">default</text>
+  <text x="10" y="258" class="lane-sub">fwd · bwd · optim</text>
 
-  <line x1="230" y1="248" x2="255" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="325" y1="248" x2="350" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="630" y1="248" x2="655" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
-  <line x1="725" y1="248" x2="750" y2="248" stroke="#475569" stroke-width="1.5" marker-end="url(#pa)"/>
+  <!-- lane rows backdrop -->
+  <rect x="150" y="40" width="950" height="50" fill="#fff7ed" opacity=".4"/>
+  <rect x="150" y="100" width="950" height="50" fill="#dbeafe" opacity=".3"/>
+  <rect x="150" y="160" width="950" height="50" fill="#cffafe" opacity=".3"/>
+  <rect x="150" y="220" width="950" height="50" fill="#ede9fe" opacity=".3"/>
 
-  <!-- Overlap note -->
-  <rect x="40" y="286" width="880" height="22" rx="4" fill="#ecfdf5" stroke="#a7f3d0"/>
-  <text x="480" y="301" text-anchor="middle" fill="#065f46" font-size="10">Each stage runs on a different CUDA stream → all three stages from different batches overlap in time!</text>
+  <!-- iter i-1 blocks (only default, since iter i-1 started earlier) -->
+  <rect x="160" y="228" width="296" height="34" rx="4" fill="#7c3aed"/>
+  <text x="308" y="250" text-anchor="middle" class="blk-lbl">fwd + bwd + optim (iter i-1)</text>
+
+  <!-- iter i blocks -->
+  <!-- memcpy -->
+  <rect x="170" y="48" width="76" height="34" rx="4" fill="#ea580c"/>
+  <text x="208" y="70" text-anchor="middle" class="blk-lbl">H2D</text>
+  <!-- data_dist -->
+  <rect x="246" y="108" width="126" height="34" rx="4" fill="#2563eb"/>
+  <text x="309" y="130" text-anchor="middle" class="blk-lbl">fused AllToAll</text>
+  <text x="309" y="98" text-anchor="middle" class="ann">★ wait #1</text>
+  <!-- prefetch -->
+  <rect x="372" y="168" width="100" height="34" rx="4" fill="#0891b2"/>
+  <text x="422" y="190" text-anchor="middle" class="blk-lbl">prefetch</text>
+  <text x="422" y="158" text-anchor="middle" class="ann" fill="#059669">★ wait #2</text>
+  <!-- default (iter i fwd + bwd) -->
+  <rect x="462" y="228" width="290" height="34" rx="4" fill="#7c3aed" opacity="0.9"/>
+  <text x="607" y="250" text-anchor="middle" class="blk-lbl">model(batch_i) fwd · bwd · optim</text>
+
+  <!-- iter i+1 blocks -->
+  <!-- memcpy -->
+  <rect x="486" y="48" width="76" height="34" rx="4" fill="#ea580c"/>
+  <text x="524" y="70" text-anchor="middle" class="blk-lbl">H2D</text>
+  <!-- data_dist -->
+  <rect x="562" y="108" width="126" height="34" rx="4" fill="#2563eb"/>
+  <text x="625" y="130" text-anchor="middle" class="blk-lbl">fused AllToAll</text>
+  <!-- prefetch -->
+  <rect x="688" y="168" width="100" height="34" rx="4" fill="#0891b2"/>
+  <text x="738" y="190" text-anchor="middle" class="blk-lbl">prefetch</text>
+  <!-- default -->
+  <rect x="778" y="228" width="290" height="34" rx="4" fill="#7c3aed" opacity="0.9"/>
+  <text x="923" y="250" text-anchor="middle" class="blk-lbl">model(batch_i+1) fwd · bwd · optim</text>
+
+  <!-- Gutter notes -->
+  <text x="160" y="288" class="gut">Overlap: while default runs iter-i compute, memcpy/data_dist/prefetch already pre-stage iter-(i+1).</text>
+  <text x="160" y="310" class="gut">Both wait #1 and wait #2 land on dedicated streams — neither blocks the default-stream critical path.</text>
 </svg>
-</div>
-</div>
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <strong><span class="zh">💡 两次 wait 分别在哪条 stream 上</span><span class="en">💡 Each wait rides its own stream</span></strong>
+    <span class="zh">wait #1 跑在 <code>data_dist_stream</code>，wait #2 跑在 <code>default_stream</code>——两条 NCCL 延迟都被相邻 batch 的 fwd/bwd 盖住。三种 forward 变体之间的 wait 放置差异已在 §2 的 class 图里标出。</span>
+    <span class="en">wait #1 runs on <code>data_dist_stream</code>, wait #2 on <code>default_stream</code> — both NCCL latencies are covered by neighbour batches' fwd/bwd. Per-variant wait placement is already annotated in the §2 class diagram.</span>
+  </div>
 </section>
 
-<!-- ═══════════ TIMELINE ═══════════ -->
-<section id="timeline">
-<div class="phase-banner pb-summary">
-  <h2><span class="zh">时间线 — 拆分后的执行效果</span><span class="en">Timeline — Execution After Split</span></h2>
-</div>
-<div class="xref-bar">
-<a href="runtime_timeline.html">交互式 3 迭代 Timeline 可视化 → Runtime Timeline</a>
-<a href="pipeline_init.html#progress">progress() 稳态循环对比 →</a>
-</div>
+<!-- ═══════════════════════════ §5  SPLITS FUSING  ═══════════════════════════ -->
+<section id="fuse">
+  <div class="phase-banner fuse">
+    <h2><span class="zh">§5 把 N 次 splits AllToAll 融成一次</span><span class="en">§5 Fusing N splits AllToAlls into one</span></h2>
+    <p><span class="zh">下图展示 Stage 1 为什么值得 fuse、Stage 2 为什么不动</span><span class="en">The sequence below shows why Stage 1 splits (not Stage 2 tensors) are the fusing target.</span></p>
+  </div>
 
-<div class="svg-wrap">
-<div class="svg-header"><span><span class="zh">Prefetch Pipeline 稳态时间线（3 batch in-flight）</span><span class="en">Prefetch Pipeline Steady-State Timeline (3 batches in-flight)</span></span></div>
-<div class="svg-container">
-<svg viewBox="0 0 960 340" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono',Consolas,monospace" font-size="11">
-  <rect width="960" height="340" fill="#fafbfc" rx="8"/>
+  <div class="svg-wrap">
+    <div class="svg-header">
+      <span><span class="zh">N 次独立启动 vs 一次 fused 启动</span><span class="en">N independent launches vs one fused launch</span></span>
+      <span class="hint">sequence diagram</span>
+    </div>
+    <div class="svg-container">
+<svg viewBox="0 0 1040 460" xmlns="http://www.w3.org/2000/svg" width="1040" height="460">
+  <defs>
+    <style>
+      text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+      .ptcp{font-size:11px;font-weight:700;fill:#fff}
+      .mono{font-family:'SF Mono',Consolas,monospace;font-size:10px;fill:#475569}
+      .sec{font-size:13px;font-weight:700;fill:#1e293b}
+      .cost{font-size:10.5px;font-weight:700}
+    </style>
+    <marker id="f-orn" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#ea580c"/>
+    </marker>
+    <marker id="f-grn" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#16a34a"/>
+    </marker>
+    <marker id="f-gry" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <polygon points="0,1 7,4 0,7" fill="#9ca3af"/>
+    </marker>
+    <filter id="sh5"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/></filter>
+  </defs>
+  <rect width="1040" height="460" fill="#fafbfc"/>
 
-  <!-- Time axis -->
-  <line x1="190" y1="300" x2="900" y2="300" stroke="#94a3b8" stroke-width="1"/>
-  <text x="545" y="322" text-anchor="middle" fill="#94a3b8" font-size="11">time →</text>
+  <!-- ============ TOP: Native N launches ============ -->
+  <text x="30" y="24" class="sec" fill="#ea580c">Native — each module launches its own splits AllToAll</text>
 
-  <!-- Stream labels -->
-  <text x="24" y="60" fill="#dc2626" font-weight="700" font-size="11">memcpy_stream</text>
-  <text x="24" y="110" fill="#ea580c" font-weight="700" font-size="11">data_dist_stream</text>
-  <text x="24" y="160" fill="#0891b2" font-weight="700" font-size="11">prefetch_stream</text>
-  <text x="24" y="210" fill="#059669" font-weight="700" font-size="11">default_stream</text>
-  <text x="24" y="260" fill="#475569" font-weight="700" font-size="11">CPU thread</text>
+  <g filter="url(#sh5)">
+    <rect x="70" y="42" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="130" y="64" text-anchor="middle" class="ptcp">module_1</text>
 
-  <!-- Gridlines -->
-  <line x1="190" y1="40" x2="190" y2="288" stroke="#e2e8f0" stroke-width="1"/>
+    <rect x="230" y="42" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="290" y="64" text-anchor="middle" class="ptcp">module_2</text>
 
-  <!-- ======= progress(batch_i) ======= -->
-  <!-- memcpy: batch_i+2 H2D -->
-  <rect x="430" y="50" width="130" height="28" rx="4" fill="#fecaca" stroke="#dc2626"/>
-  <text x="495" y="68" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">H2D batch_i+2</text>
+    <rect x="470" y="42" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="530" y="64" text-anchor="middle" class="ptcp">module_N</text>
 
-  <!-- data_dist: batch_i+1 input_dist (AllToAll) - was done in prev step -->
-  <rect x="210" y="100" width="230" height="28" rx="4" fill="#fed7aa" stroke="#ea580c"/>
-  <text x="325" y="118" text-anchor="middle" fill="#ea580c" font-size="10" font-weight="600">input_dist batch_i+1 (AllToAll)</text>
+    <rect x="800" y="42" width="130" height="34" rx="6" fill="#059669"/>
+    <text x="865" y="64" text-anchor="middle" class="ptcp">NCCL (PG)</text>
+  </g>
+  <text x="410" y="64" text-anchor="middle" font-size="14" fill="#64748b">...</text>
 
-  <!-- prefetch: batch_i wait + prefetch -->
-  <rect x="210" y="150" width="170" height="28" rx="4" fill="#a5f3fc" stroke="#0891b2"/>
-  <text x="295" y="168" text-anchor="middle" fill="#0891b2" font-size="10" font-weight="600">prefetch batch_i</text>
+  <!-- Lifelines -->
+  <line x1="130" y1="76" x2="130" y2="216" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="290" y1="76" x2="290" y2="216" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="530" y1="76" x2="530" y2="216" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="865" y1="76" x2="865" y2="216" stroke="#d1d5db" stroke-dasharray="6,4"/>
 
-  <!-- default: batch_i forward + backward -->
-  <rect x="390" y="200" width="110" height="28" rx="4" fill="#bbf7d0" stroke="#059669"/>
-  <text x="445" y="218" text-anchor="middle" fill="#059669" font-size="10" font-weight="600">fwd batch_i</text>
-  <rect x="515" y="200" width="175" height="28" rx="4" fill="#fde68a" stroke="#ca8a04"/>
-  <text x="602" y="218" text-anchor="middle" fill="#854d0e" font-size="10" font-weight="600">bwd + optim batch_i</text>
+  <!-- Arrows from each module to NCCL -->
+  <line x1="138" y1="106" x2="797" y2="106" stroke="#ea580c" stroke-width="1.5" marker-end="url(#f-orn)"/>
+  <text x="470" y="100" text-anchor="middle" class="mono" fill="#ea580c">all_to_all_single(splits_1)</text>
 
-  <!-- data_dist: batch_i+2 starts after batch_i+1 done -->
-  <rect x="650" y="100" width="210" height="28" rx="4" fill="#fed7aa" stroke="#ea580c" opacity=".6"/>
-  <text x="755" y="118" text-anchor="middle" fill="#ea580c" font-size="10">input_dist batch_i+2</text>
+  <line x1="298" y1="138" x2="797" y2="138" stroke="#ea580c" stroke-width="1.5" marker-end="url(#f-orn)"/>
+  <text x="548" y="132" text-anchor="middle" class="mono" fill="#ea580c">all_to_all_single(splits_2)</text>
 
-  <!-- prefetch: batch_i+1 -->
-  <rect x="650" y="150" width="170" height="28" rx="4" fill="#a5f3fc" stroke="#0891b2" opacity=".6"/>
-  <text x="735" y="168" text-anchor="middle" fill="#0891b2" font-size="10">prefetch batch_i+1</text>
+  <line x1="538" y1="170" x2="797" y2="170" stroke="#ea580c" stroke-width="1.5" marker-end="url(#f-orn)"/>
+  <text x="668" y="164" text-anchor="middle" class="mono" fill="#ea580c">all_to_all_single(splits_N)</text>
 
-  <!-- CPU: orchestrates -->
-  <rect x="210" y="250" width="60" height="28" rx="4" fill="#e2e8f0"/><text x="240" y="268" text-anchor="middle" fill="#475569" font-size="10">wait</text>
-  <rect x="278" y="250" width="90" height="28" rx="4" fill="#e2e8f0"/><text x="323" y="268" text-anchor="middle" fill="#475569" font-size="10">sdd i+2</text>
-  <rect x="376" y="250" width="60" height="28" rx="4" fill="#e2e8f0"/><text x="406" y="268" text-anchor="middle" fill="#475569" font-size="10">fwd</text>
-  <rect x="444" y="250" width="84" height="28" rx="4" fill="#e2e8f0"/><text x="486" y="268" text-anchor="middle" fill="#475569" font-size="10">prefetch</text>
+  <!-- Cost -->
+  <rect x="800" y="186" width="210" height="24" rx="4" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="905" y="202" text-anchor="middle" class="cost" fill="#991b1b">N × ~20 μs launch overhead</text>
 
-  <!-- Overlap brackets -->
-  <rect x="355" y="42" width="305" height="210" rx="6" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,3" opacity=".5"/>
-  <text x="507" y="36" text-anchor="middle" fill="#7c3aed" font-size="11" font-weight="700">All 4 streams active simultaneously</text>
+  <!-- ============ DIVIDER ============ -->
+  <line x1="30" y1="232" x2="1010" y2="232" stroke="#cbd5e1" stroke-dasharray="5,4"/>
+  <text x="520" y="250" text-anchor="middle" font-size="11" font-weight="700" fill="#475569" font-style="italic">↓ override returns metadata, _fuse_input_dist_splits concats, ONE NCCL launches ↓</text>
+
+  <!-- ============ BOTTOM: Fused ============ -->
+  <text x="30" y="274" class="sec" fill="#16a34a">Fused — metadata collected, one all_to_all_single per PG</text>
+
+  <g filter="url(#sh5)">
+    <rect x="70" y="292" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="130" y="314" text-anchor="middle" class="ptcp">module_1</text>
+
+    <rect x="230" y="292" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="290" y="314" text-anchor="middle" class="ptcp">module_2</text>
+
+    <rect x="470" y="292" width="120" height="34" rx="6" fill="#6366f1"/>
+    <text x="530" y="314" text-anchor="middle" class="ptcp">module_N</text>
+
+    <rect x="630" y="292" width="160" height="34" rx="6" fill="#7c3aed"/>
+    <text x="710" y="314" text-anchor="middle" class="ptcp">_fuse_input_dist_splits</text>
+
+    <rect x="830" y="292" width="130" height="34" rx="6" fill="#059669"/>
+    <text x="895" y="314" text-anchor="middle" class="ptcp">NCCL (PG)</text>
+  </g>
+  <text x="410" y="314" text-anchor="middle" font-size="14" fill="#64748b">...</text>
+
+  <!-- Lifelines (bottom) -->
+  <line x1="130" y1="326" x2="130" y2="440" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="290" y1="326" x2="290" y2="440" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="530" y1="326" x2="530" y2="440" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="710" y1="326" x2="710" y2="440" stroke="#d1d5db" stroke-dasharray="6,4"/>
+  <line x1="895" y1="326" x2="895" y2="440" stroke="#d1d5db" stroke-dasharray="6,4"/>
+
+  <!-- Returns (muted) -->
+  <line x1="138" y1="352" x2="627" y2="352" stroke="#9ca3af" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#f-gry)"/>
+  <text x="382" y="346" text-anchor="middle" class="mono" fill="#64748b">return KJTSplitsAllToAllMeta  (no NCCL)</text>
+
+  <line x1="298" y1="378" x2="627" y2="378" stroke="#9ca3af" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#f-gry)"/>
+  <text x="462" y="372" text-anchor="middle" class="mono" fill="#64748b">return Meta</text>
+
+  <line x1="538" y1="404" x2="627" y2="404" stroke="#9ca3af" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#f-gry)"/>
+  <text x="582" y="398" text-anchor="middle" class="mono" fill="#64748b">return Meta</text>
+
+  <!-- Fused NCCL launch -->
+  <line x1="718" y1="426" x2="827" y2="426" stroke="#16a34a" stroke-width="2.5" marker-end="url(#f-grn)"/>
+  <text x="772" y="418" text-anchor="middle" fill="#16a34a" font-weight="700" font-size="12" font-family="'SF Mono',Consolas,monospace">stack + flatten → ONE all_to_all_single</text>
+
+  <!-- Cost -->
+  <rect x="830" y="436" width="140" height="22" rx="4" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="900" y="451" text-anchor="middle" class="cost" fill="#065f46">1 × ~20 μs</text>
 </svg>
-</div>
-</div>
+    </div>
+  </div>
 
-<div class="callout callout-tip">
-<span class="zh"><strong>总结</strong>：Pipeline 的核心是一次 "forward 截取手术"——用 <code>_rewrite_model</code> 记住 batch 到 ShardedModule 的参数提取路径（ArgInfo），然后把 <code>forward()</code> 替换为只做 <code>compute_and_output_dist()</code> 的 PipelinedForward。<code>input_dist()</code> 被提前到上一个 batch 的时间段内异步执行，通过 <code>TrainPipelineContext</code> 在两个 stage 之间传递中间结果。</span>
-<span class="en"><strong>Summary</strong>: The pipeline's core is a "forward hijack surgery" — <code>_rewrite_model</code> records the batch-to-ShardedModule argument extraction path (ArgInfo), then replaces <code>forward()</code> with a PipelinedForward that only does <code>compute_and_output_dist()</code>. <code>input_dist()</code> is moved to execute asynchronously during the previous batch's time window, with <code>TrainPipelineContext</code> bridging intermediate results between the two stages.</span>
-</div>
+  <table class="tbl">
+    <tr>
+      <th></th>
+      <th><span class="zh">Stage 1 (splits)</span><span class="en">Stage 1 (splits)</span></th>
+      <th><span class="zh">Stage 2 (tensors)</span><span class="en">Stage 2 (tensors)</span></th>
+    </tr>
+    <tr>
+      <td><span class="zh">单次数据量</span><span class="en">Payload per call</span></td>
+      <td><span class="zh">每 feature 少量 int64（数十字节）</span><span class="en">a few int64 per feature (~tens of bytes)</span></td>
+      <td><span class="zh">真实 KJT 数据（MB–百 MB）</span><span class="en">real KJT data (MB – hundreds of MB)</span></td>
+    </tr>
+    <tr>
+      <td><span class="zh">Launch 开销占比</span><span class="en">Launch-overhead share</span></td>
+      <td><strong style="color:#dc2626"><span class="zh">压倒性（~20 μs 远大于传输时间）</span><span class="en">dominant (~20 μs ≫ transfer time)</span></strong></td>
+      <td><span class="zh">可忽略</span><span class="en">negligible</span></td>
+    </tr>
+    <tr>
+      <td><span class="zh">Fuse 收益</span><span class="en">Fuse ROI</span></td>
+      <td><strong style="color:#16a34a"><span class="zh">高——N 次 launch → 1 次</span><span class="en">high — N launches → 1</span></strong></td>
+      <td><span class="zh">低；还会打乱 per-module pipeline</span><span class="en">low; also serialises per-module pipelining</span></td>
+    </tr>
+    <tr>
+      <td><span class="zh">是否 fuse</span><span class="en">Is fused?</span></td>
+      <td>✓ <code>_fuse_input_dist_splits</code></td>
+      <td>✗ <span class="zh">按模块各自异步</span><span class="en">left per-module async</span></td>
+    </tr>
+  </table>
+
+  <div class="callout callout-tip">
+    <strong><span class="zh">💡 Edge cases</span><span class="en">💡 Edge cases</span></strong>
+    <span class="zh">
+      <ul>
+        <li><strong>variable_stride_per_key=True</strong>（每 key 变长 batch）：override 里用 <code>input.variable_stride_per_key()</code> 判断走哪条路。</li>
+        <li><strong>单 worker (world_size=1)</strong>：原版 <code>KJTAllToAllSplitsAwaitable.__init__</code> 有短路；override 没短路，但 <code>FusedKJTListSplitsAwaitable</code> 的 <code>pg is None</code> 分支会跳过 NCCL。</li>
+        <li><strong>多 PG (hybrid sharding)</strong>：<code>_fuse_input_dist_splits</code> 按 <code>pg</code> 分组，每个 PG 一个 fused awaitable——不跨 PG。</li>
+      </ul>
+    </span>
+    <span class="en">
+      <ul>
+        <li><strong>variable_stride_per_key=True</strong> (per-key variable batch): the override branches on <code>input.variable_stride_per_key()</code>.</li>
+        <li><strong>Single worker</strong> (world_size=1): native <code>KJTAllToAllSplitsAwaitable.__init__</code> short-circuits; the override does not, but <code>FusedKJTListSplitsAwaitable</code> skips NCCL when <code>pg is None</code>.</li>
+        <li><strong>Multiple PGs</strong> (hybrid sharding): <code>_fuse_input_dist_splits</code> groups by <code>pg</code>; one fused awaitable per PG — no fusing across PGs.</li>
+      </ul>
+    </span>
+  </div>
+
+  <div class="xref-bar">
+    <a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/_rewrite_model.py" target="_blank">_rewrite_model.py</a>
+    <a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/_pipelined_forward.py" target="_blank">_pipelined_forward.py</a>
+    <a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/_data_dist.py" target="_blank">_data_dist.py</a>
+    <a href="https://github.com/NVIDIA/recsys-examples/blob/main/examples/commons/pipeline/_types.py" target="_blank">_types.py</a>
+  </div>
 </section>
 
-</div><!-- container -->
+</div>
 
 <footer>
-  <div class="xref-bar" style="justify-content:center;margin-bottom:12px">
-    <a href="index.html">← 总入口</a>
-    <a href="pipeline_init.html">← Pipeline Init</a>
-    <a href="context_lifecycle.html">Context Lifecycle →</a>
-    <a href="runtime_timeline.html">Runtime Timeline →</a>
-  </div>
-  NVIDIA recsys-examples · Forward Hijack Deep Dive
+  <span class="zh">NVIDIA recsys-examples · Pipeline 拆分机制深度解析 · 生成于 2026-04-22</span>
+  <span class="en">NVIDIA recsys-examples · Pipeline forward-splitting deep dive · Generated 2026-04-22</span>
 </footer>
 
 <script>
+// Language toggle
 function toggleLang(){
-  const b=document.body,z=b.classList.contains('lang-zh');
-  b.classList.toggle('lang-zh',!z);b.classList.toggle('lang-en',z);
-  document.getElementById('langBtn').textContent=z?'中文':'EN';
-  document.documentElement.lang=z?'en':'zh-CN';
+  const b = document.body;
+  const btn = document.getElementById('langBtn');
+  if(b.classList.contains('lang-en')){
+    b.classList.remove('lang-en');
+    b.classList.add('lang-zh');
+    btn.textContent = 'English';
+  } else {
+    b.classList.remove('lang-zh');
+    b.classList.add('lang-en');
+    btn.textContent = '中文';
+  }
 }
-const secs=document.querySelectorAll('section[id]');
-const navLinks=document.querySelectorAll('.nav-links a');
-const tocLinks=document.querySelectorAll('#ftocList a');
-function updateActiveSection(){
-  let cur='';
-  secs.forEach(s=>{if(s.getBoundingClientRect().top<80)cur=s.id;});
-  navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+cur));
-  tocLinks.forEach(a=>a.classList.toggle('cur',a.getAttribute('href')==='#'+cur));
-}
-updateActiveSection();
-window.addEventListener('scroll',updateActiveSection,{passive:true});
 
+// Sticky-nav scrollspy
+const secs = Array.from(document.querySelectorAll('section[id]'));
+const navLinks = Array.from(document.querySelectorAll('#nav .nav-links a'));
+const tocLinks = Array.from(document.querySelectorAll('#ftocList a'));
+function updateNav(){
+  let cur = secs[0].id;
+  const y = window.scrollY + 120;
+  for(const s of secs){
+    if(s.offsetTop <= y) cur = s.id;
+  }
+  navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
+  tocLinks.forEach(a => a.classList.toggle('cur', a.getAttribute('href') === '#' + cur));
+}
+window.addEventListener('scroll', updateNav, {passive:true});
+updateNav();
+
+// Floating TOC drag
 (function(){
-  const ftoc=document.getElementById('ftoc');
-  if(window.innerWidth<1200)ftoc.classList.add('collapsed');
-  const head=document.getElementById('ftocHead');
-  let dragging=false,ox=0,oy=0,sx=0,sy=0;
-  head.addEventListener('mousedown',e=>{
-    dragging=true;
-    const r=ftoc.getBoundingClientRect();
-    ox=e.clientX;oy=e.clientY;sx=r.left;sy=r.top;
+  const ftoc = document.getElementById('ftoc');
+  const handle = document.getElementById('ftocHead');
+  let dx = 0, dy = 0, sx = 0, sy = 0, dragging = false;
+  handle.addEventListener('mousedown', (e) => {
+    if(e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    sx = e.clientX; sy = e.clientY;
+    const r = ftoc.getBoundingClientRect();
+    dx = r.left; dy = r.top;
     e.preventDefault();
   });
-  document.addEventListener('mousemove',e=>{
-    if(!dragging)return;
-    ftoc.style.right='auto';
-    ftoc.style.left=(sx+e.clientX-ox)+'px';
-    ftoc.style.top=(sy+e.clientY-oy)+'px';
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    ftoc.style.right = 'auto';
+    ftoc.style.top = (dy + e.clientY - sy) + 'px';
+    ftoc.style.left = (dx + e.clientX - sx) + 'px';
   });
-  document.addEventListener('mouseup',()=>{dragging=false;});
+  window.addEventListener('mouseup', () => dragging = false);
 })();
 </script>
+
 </body>
 </html>

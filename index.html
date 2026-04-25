@@ -50,6 +50,11 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
     <h2>DynamicEmb Training Pipeline</h2>
     <p>NVIDIA DynamicEmb 训练迭代五阶段（input_dist → wait_sparse → prefetch → forward → backward）序列图与文档，涵盖 CACHE / HBM_DIRECT / DEFAULT 三种 StorageMode 路径对比。</p>
   </a>
+  <a class="card" href="recsys-examples/schedulable_pipeline/pipeline_overview.html">
+    <span class="tag tag-doc">Documentation</span>
+    <h2>Schedulable Pipeline Engine</h2>
+    <p>recsys-examples 三层重写设计文档（中英双语切换）：HugeCTR 风格的 Task/Schedule 引擎、多线程执行器（NCCL ordered lock）、HSTU 适配层。含 UML 时序图、类图、首次 progress() 引导流程、稳态迭代、票据锁状态机与 API 示例。</p>
+  </a>
   <a class="card" href="torchrec-internals/sharded_ec_internals.html">
     <span class="tag tag-doc">Documentation</span>
     <h2>ShardedEmbeddingCollection 内部机制</h2>

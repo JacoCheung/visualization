@@ -240,9 +240,23 @@
 <main>
 <h1><span class="en">Schedulable Pipeline Engine</span><span class="zh">可调度流水线引擎</span></h1>
 <p class="meta">
-<span class="en">Branch: <code>junzhang/rework-mtms</code> · Last updated: 2026-04-25 · Three coupled SPECs: <code>SPEC.md</code> (Problem #1), <code>SPEC_p2.md</code> (HSTU adapter), <code>SPEC_p3.md</code> (event-based sync, draft).</span>
-<span class="zh">分支：<code>junzhang/rework-mtms</code> · 最后更新：2026-04-25 · 三份相互关联的 SPEC：<code>SPEC.md</code>（Problem #1）、<code>SPEC_p2.md</code>（HSTU 适配层）、<code>SPEC_p3.md</code>（基于事件的同步，草案）。</span>
+<span class="en">Branch: <code>junzhang/rework-mtms</code> · Last updated: 2026-04-26 · Coupled SPECs: <code>SPEC.md</code> (Problem #1), <code>SPEC_p2.md</code> (HSTU adapter), <code>SPEC_p3.md</code> (event-based sync, RESOLVED), <code>SPEC_p4_declarative_pipeline.md</code> (v2 declarative API).</span>
+<span class="zh">分支：<code>junzhang/rework-mtms</code> · 最后更新：2026-04-26 · 相互关联的 SPEC：<code>SPEC.md</code>（Problem #1）、<code>SPEC_p2.md</code>（HSTU 适配层）、<code>SPEC_p3.md</code>（基于事件的同步，已 RESOLVED）、<code>SPEC_p4_declarative_pipeline.md</code>（v2 声明式 API）。</span>
 </p>
+
+<div class="note" id="changelog-spec-p4-v2">
+  <strong><span class="en">Changelog: SPEC_p4 v2 (2026-04-26)</span><span class="zh">更新日志：SPEC_p4 v2（2026-04-26）</span></strong>
+  <ul>
+    <li><span class="en"><strong>User-facing Task API</strong>: <code>batch_offset=N</code> kwarg removed. Use <code>lookahead=N</code> instead — same semantics, better name. <code>reads</code> / <code>writes</code> accept bare strings; offsets are inferred from the producer's <code>lookahead</code>.</span><span class="zh"><strong>用户可见的 Task API</strong>：移除了 <code>batch_offset=N</code> 形参。改用 <code>lookahead=N</code>，语义不变、名字更准。<code>reads</code> / <code>writes</code> 直接传字符串，offset 由生产者的 <code>lookahead</code> 自动推断。</span></li>
+    <li><span class="en"><strong>Bare-name <code>depends_on</code></strong>: write <code>depends_on=("prefetch_embeddings",)</code> and the engine auto-classifies as within-iter or cross-iter from the producer's vs consumer's <code>lookahead</code>. No more leaking pseudo-slot names like <code>module_input_post_prefetch</code> in user code.</span><span class="zh"><strong>bare-name <code>depends_on</code></strong>：直接写 <code>depends_on=("prefetch_embeddings",)</code>，引擎根据生产者/消费者的 <code>lookahead</code> 自动判断是同迭代还是跨迭代依赖。再也不用把 <code>module_input_post_prefetch</code> 这类 pseudo-slot 暴露在用户代码里。</span></li>
+    <li><span class="en"><strong>Declarative <code>Pipeline</code> wrapper</strong>: <code>commons.pipeline.engine.Pipeline(tasks=[...])</code> — a thin façade over <code>SchedulablePipeline</code> + <code>Schedule</code> + <code>StreamPool</code> for one-shot user code.</span><span class="zh"><strong>声明式 <code>Pipeline</code> 封装</strong>：<code>commons.pipeline.engine.Pipeline(tasks=[...])</code>，把 <code>SchedulablePipeline</code> + <code>Schedule</code> + <code>StreamPool</code> 一层薄封装，给一次性用户代码用。</span></li>
+    <li><span class="en"><strong>Event-based cross-stream sync</strong>: executor prefers <code>wait_event(producer_event)</code> from the ring slot over coarse <code>wait_stream(producer_stream)</code>. Stream-level wait remains as first-iter fallback.</span><span class="zh"><strong>基于 Event 的跨流同步</strong>：执行器优先从 ring slot 取 <code>wait_event(producer_event)</code>，回退到粗粒度的 <code>wait_stream(producer_stream)</code>。stream 级别的 wait 仍作为第一轮迭代的兜底。</span></li>
+    <li><span class="en"><strong>NVTX integration</strong>: every <code>task.run(ctx)</code> is wrapped in <code>nvtx.annotate(task.nvtx_tag or task.name)</code> at all execution callsites (sequential, threaded, single-task fast path, NCCL-locked path). No-op on CPU-only hosts.</span><span class="zh"><strong>NVTX 集成</strong>：所有执行点（sequential / threaded / 单任务快路径 / NCCL-锁路径）都用 <code>nvtx.annotate(task.nvtx_tag or task.name)</code> 包裹了 <code>task.run(ctx)</code>。CPU-only 环境下是 no-op。</span></li>
+    <li><span class="en"><strong><code>HSTUPipeline.detach()</code> resets bookkeeping</strong> so a follow-up <code>attach()</code> + <code>progress()</code> rebuilds the engine cleanly (Codex B-MEDIUM-1).</span><span class="zh"><strong><code>HSTUPipeline.detach()</code> 现在重置 bookkeeping</strong>，下一次 <code>attach()</code> + <code>progress()</code> 能干净地重建引擎（Codex B-MEDIUM-1）。</span></li>
+    <li><span class="en"><strong><code>SchedulablePipeline.progress()</code> resets §4.8 state on a fresh iterator</strong> (mirrors legacy <code>train_pipeline.py:418</code>). Switching from train loader to eval loader inside one session no longer raises <code>StopIteration</code> immediately.</span><span class="zh"><strong><code>SchedulablePipeline.progress()</code> 在新 iterator 上重置 §4.8 状态</strong>（对齐遗留的 <code>train_pipeline.py:418</code>）。在同一个 session 里从 train loader 切到 eval loader 不再立刻抛 <code>StopIteration</code>。</span></li>
+    <li><span class="en"><strong>HSTU pretrain ranking GR integration</strong>: <code>RECSYS_PIPELINE_BACKEND=new</code> (default <code>legacy</code>) routes <code>examples/hstu/training/pretrain_gr_ranking.py</code> through <code>HSTUPipelineFactory</code>. 8-GPU benchmark on synthetic 8-layer 1024-hidden + cutlass: <strong>568.24 / 565.76 TFLOPS</strong> (legacy / new, within 0.4%); 81.8% NCCL/compute overlap; 64 host threads × 5 streams. See <code>tasks/nsys_runs/RESULTS.md</code>.</span><span class="zh"><strong>集成到 HSTU pretrain ranking GR</strong>：<code>RECSYS_PIPELINE_BACKEND=new</code>（默认 <code>legacy</code>）把 <code>examples/hstu/training/pretrain_gr_ranking.py</code> 走 <code>HSTUPipelineFactory</code>。8 卡基准（合成 8 层 1024 隐藏 + cutlass）：<strong>568.24 / 565.76 TFLOPS</strong>（legacy / new，差 0.4%）；NCCL/compute overlap 81.8%；64 个 host 线程跨 5 个 stream。详见 <code>tasks/nsys_runs/RESULTS.md</code>。</span></li>
+  </ul>
+</div>
 
 <!-- =========================================================== -->
 <section id="background">
@@ -455,14 +469,21 @@ commons.pipeline.hstu_pipeline
     name: <span class="ty">str</span>
     stream: <span class="ty">str</span>                       <span class="cm"># named CUDA stream context</span>
     priority: <span class="ty">int</span>                    <span class="cm"># NVTX priority hint</span>
-    batch_offset: <span class="ty">int</span>                <span class="cm"># 0 = current batch, k = k iters ahead</span>
-    reads: Tuple[<span class="ty">DataSlot</span>, ...]      <span class="cm"># slots consumed</span>
+    lookahead: <span class="ty">int</span>                   <span class="cm"># SPEC_p4 v2: 0 = current batch, k = k iters ahead</span>
+    reads: Tuple[<span class="ty">DataSlot</span>, ...]      <span class="cm"># slots consumed (str shorthand auto-wraps)</span>
     writes: Tuple[<span class="ty">DataSlot</span>, ...]     <span class="cm"># slots produced</span>
-    depends_on: Tuple[<span class="ty">str</span>, ...]      <span class="cm"># explicit task-name edges</span>
+    depends_on: Tuple[<span class="ty">str</span>, ...]      <span class="cm"># bare-name task edges; engine</span>
+                                       <span class="cm">#   auto-classifies within/cross-iter</span>
+                                       <span class="cm">#   from producer.lookahead vs consumer.lookahead</span>
     nccl: <span class="ty">bool</span>                       <span class="cm"># participate in NCCL ordered lock</span>
-    nvtx_tag: Optional[<span class="ty">str</span>]
+    nvtx_tag: Optional[<span class="ty">str</span>]            <span class="cm"># auto-emitted via nvtx.annotate</span>
 
     <span class="kw">def</span> run(<span class="kw">self</span>, ctx: <span class="ty">TaskContext</span>) -> <span class="ty">None</span>: ...</pre>
+
+<p>
+<span class="en"><strong>SPEC_p4 v2 user API note</strong> (commits <code>2060ee62</code>, <code>9a2c7a12</code>, <code>faa7a30f</code>): the legacy <code>batch_offset=N</code> kwarg is removed (Phase C hard break). Pass <code>lookahead=N</code>; <code>reads</code> / <code>writes</code> accept bare strings; <code>depends_on</code> is bare-name and the engine derives within/cross-iter from the lookahead diff. Pseudo-slot names (e.g. <code>module_input_post_prefetch</code>) are no longer required to model HSTU's prefetch→forward mutation chain.</span>
+<span class="zh"><strong>SPEC_p4 v2 用户 API 说明</strong>（提交 <code>2060ee62</code>、<code>9a2c7a12</code>、<code>faa7a30f</code>）：legacy 的 <code>batch_offset=N</code> 形参已移除（Phase C hard break）。改用 <code>lookahead=N</code>；<code>reads</code> / <code>writes</code> 直接传字符串；<code>depends_on</code> 用 bare name，引擎从 lookahead 差自动判断同迭代/跨迭代。HSTU 的 prefetch→forward mutation chain 不再需要 pseudo-slot 名（如 <code>module_input_post_prefetch</code>）。</span>
+</p>
 
 <p>
 <span class="en"><code>DataSlot</code> is an opaque named handle: <code>(name: str, batch_offset: int)</code>. Two slots are equal iff both fields match. Cross-iter data flow happens via <code>BatchRing.advance()</code> shifting the slot store rather than copying values.</span>

@@ -1550,9 +1550,14 @@ pipe = <span class="ty">HSTUPipelineFactory</span>.create(
     batch_shuffler=batch_shuffler,
 )
 
+<span class="cm"># Create the iterator ONCE outside the loop. SPEC_p4 v2's</span>
+<span class="cm"># iterator-identity reset means a fresh `iter(dataloader)` per</span>
+<span class="cm"># step would restart the engine each time and discard in-flight</span>
+<span class="cm"># batches.</span>
+dataloader_iter = <span class="kw">iter</span>(dataloader)
 <span class="kw">for</span> _ <span class="kw">in</span> range(max_train_iters):
     <span class="kw">try</span>:
-        loss, tokens, output = pipe.progress(<span class="kw">iter</span>(dataloader))
+        loss, tokens, output = pipe.progress(dataloader_iter)
     <span class="kw">except</span> <span class="ty">StopIteration</span>:
         <span class="kw">break</span>
 pipe.shutdown()</pre>

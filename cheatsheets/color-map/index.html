@@ -10,23 +10,15 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
       background: #f8fafc;
       color: #0f172a;
-      padding: 22px;
-      line-height: 1.45;
+      padding: 18px;
+      line-height: 1.4;
     }
-    .wrap { max-width: 1080px; margin: 0 auto; }
+    .wrap { max-width: 1200px; margin: 0 auto; }
     .crumb { font-size: 13px; color: #64748b; margin-bottom: 8px; }
     .crumb a { color: #2563eb; text-decoration: none; }
     .crumb a:hover { text-decoration: underline; }
-    h1 { font-size: 28px; margin-bottom: 6px; }
-    .sub { color: #475569; font-size: 14px; margin-bottom: 12px; }
-    .src {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 12px;
-      margin-bottom: 14px;
-    }
+    h1 { font-size: 24px; margin-bottom: 6px; }
+    .sub { color: #475569; font-size: 13px; margin-bottom: 12px; }
     .card {
       background: #fff;
       border: 1px solid #e2e8f0;
@@ -34,22 +26,33 @@
       padding: 12px;
       margin-bottom: 12px;
     }
-    h2 { font-size: 16px; margin-bottom: 8px; color: #1d4ed8; }
-    .img-wrap {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #fff;
+    h2 { font-size: 16px; margin-bottom: 10px; color: #1d4ed8; }
+    .group {
+      margin-bottom: 10px;
     }
-    img { width: 100%; height: auto; display: block; }
-    ul { padding-left: 18px; }
-    li { margin: 5px 0; font-size: 13px; }
-    code {
-      background: #f1f5f9;
-      border-radius: 4px;
-      padding: 1px 4px;
+    .group h3 {
+      font-size: 13px;
+      color: #334155;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 3px 0;
+    }
+    .name {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
+      color: #1e293b;
+    }
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid #cbd5e1;
+      background: linear-gradient(90deg, #000, #fff);
     }
     @media print {
       @page { size: A4 portrait; margin: 10mm; }
@@ -61,35 +64,100 @@
 <body>
   <div class="wrap">
     <div class="crumb"><a href="../">← 返回速查表合集</a></div>
-    <h1>Color Map 速查图</h1>
-    <div class="sub">基于下载文件中的色图总览（适合快速挑选 colormap）</div>
-    <div class="src">来源：`/Users/junzhang/Downloads/color_map.webp`</div>
+    <h1>Color Map 速查图（前端重建）</h1>
+    <div class="sub">不依赖源图片文件；使用 HTML/CSS 渐变条重建色图分类与图例元素。</div>
 
     <section class="card">
-      <h2>色图总览</h2>
-      <div class="img-wrap">
-        <img src="./color_map.webp" alt="Color map cheat image" />
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>如何快速选型</h2>
-      <ul>
-        <li><strong>连续数值（默认优先）</strong>：选 Perceptually Uniform（如 <code>viridis</code>、<code>cividis</code>）。</li>
-        <li><strong>有中性中心的偏差数据</strong>：选 Diverging（如 <code>coolwarm</code>、<code>RdBu</code>）。</li>
-        <li><strong>类别标签</strong>：选 Qualitative（如 <code>tab10</code>、<code>Set3</code>）。</li>
-        <li><strong>角度/周期变量</strong>：选 Cyclic（如 <code>twilight</code>）。</li>
-      </ul>
-    </section>
-
-    <section class="card">
-      <h2>Matplotlib 调用示例</h2>
-      <ul>
-        <li><code>plt.imshow(Z, cmap="viridis")</code></li>
-        <li><code>plt.get_cmap("viridis_r")</code>（反转）</li>
-        <li><code>plt.get_cmap("viridis", 10)</code>（离散 10 阶）</li>
-      </ul>
+      <h2>Colormap Legend</h2>
+      <div id="legend"></div>
     </section>
   </div>
+  <script>
+    const groups = [
+      {
+        title: "Perceptually Uniform Sequential",
+        items: [
+          ["viridis", "linear-gradient(90deg,#440154,#3b528b,#21918c,#5ec962,#fde725)"],
+          ["plasma", "linear-gradient(90deg,#0d0887,#7e03a8,#cc4778,#f89540,#f0f921)"],
+          ["inferno", "linear-gradient(90deg,#000004,#420a68,#932667,#dd513a,#fca50a,#fcffa4)"],
+          ["magma", "linear-gradient(90deg,#000004,#3b0f70,#8c2981,#de4968,#fe9f6d,#fcfdbf)"],
+          ["cividis", "linear-gradient(90deg,#00224e,#35456c,#666970,#948e77,#c7b97e,#fee838)"]
+        ]
+      },
+      {
+        title: "Sequential",
+        items: [
+          ["Greys", "linear-gradient(90deg,#ffffff,#000000)"],
+          ["Purples", "linear-gradient(90deg,#fcfbfd,#3f007d)"],
+          ["Blues", "linear-gradient(90deg,#f7fbff,#08306b)"],
+          ["Greens", "linear-gradient(90deg,#f7fcf5,#00441b)"],
+          ["Oranges", "linear-gradient(90deg,#fff5eb,#7f2704)"],
+          ["Reds", "linear-gradient(90deg,#fff5f0,#67000d)"],
+          ["YlOrBr", "linear-gradient(90deg,#ffffe5,#fe9929,#662506)"],
+          ["YlOrRd", "linear-gradient(90deg,#ffffcc,#fd8d3c,#800026)"],
+          ["OrRd", "linear-gradient(90deg,#fff7ec,#fc8d59,#7f0000)"],
+          ["PuRd", "linear-gradient(90deg,#f1eef6,#dd1c77,#67001f)"],
+          ["BuGn", "linear-gradient(90deg,#f7fcfd,#66c2a4,#00441b)"],
+          ["YlGnBu", "linear-gradient(90deg,#ffffd9,#41b6c4,#081d58)"]
+        ]
+      },
+      {
+        title: "Diverging",
+        items: [
+          ["PiYG", "linear-gradient(90deg,#8e0152,#f7f7f7,#276419)"],
+          ["PRGn", "linear-gradient(90deg,#40004b,#f7f7f7,#00441b)"],
+          ["BrBG", "linear-gradient(90deg,#543005,#f5f5f5,#003c30)"],
+          ["PuOr", "linear-gradient(90deg,#7f3b08,#f7f7f7,#2d004b)"],
+          ["RdGy", "linear-gradient(90deg,#b2182b,#f7f7f7,#4d4d4d)"],
+          ["RdBu", "linear-gradient(90deg,#b2182b,#f7f7f7,#2166ac)"],
+          ["RdYlBu", "linear-gradient(90deg,#d73027,#ffffbf,#4575b4)"],
+          ["RdYlGn", "linear-gradient(90deg,#d73027,#ffffbf,#1a9850)"],
+          ["Spectral", "linear-gradient(90deg,#9e0142,#fdae61,#ffffbf,#66c2a5,#5e4fa2)"],
+          ["coolwarm", "linear-gradient(90deg,#3b4cc0,#f7f7f7,#b40426)"],
+          ["seismic", "linear-gradient(90deg,#0000ff,#ffffff,#ff0000)"]
+        ]
+      },
+      {
+        title: "Qualitative",
+        items: [
+          ["Pastel1", "linear-gradient(90deg,#fbb4ae,#b3cde3,#ccebc5,#decbe4,#fed9a6)"],
+          ["Pastel2", "linear-gradient(90deg,#b3e2cd,#fdcdac,#cbd5e8,#f4cae4,#e6f5c9)"],
+          ["Paired", "linear-gradient(90deg,#a6cee3,#1f78b4,#b2df8a,#33a02c,#fb9a99,#e31a1c)"],
+          ["Accent", "linear-gradient(90deg,#7fc97f,#beaed4,#fdc086,#ffff99,#386cb0,#f0027f)"],
+          ["Dark2", "linear-gradient(90deg,#1b9e77,#d95f02,#7570b3,#e7298a,#66a61e,#e6ab02)"],
+          ["Set1", "linear-gradient(90deg,#e41a1c,#377eb8,#4daf4a,#984ea3,#ff7f00,#ffff33)"],
+          ["Set2", "linear-gradient(90deg,#66c2a5,#fc8d62,#8da0cb,#e78ac3,#a6d854,#ffd92f)"],
+          ["Set3", "linear-gradient(90deg,#8dd3c7,#ffffb3,#bebada,#fb8072,#80b1d3,#fdb462)"],
+          ["tab10", "linear-gradient(90deg,#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf)"],
+          ["tab20", "linear-gradient(90deg,#1f77b4,#aec7e8,#ff7f0e,#ffbb78,#2ca02c,#98df8a,#d62728,#ff9896,#9467bd,#c5b0d5)"]
+        ]
+      },
+      {
+        title: "Cyclic / Misc",
+        items: [
+          ["twilight", "linear-gradient(90deg,#e2d9e2,#6a5acd,#2f4f4f,#6a5acd,#e2d9e2)"],
+          ["twilight_shifted", "linear-gradient(90deg,#d8d0ff,#4b4f8f,#213a5c,#4b4f8f,#d8d0ff)"],
+          ["terrain", "linear-gradient(90deg,#3366cc,#55aa55,#c8b560,#8b5a2b,#ffffff)"],
+          ["ocean", "linear-gradient(90deg,#001f3f,#0074d9,#7fdbff,#39cccc,#3d9970)"],
+          ["cubehelix", "linear-gradient(90deg,#000000,#5f4b8b,#3cb371,#f4d03f,#ffffff)"],
+          ["rainbow", "linear-gradient(90deg,#9400d3,#4b0082,#0000ff,#00ff00,#ffff00,#ff7f00,#ff0000)"]
+        ]
+      }
+    ];
+
+    const legend = document.getElementById("legend");
+    groups.forEach((group) => {
+      const block = document.createElement("div");
+      block.className = "group";
+      block.innerHTML = `<h3>${group.title}</h3>`;
+      group.items.forEach(([name, gradient]) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `<div class="name">${name}</div><div class="bar" style="background:${gradient}"></div>`;
+        block.appendChild(row);
+      });
+      legend.appendChild(block);
+    });
+  </script>
 </body>
 </html>

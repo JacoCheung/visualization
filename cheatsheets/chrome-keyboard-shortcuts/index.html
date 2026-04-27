@@ -3,119 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chrome Keyboard Shortcuts 速查</title>
+  <title>Chrome Keyboard Shortcuts</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
       background: #f8fafc;
       color: #0f172a;
-      padding: 22px;
-      line-height: 1.45;
+      padding: 18px;
     }
-    .wrap { max-width: 1180px; margin: 0 auto; }
+    .wrap { max-width: 1200px; margin: 0 auto; }
     .crumb { font-size: 13px; color: #64748b; margin-bottom: 8px; }
     .crumb a { color: #2563eb; text-decoration: none; }
-    .crumb a:hover { text-decoration: underline; }
-    h1 { font-size: 28px; margin-bottom: 6px; }
-    .sub { color: #475569; font-size: 14px; margin-bottom: 12px; }
-    .src {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 12px;
-      margin-bottom: 14px;
-    }
-    .sec {
+    h1 { font-size: 24px; margin-bottom: 6px; }
+    .sub { color: #475569; font-size: 13px; margin-bottom: 10px; }
+    .viewer {
       background: #fff;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
-      padding: 12px;
+      overflow: hidden;
+      min-height: 680px;
       margin-bottom: 12px;
     }
-    h2 { font-size: 16px; margin-bottom: 8px; color: #1d4ed8; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      border: 1px solid #e2e8f0;
-      padding: 7px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th { background: #f8fafc; }
-    code {
-      background: #f1f5f9;
-      border-radius: 4px;
-      padding: 1px 4px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    @media print {
-      @page { size: A4 landscape; margin: 8mm; }
-      body { padding: 0; background: #fff; }
-      .sec { break-inside: avoid; }
-    }
+    object { width: 100%; display: block; border: 0; }
+    .viewer.p1 object { height: 980px; }
+    .viewer.p2 object { height: 980px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="crumb"><a href="../">← 返回速查表合集</a></div>
-    <h1>Chrome Keyboard Shortcuts</h1>
-    <div class="sub">从 `Chrome keyboard shortcuts.pdf` 提炼（Windows/Linux vs Mac）</div>
-    <div class="src">来源：`/Users/junzhang/Downloads/Chrome keyboard shortcuts.pdf`</div>
-
-    <section class="sec">
-      <h2>标签页与窗口</h2>
-      <table>
-        <tr><th>动作</th><th>Win/Linux</th><th>Mac</th></tr>
-        <tr><td>新窗口 / 隐身窗口</td><td><code>Ctrl+N</code> / <code>Ctrl+Shift+N</code></td><td><code>Cmd+N</code> / <code>Cmd+Shift+N</code></td></tr>
-        <tr><td>新建 / 关闭标签</td><td><code>Ctrl+T</code> / <code>Ctrl+W</code></td><td><code>Cmd+T</code> / <code>Cmd+W</code></td></tr>
-        <tr><td>恢复关闭标签</td><td><code>Ctrl+Shift+T</code></td><td><code>Cmd+Shift+T</code></td></tr>
-        <tr><td>切换到第 N 个标签</td><td><code>Ctrl+1..8</code>, <code>Ctrl+9</code></td><td><code>Cmd+1..8</code>, <code>Cmd+9</code></td></tr>
-        <tr><td>前进 / 后退</td><td><code>Alt+Right/Left</code></td><td><code>Cmd+]/[</code></td></tr>
-      </table>
-    </section>
-
-    <section class="sec">
-      <h2>网页浏览与缩放</h2>
-      <table>
-        <tr><th>动作</th><th>Win/Linux</th><th>Mac</th></tr>
-        <tr><td>放大 / 缩小 / 重置</td><td><code>Ctrl + + / - / 0</code></td><td><code>Cmd + + / - / 0</code></td></tr>
-        <tr><td>页面查找</td><td><code>Ctrl+F</code></td><td><code>Cmd+F</code></td></tr>
-        <tr><td>全屏</td><td><code>F11</code></td><td><code>Cmd+Ctrl+F</code></td></tr>
-        <tr><td>地址栏全选</td><td><code>Ctrl+L</code></td><td><code>Cmd+L</code></td></tr>
-        <tr><td>页首 / 页尾</td><td><code>Home / End</code></td><td><code>Cmd+Up / Cmd+Down</code></td></tr>
-      </table>
-    </section>
-
-    <section class="sec">
-      <h2>编辑与选择</h2>
-      <table>
-        <tr><th>动作</th><th>Win/Linux</th><th>Mac</th></tr>
-        <tr><td>复制 / 剪切 / 粘贴</td><td><code>Ctrl+C/X/V</code></td><td><code>Cmd+C/X/V</code></td></tr>
-        <tr><td>纯文本粘贴</td><td><code>Ctrl+Shift+V</code></td><td><code>Cmd+Shift+V</code></td></tr>
-        <tr><td>撤销 / 重做</td><td><code>Ctrl+Z / Ctrl+Y</code></td><td><code>Cmd+Z / Cmd+Shift+Z</code></td></tr>
-        <tr><td>删上一个词</td><td><code>Ctrl+Backspace</code></td><td><code>Option+Delete</code></td></tr>
-        <tr><td>按词移动光标</td><td><code>Ctrl+Left/Right</code></td><td><code>Option+Left/Right</code></td></tr>
-      </table>
-    </section>
-
-    <section class="sec">
-      <h2>常用功能</h2>
-      <table>
-        <tr><th>动作</th><th>Win/Linux</th><th>Mac</th></tr>
-        <tr><td>打印 / 保存网页</td><td><code>Ctrl+P</code> / <code>Ctrl+S</code></td><td><code>Cmd+P</code> / <code>Cmd+S</code></td></tr>
-        <tr><td>刷新 / 强制刷新</td><td><code>Ctrl+R</code> / <code>Ctrl+Shift+R</code></td><td><code>Cmd+R</code> / <code>Cmd+Shift+R</code></td></tr>
-        <tr><td>历史 / 下载</td><td><code>Ctrl+H</code> / <code>Ctrl+J</code></td><td><code>Cmd+Y</code> / <code>Cmd+Shift+J</code></td></tr>
-        <tr><td>开发者工具</td><td><code>Ctrl+Shift+J</code></td><td><code>Cmd+Option+I</code></td></tr>
-        <tr><td>清理浏览数据</td><td><code>Ctrl+Shift+Del</code></td><td><code>Cmd+Shift+Delete</code></td></tr>
-      </table>
-    </section>
+    <h1>Chrome Keyboard Shortcuts（SVG 重绘）</h1>
+    <div class="sub">按原 PDF 页面转成 SVG，并叠加可选中文本层（可复制粘贴）。</div>
+    <div class="viewer p1">
+      <object data="./page-1.svg" type="image/svg+xml"></object>
+    </div>
+    <div class="viewer p2">
+      <object data="./page-2.svg" type="image/svg+xml"></object>
+    </div>
   </div>
 </body>
 </html>

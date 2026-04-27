@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Map 速查</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 22px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; }
+    .crumb { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+    .crumb a { color: #2563eb; text-decoration: none; }
+    .crumb a:hover { text-decoration: underline; }
+    h1 { font-size: 28px; margin-bottom: 6px; }
+    .sub { color: #475569; font-size: 14px; margin-bottom: 12px; }
+    .src {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    h2 { font-size: 16px; margin-bottom: 8px; color: #1d4ed8; }
+    .img-wrap {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    img { width: 100%; height: auto; display: block; }
+    ul { padding-left: 18px; }
+    li { margin: 5px 0; font-size: 13px; }
+    code {
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      body { padding: 0; background: #fff; }
+      .card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="crumb"><a href="../">← 返回速查表合集</a></div>
+    <h1>Color Map 速查图</h1>
+    <div class="sub">基于下载文件中的色图总览（适合快速挑选 colormap）</div>
+    <div class="src">来源：`/Users/junzhang/Downloads/color_map.webp`</div>
+
+    <section class="card">
+      <h2>色图总览</h2>
+      <div class="img-wrap">
+        <img src="./color_map.webp" alt="Color map cheat image" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>如何快速选型</h2>
+      <ul>
+        <li><strong>连续数值（默认优先）</strong>：选 Perceptually Uniform（如 <code>viridis</code>、<code>cividis</code>）。</li>
+        <li><strong>有中性中心的偏差数据</strong>：选 Diverging（如 <code>coolwarm</code>、<code>RdBu</code>）。</li>
+        <li><strong>类别标签</strong>：选 Qualitative（如 <code>tab10</code>、<code>Set3</code>）。</li>
+        <li><strong>角度/周期变量</strong>：选 Cyclic（如 <code>twilight</code>）。</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Matplotlib 调用示例</h2>
+      <ul>
+        <li><code>plt.imshow(Z, cmap="viridis")</code></li>
+        <li><code>plt.get_cmap("viridis_r")</code>（反转）</li>
+        <li><code>plt.get_cmap("viridis", 10)</code>（离散 10 阶）</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

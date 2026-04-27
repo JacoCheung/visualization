@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matplotlib Cheat Sheet（速查）</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 22px;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; }
+    .crumb { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+    .crumb a { color: #2563eb; text-decoration: none; }
+    .crumb a:hover { text-decoration: underline; }
+    h1 { font-size: 28px; margin-bottom: 6px; }
+    .sub { color: #475569; font-size: 14px; margin-bottom: 12px; }
+    .src {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    h2 { font-size: 16px; margin-bottom: 8px; color: #1d4ed8; }
+    ul { padding-left: 18px; }
+    li { margin: 5px 0; font-size: 13px; }
+    code {
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      body { padding: 0; background: #fff; }
+      .card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="crumb"><a href="../">← 返回速查表合集</a></div>
+    <h1>Matplotlib Cheat Sheet</h1>
+    <div class="sub">从 `matplotlib cheat.pdf` 提炼的常用 API 速查（v3.5.0）</div>
+    <div class="src">来源：`/Users/junzhang/Downloads/matplotlib cheat.pdf`</div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>快速起手</h2>
+        <ul>
+          <li><code>import matplotlib.pyplot as plt</code></li>
+          <li><code>fig, ax = plt.subplots()</code></li>
+          <li><code>ax.plot(X, Y)</code> / <code>ax.scatter(X, Y)</code></li>
+          <li><code>fig.savefig("figure.pdf")</code>, <code>plt.show()</code></li>
+          <li><code>fig.tight_layout()</code> 做自动布局</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>高频绘图 API</h2>
+        <ul>
+          <li><code>plot</code>, <code>scatter</code>, <code>bar/barh</code>, <code>hist</code></li>
+          <li><code>imshow</code>, <code>contour/contourf</code>, <code>pcolormesh</code>, <code>hexbin</code></li>
+          <li><code>errorbar</code>, <code>boxplot</code>, <code>violinplot</code>, <code>eventplot</code></li>
+          <li><code>pie</code>, <code>quiver</code>, <code>fill_between</code>, <code>step</code></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>坐标与比例尺</h2>
+        <ul>
+          <li><code>ax.set_xscale(...)</code> / <code>ax.set_yscale(...)</code></li>
+          <li>可选：<code>linear</code>, <code>log</code>, <code>symlog</code>, <code>logit</code></li>
+          <li><code>ax.set_xlim/ylim</code>, <code>ax.set_xticks/yticks</code></li>
+          <li><code>projection="polar"</code> / <code>projection="3d"</code></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>样式与颜色</h2>
+        <ul>
+          <li>线型：<code>"-" ":" "--" "-."</code></li>
+          <li>颜色：<code>"C0"</code>、命名色、<code>(R,G,B[,A])</code>、<code>#RRGGBB[AA]</code></li>
+          <li>colormap：<code>plt.get_cmap(name)</code>，反转用 <code>_r</code></li>
+          <li><code>plt.style.use("ggplot")</code> / <code>"fast"</code> / <code>"seaborn"</code></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Ticks / Formatters</h2>
+        <ul>
+          <li><code>from matplotlib import ticker</code></li>
+          <li>locator：<code>AutoLocator</code>, <code>MultipleLocator</code>, <code>LogLocator</code></li>
+          <li>formatter：<code>ScalarFormatter</code>, <code>FuncFormatter</code>, <code>PercentFormatter</code></li>
+          <li><code>ax.xaxis.set_major_locator(...)</code> / <code>set_major_formatter(...)</code></li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>注释、图例、颜色条</h2>
+        <ul>
+          <li><code>ax.legend(...)</code>：位置、边框、间距等</li>
+          <li><code>ax.colorbar(...)</code>：连续值映射</li>
+          <li><code>ax.annotate(text, xy=..., xytext=...)</code>：箭头注释</li>
+          <li>连接样式：<code>arc3</code>, <code>angle</code>, <code>bar</code> 等</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>性能提示</h2>
+        <ul>
+          <li>大量点：<code>plot(..., marker="o", ls="")</code> 往往比 <code>scatter</code> 更快</li>
+          <li>动画更新优先 <code>set_data</code>，避免反复 <code>cla()</code> + 重绘</li>
+          <li>批量绘线可先拼接数据，减少 Python 循环开销</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>键盘快捷（Matplotlib 窗口）</h2>
+        <ul>
+          <li><code>p</code> 平移，<code>o</code> 框选缩放，<code>r</code> 复位</li>
+          <li><code>f</code> 全屏，<code>ctrl+s</code> 保存，<code>ctrl+w</code> 关闭</li>
+          <li><code>g</code>/<code>G</code> 切换网格，<code>l</code>/<code>L</code> 切换 log/linear</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

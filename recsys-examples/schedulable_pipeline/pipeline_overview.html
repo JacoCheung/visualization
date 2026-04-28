@@ -752,8 +752,8 @@ commons.pipeline.hstu_pipeline
   </g>
   <g>
     <rect x="540" y="30" width="120" height="40" rx="4" class="uml-box-fill" style="stroke-dasharray: 4,3;"/>
-    <text x="600" y="48" text-anchor="middle" class="uml-text-em">update</text>
-    <text x="600" y="62" text-anchor="middle" class="uml-text-mute">la=2, update (hyp.)</text>
+    <text x="600" y="48" text-anchor="middle" class="uml-text-em">aux_stats</text>
+    <text x="600" y="62" text-anchor="middle" class="uml-text-mute">la=2, stats (hyp.)</text>
   </g>
 
   <line x1="150" y1="100" x2="190" y2="100" stroke="#0969da" stroke-width="2" marker-end="url(#arrEvBlue)"/>
@@ -791,8 +791,8 @@ commons.pipeline.hstu_pipeline
   </g>
 </svg>
 </div><figcaption>
-<span class="en">Five tasks from HSTU prefetch variant + one hypothetical <code>update</code> task (not in real HSTU; here only to illustrate <code>cross_iter_depends_on</code>). <code>topological_sort</code> only consumes the three solid edges (<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>, plus <code>prefetch_embeddings</code> → <code>backward</code>); the dashed edges contribute event triples but no in-progress ordering — their producer/consumer ordering across progress() calls is mediated by ring rotation, not by topo sort.</span>
-<span class="zh">HSTU prefetch 变体里抽出 5 个 task，加 1 个假想的 <code>update</code> task（HSTU 实际无此任务，这里只为演示 <code>cross_iter_depends_on</code>）。<code>topological_sort</code> 只看 3 条实线边（<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>，加 <code>prefetch_embeddings</code> → <code>backward</code>）；虚线边只 emit 事件三元组，不参与 progress 内顺序——它们 producer/consumer 跨 progress 的顺序由 ring 旋转保证，不由 topo sort 排。</span>
+<span class="en">Five tasks from HSTU prefetch variant + one hypothetical <code>aux_stats</code> task (not in real HSTU; only here to illustrate <code>cross_iter_depends_on</code>). Why la=2? <code>cross_iter_depends_on=((X,-N))</code> requires <code>consumer.la ≥ N</code>, otherwise <code>slot_offset = consumer.la + neg_offset</code> goes negative (event already rotated out of ring) and deps.py raises. So a cross_iter consumer must be a high-lookahead "prefetch-side" task — streaming/aux statistics is the canonical use case. <code>topological_sort</code> only consumes the three solid edges (<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>, plus <code>prefetch_embeddings</code> → <code>backward</code>); the dashed edges contribute event triples but no in-progress ordering — their producer/consumer ordering across progress() calls is mediated by ring rotation, not by topo sort.</span>
+<span class="zh">HSTU prefetch 变体里抽出 5 个 task，加 1 个假想的 <code>aux_stats</code> task（HSTU 实际无此任务，这里只为演示 <code>cross_iter_depends_on</code>）。为什么是 la=2？<code>cross_iter_depends_on=((X,-N))</code> 要求 <code>consumer.la ≥ N</code>，否则 <code>slot_offset = consumer.la + neg_offset</code> 会变负（事件已转出 ring），deps.py 直接 raise。所以 cross_iter 的 consumer 必然是高 lookahead 的"prefetch 侧"任务——典型用例就是流式/辅助统计。<code>topological_sort</code> 只看 3 条实线边（<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>，加 <code>prefetch_embeddings</code> → <code>backward</code>）；虚线边只 emit 事件三元组，不参与 progress 内顺序——它们 producer/consumer 跨 progress 的顺序由 ring 旋转保证，不由 topo sort 排。</span>
 </figcaption></figure>
 
 <figure><div class="svg-wrap">
@@ -863,7 +863,7 @@ commons.pipeline.hstu_pipeline
   <text x="50" y="328" font-family="ui-monospace,monospace" font-size="10" fill="#bc4c00">②  backward.same_progress_sync=("prefetch")  —  slot_offset = producer.la = 1  (no rotation)</text>
 
   <path d="M320 105 C 380 105 420 165 480 165" stroke="#cf222e" stroke-width="2" stroke-dasharray="6,4" fill="none" marker-end="url(#arrSyncRed)"/>
-  <text x="50" y="346" font-family="ui-monospace,monospace" font-size="10" fill="#cf222e">③  update(la=2).cross_iter_depends_on=(("h2d", -1))  —  slot_offset = consumer.la + neg_offset = 2 + (-1) = 1  (after 1 ring advance)</text>
+  <text x="50" y="346" font-family="ui-monospace,monospace" font-size="10" fill="#cf222e">③  aux_stats(la=2).cross_iter_depends_on=(("h2d", -1))  —  slot_offset = consumer.la + neg_offset = 2 + (-1) = 1  (after 1 ring advance)</text>
 </svg>
 </div><figcaption>
 <span class="en">Two consecutive progress() calls. ① <strong>depends_on</strong> across progresses: prefetch records its event for B_n at slot[1] in P_(n-1); after one ring advance that slot rotates to slot[0]; forward in P_n looks up slot[<em>consumer.la</em>=0] and finds prefetch_evt(B_n). ② <strong>same_progress_sync</strong> within one progress: prefetch records at slot[1] in P_n; backward (also in P_n, no rotation between them) looks up slot[<em>producer.la</em>=1] directly. ③ <strong>cross_iter_depends_on</strong>: an aux task with la=2 depending on h2d(la=2) from one progress earlier — h2d's event was at slot[2] in P_(n-1); after rotation it's at slot[1] in P_n; aux looks up slot[<em>consumer.la + neg_offset</em>=1]. The shared structure: producer always records at slot[producer.la] in <em>its own</em> progress; consumer's slot_offset depends on which sync type and how many ring advances have happened in between.</span>

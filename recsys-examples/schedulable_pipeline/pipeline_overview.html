@@ -1988,28 +1988,37 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <section id="appendix-delta-def">
 <h3><span class="en">A.1 Definition</span><span class="zh">A.1 定义</span></h3>
 <p>
-<span class="en">For a consumer task that declares <code>cross_iter_depends_on=(("X", -N),)</code> with N&nbsp;&gt;&nbsp;0:</span>
-<span class="zh">对于声明了 <code>cross_iter_depends_on=(("X", -N),)</code> (N&nbsp;&gt;&nbsp;0) 的 consumer task：</span>
+<span class="en"><strong>Δ is primitively defined</strong> as the progress lag between two task submissions — equivalently, the number of <code>ring.advance()</code> calls (one per <code>progress()</code>) elapsed between when a producer records an event and when a consumer reads it back:</span>
+<span class="zh"><strong>Δ 的本质定义</strong>是两次任务提交之间的 progress 跨度——等价地，producer 录 event 到 consumer 读 event 之间 <code>ring.advance()</code>（每次 <code>progress()</code> 调一次）调用的次数：</span>
 </p>
-<p style="text-align:center;">$$\Delta \;\stackrel{\text{def}}{=}\; X.\mathrm{la} + N - \mathrm{consumer.la}$$</p>
+<p style="text-align:center;">$$\Delta \;\stackrel{\text{def}}{=}\; q_c - q_p$$</p>
 <p>
-<span class="en">Three equivalent physical meanings:</span>
-<span class="zh">三个等价的物理含义：</span>
+<span class="en">where $q_c$ is the progress() index in which consumer reads the event and $q_p$ is the progress() index in which producer recorded it. This definition is universal — it applies to any cross-progress wait, independent of which sync field the user declared. cross-iter requires $q_p &lt; q_c$, i.e. $\Delta \ge 1$.</span>
+<span class="zh">其中 $q_c$ 是 consumer 读 event 时所在的 progress() 编号，$q_p$ 是 producer 录 event 时所在的 progress() 编号。这个定义是普适的——任何跨 progress 等待都适用，与用户用了哪种 sync 字段无关。cross-iter 要求 $q_p &lt; q_c$，即 $\Delta \ge 1$。</span>
 </p>
-<ul>
-  <li><span class="en"><strong>Progress lag</strong>: $\Delta = q_c - q_p$, where $q_c$ is the progress() index in which consumer reads the event and $q_p$ is the progress() index in which producer recorded it. Cross-iter requires $q_p &lt; q_c$, i.e. $\Delta \ge 1$.</span><span class="zh"><strong>progress 延迟</strong>：$\Delta = q_c - q_p$，其中 $q_c$ 是 consumer 读 event 时所在的 progress() 编号，$q_p$ 是 producer 录 event 时所在的 progress() 编号。cross-iter 要求 $q_p &lt; q_c$，即 $\Delta \ge 1$。</span></li>
-  <li><span class="en"><strong>Ring advance count</strong>: number of <code>ring.advance()</code> calls between producer's record and consumer's read (one per progress() call).</span><span class="zh"><strong>ring 旋转次数</strong>：producer 录到 consumer 读之间 <code>ring.advance()</code> 被调用的次数（每次 progress() 末尾调一次）。</span></li>
-  <li><span class="en"><strong>Slot displacement</strong>: producer wrote at $\mathrm{slot}[X.\mathrm{la}]$ in its progress; after $\Delta$ advances the slot has rotated to position $X.\mathrm{la} - \Delta = \mathrm{consumer.la} - N = \mathrm{slot\_offset}$.</span><span class="zh"><strong>slot 位移</strong>：producer 录在自己 progress 的 $\mathrm{slot}[X.\mathrm{la}]$；经过 $\Delta$ 次 advance 后该 slot 平移到 $X.\mathrm{la} - \Delta = \mathrm{consumer.la} - N = \mathrm{slot\_offset}$。</span></li>
-</ul>
 
 <p>
-<span class="en">Decomposition: $\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$. When producer and consumer have equal lookahead, $\Delta = N$ exactly (the user's "wait for N batches ago"); when producer is deeper in the ring ($X.\mathrm{la} &gt; \mathrm{consumer.la}$), $\Delta &gt; N$ (extra rotations to bring the slot down).</span>
-<span class="zh">分解：$\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$。producer 与 consumer lookahead 相等时 $\Delta = N$（即用户字面意思的"N 个 batch 前"）；producer 在 ring 更深处 ($X.\mathrm{la} &gt; \mathrm{consumer.la}$) 时 $\Delta &gt; N$（slot 多走了几步才到 consumer 视角）。</span>
+<span class="en"><strong>Closed-form value in the cross_iter case.</strong> When the wait is declared via <code>consumer.cross_iter_depends_on=(("X", -N),)</code> with $N&nbsp;&gt;&nbsp;0$, the lookahead mechanics determine $q_c$ and $q_p$ uniquely; working through them (see §A.2) gives:</span>
+<span class="zh"><strong>cross_iter 场景下的闭式取值。</strong>当依赖通过 <code>consumer.cross_iter_depends_on=(("X", -N),)</code> ($N&nbsp;&gt;&nbsp;0$) 声明时，lookahead 机制把 $q_c$ 和 $q_p$ 唯一确定下来；按 §A.2 的推导，可以算出：</span>
+</p>
+<p style="text-align:center;">$$\Delta \;=\; X.\mathrm{la} + N - \mathrm{consumer.la} \quad\text{(cross\_iter only)}$$</p>
+<p>
+<span class="en">This is a derived equality, not a definition — it holds in the cross_iter context because of how lookahead pins down which batch each task processes. Other sync types would yield different closed forms (e.g. <code>same_progress_sync</code> always has $\Delta = 0$ since both tasks are in the same progress).</span>
+<span class="zh">这是个推导出来的等式，不是定义——在 cross_iter 上下文里成立，是因为 lookahead 把每个 task 处理的 batch 钉死了。其他 sync 类型会有不同的闭式（例如 <code>same_progress_sync</code> 永远 $\Delta = 0$，因为两个 task 在同一次 progress 内）。</span>
+</p>
+
+<p>
+<span class="en"><strong>Useful decomposition</strong>: $\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$. When producer and consumer have equal lookahead, $\Delta = N$ exactly (the user's literal "wait for N batches ago"); when producer is deeper in the ring ($X.\mathrm{la} &gt; \mathrm{consumer.la}$), $\Delta &gt; N$ (extra rotations to bring the slot down to consumer's view).</span>
+<span class="zh"><strong>有用的分解</strong>：$\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$。producer 与 consumer lookahead 相等时 $\Delta = N$（即用户字面理解的"N 个 batch 前"）；producer 在 ring 更深处 ($X.\mathrm{la} &gt; \mathrm{consumer.la}$) 时 $\Delta &gt; N$（slot 需要多平移几步才到 consumer 视角）。</span>
 </p>
 </section>
 
 <section id="appendix-delta-derivation">
-<h3><span class="en">A.2 Derivation</span><span class="zh">A.2 推导</span></h3>
+<h3><span class="en">A.2 Derivation of Δ in the cross_iter case</span><span class="zh">A.2 cross_iter 场景下 Δ 的推导</span></h3>
+<p>
+<span class="en">Goal: take the primitive Δ definition $q_c - q_p$ from §A.1 and reduce it to a closed-form expression in $X.\mathrm{la}$, $N$, and $\mathrm{consumer.la}$ when the wait is declared as <code>cross_iter_depends_on=(("X", -N),)</code>.</span>
+<span class="zh">目标：把 §A.1 给出的本质定义 $\Delta = q_c - q_p$，在 <code>cross_iter_depends_on=(("X", -N),)</code> 这种声明下化简成只含 $X.\mathrm{la}$、$N$、$\mathrm{consumer.la}$ 的闭式。</span>
+</p>
 <p>
 <span class="en">Convention: in <code>P_n</code> (the n-th call to <code>progress()</code>, 0-indexed), a task with lookahead <code>k</code> processes batch <code>B_(n+k)</code> and records its event at <code>slot[k]</code>. Equivalently, <code>slot[k]</code> in <code>P_n</code> currently holds <code>B_(n+k)</code>.</span>
 <span class="zh">约定：在 <code>P_n</code>（第 n 次调用 <code>progress()</code>，0-indexed）里，lookahead 为 <code>k</code> 的 task 处理 batch <code>B_(n+k)</code>，并在 <code>slot[k]</code> 记录 event。等价地，<code>P_n</code> 里 <code>slot[k]</code> 当前装着 <code>B_(n+k)</code>。</span>

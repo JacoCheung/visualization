@@ -2027,8 +2027,18 @@ q_p &= n + \mathrm{consumer.la} - N - X.\mathrm{la} \\
 \end{aligned}
 $$</p>
 <p>
-<span class="en">$X.\mathrm{la}$ does appear in $\Delta$, but it cancels when computing $\mathrm{slot\_offset}$: $\mathrm{slot\_offset} = X.\mathrm{la} - \Delta = X.\mathrm{la} - (X.\mathrm{la} + N - \mathrm{consumer.la}) = \mathrm{consumer.la} - N$. That is why the consumer-side lookup index depends only on $\mathrm{consumer.la}$ and $N$, not on the producer's lookahead — ring rotation is uniform, so producer.la is fully absorbed into $\Delta$.</span>
-<span class="zh">$\Delta$ 里其实有 $X.\mathrm{la}$，但在算 $\mathrm{slot\_offset}$ 时它会被消掉：$\mathrm{slot\_offset} = X.\mathrm{la} - \Delta = X.\mathrm{la} - (X.\mathrm{la} + N - \mathrm{consumer.la}) = \mathrm{consumer.la} - N$。所以 consumer 端真正去查的那个 slot 编号只跟 $\mathrm{consumer.la}$ 和 $N$ 有关，与 producer 的 lookahead 无关——ring 旋转是整体均匀平移，producer.la 的信息全部被 $\Delta$ 吸收了。</span>
+<span class="en"><strong>Where consumer actually looks up the event.</strong> Producer recorded its event at $\mathrm{slot}[X.\mathrm{la}]$ in its own progress $P_{q_p}$. Each <code>ring.advance()</code> uniformly shifts every slot by $-1$. After $\Delta$ advances, the slot that was at offset $X.\mathrm{la}$ has rotated to offset $X.\mathrm{la} - \Delta$ in consumer's progress $P_{q_c}$. The engine's consumer-side ring index is exactly this:</span>
+<span class="zh"><strong>consumer 实际去查的 slot。</strong>producer 在自己的 progress $P_{q_p}$ 里把 event 录在 $\mathrm{slot}[X.\mathrm{la}]$；每次 <code>ring.advance()</code> 把所有 slot 整体 $-1$ 平移，经过 $\Delta$ 次 advance 后那个 slot 在 consumer 的 progress $P_{q_c}$ 里已经落到偏移 $X.\mathrm{la} - \Delta$。这个偏移就是引擎在 consumer 端实际查询的 ring index：</span>
+</p>
+<p style="text-align:center;">$$\mathrm{slot\_offset} \;\stackrel{\text{def}}{=}\; X.\mathrm{la} - \Delta$$</p>
+<p>
+<span class="en">$X.\mathrm{la}$ does appear in $\Delta$, but it cancels when we substitute:</span>
+<span class="zh">$\Delta$ 里其实带着 $X.\mathrm{la}$，代入展开后两个 $X.\mathrm{la}$ 相消：</span>
+</p>
+<p style="text-align:center;">$$\mathrm{slot\_offset} \;=\; X.\mathrm{la} - (X.\mathrm{la} + N - \mathrm{consumer.la}) \;=\; \mathrm{consumer.la} - N$$</p>
+<p>
+<span class="en">That is why the consumer-side lookup index depends only on $\mathrm{consumer.la}$ and $N$, not on the producer's lookahead — ring rotation is uniform, so producer.la is fully absorbed into $\Delta$. The slot_offset formula in <code>deps.py</code> writes this directly as <code>consumer.batch_offset + neg_offset</code> (where <code>neg_offset = -N</code>).</span>
+<span class="zh">这就是为什么 consumer 端实际查询的 slot 编号只跟 $\mathrm{consumer.la}$ 和 $N$ 有关，与 producer 的 lookahead 无关——ring 旋转是整体均匀平移，producer.la 的信息全部被 $\Delta$ 吸收。<code>deps.py</code> 里直接写成 <code>consumer.batch_offset + neg_offset</code>（其中 <code>neg_offset = -N</code>）。</span>
 </p>
 </section>
 

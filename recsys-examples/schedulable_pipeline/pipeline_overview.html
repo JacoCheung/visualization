@@ -1997,9 +1997,9 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <span class="zh">三个等价的物理含义：</span>
 </p>
 <ul>
-  <li><span class="en"><strong>Progress lag</strong>: <code>Δ = q_c − q_p</code>, where <code>q_c</code> is the progress() index in which consumer reads the event and <code>q_p</code> is the progress() index in which producer recorded it. Cross-iter requires <code>q_p &lt; q_c</code>, i.e. Δ&nbsp;≥&nbsp;1.</span><span class="zh"><strong>progress 延迟</strong>：<code>Δ = q_c − q_p</code>，其中 <code>q_c</code> 是 consumer 读 event 时所在的 progress() 编号，<code>q_p</code> 是 producer 录 event 时所在的 progress() 编号。cross-iter 要求 <code>q_p &lt; q_c</code>，即 Δ&nbsp;≥&nbsp;1。</span></li>
+  <li><span class="en"><strong>Progress lag</strong>: $\Delta = q_c - q_p$, where $q_c$ is the progress() index in which consumer reads the event and $q_p$ is the progress() index in which producer recorded it. Cross-iter requires $q_p &lt; q_c$, i.e. $\Delta \ge 1$.</span><span class="zh"><strong>progress 延迟</strong>：$\Delta = q_c - q_p$，其中 $q_c$ 是 consumer 读 event 时所在的 progress() 编号，$q_p$ 是 producer 录 event 时所在的 progress() 编号。cross-iter 要求 $q_p &lt; q_c$，即 $\Delta \ge 1$。</span></li>
   <li><span class="en"><strong>Ring advance count</strong>: number of <code>ring.advance()</code> calls between producer's record and consumer's read (one per progress() call).</span><span class="zh"><strong>ring 旋转次数</strong>：producer 录到 consumer 读之间 <code>ring.advance()</code> 被调用的次数（每次 progress() 末尾调一次）。</span></li>
-  <li><span class="en"><strong>Slot displacement</strong>: producer wrote at <code>slot[X.la]</code> in its progress; after Δ advances the slot has rotated to position <code>X.la − Δ = consumer.la − N = slot_offset</code>.</span><span class="zh"><strong>slot 位移</strong>：producer 录在自己 progress 的 <code>slot[X.la]</code>；经过 Δ 次 advance 后该 slot 平移到 <code>X.la − Δ = consumer.la − N = slot_offset</code>。</span></li>
+  <li><span class="en"><strong>Slot displacement</strong>: producer wrote at $\mathrm{slot}[X.\mathrm{la}]$ in its progress; after $\Delta$ advances the slot has rotated to position $X.\mathrm{la} - \Delta = \mathrm{consumer.la} - N = \mathrm{slot\_offset}$.</span><span class="zh"><strong>slot 位移</strong>：producer 录在自己 progress 的 $\mathrm{slot}[X.\mathrm{la}]$；经过 $\Delta$ 次 advance 后该 slot 平移到 $X.\mathrm{la} - \Delta = \mathrm{consumer.la} - N = \mathrm{slot\_offset}$。</span></li>
 </ul>
 
 <p>
@@ -2027,8 +2027,8 @@ q_p &= n + \mathrm{consumer.la} - N - X.\mathrm{la} \\
 \end{aligned}
 $$</p>
 <p>
-<span class="en">X.la cancels in the difference, which is why <code>slot_offset</code> (the consumer-side lookup index) depends only on <code>consumer.la − N</code>, not on producer.</span>
-<span class="zh">差里 X.la 消去，所以 <code>slot_offset</code>（consumer 一侧的查询位置）只依赖 <code>consumer.la − N</code>，与 producer 无关。</span>
+<span class="en">$X.\mathrm{la}$ does appear in $\Delta$, but it cancels when computing $\mathrm{slot\_offset}$: $\mathrm{slot\_offset} = X.\mathrm{la} - \Delta = X.\mathrm{la} - (X.\mathrm{la} + N - \mathrm{consumer.la}) = \mathrm{consumer.la} - N$. That is why the consumer-side lookup index depends only on $\mathrm{consumer.la}$ and $N$, not on the producer's lookahead — ring rotation is uniform, so producer.la is fully absorbed into $\Delta$.</span>
+<span class="zh">$\Delta$ 里其实有 $X.\mathrm{la}$，但在算 $\mathrm{slot\_offset}$ 时它会被消掉：$\mathrm{slot\_offset} = X.\mathrm{la} - \Delta = X.\mathrm{la} - (X.\mathrm{la} + N - \mathrm{consumer.la}) = \mathrm{consumer.la} - N$。所以 consumer 端真正去查的那个 slot 编号只跟 $\mathrm{consumer.la}$ 和 $N$ 有关，与 producer 的 lookahead 无关——ring 旋转是整体均匀平移，producer.la 的信息全部被 $\Delta$ 吸收了。</span>
 </p>
 </section>
 
@@ -2041,10 +2041,10 @@ $$</p>
   <th><span class="en">Why / engine response</span><span class="zh">原因 / 引擎反应</span></th>
 </tr></thead>
 <tbody>
-<tr><td>Δ &lt; 0</td><td>consumer.la &gt; X.la + N</td><td><span class="en">Future-read: producer hasn't yet processed B_(K−N) by consumer's progress. <code>deps.py</code> raises at construction.</span><span class="zh">future-read：producer 在 consumer 的 progress 时还没处理过 B_(K−N)。<code>deps.py</code> 构造时直接 raise。</span></td></tr>
-<tr><td>Δ = 0</td><td>consumer.la = X.la + N</td><td><span class="en">Degenerate same-progress (no ring rotation). cross_iter contributes no topo-sort edge → producer/consumer order is undetermined within the same progress → silent wrong sync. Engine raises and directs user to <code>same_progress_sync</code>.</span><span class="zh">退化的同 progress 情形（中间没有 ring 旋转）。cross_iter 不进 topo DAG → 同 progress 内 producer/consumer 顺序不定 → silent wrong sync。引擎 raise，引导用户改用 <code>same_progress_sync</code>。</span></td></tr>
-<tr><td>Δ ≥ 1</td><td>consumer.la ≤ X.la + N − 1</td><td><span class="en">Strictly cross-progress — accepted.</span><span class="zh">严格跨 progress —— 接受。</span></td></tr>
-<tr><td colspan="2"><span class="en">Additional (cross-stream only): slot_offset ≥ 0</span><span class="zh">额外（仅 cross-stream）：slot_offset ≥ 0</span></td><td><span class="en">consumer.la ≥ N — slot still in ring; otherwise event has been recycled. Same-stream skips this check (CUDA stream FIFO orders submissions without needing the event lookup).</span><span class="zh">consumer.la ≥ N —— slot 仍在 ring 内；否则 event 已被回收。同 stream 跳过此检查（CUDA stream FIFO 直接保序，不需要查 event）。</span></td></tr>
+<tr><td>$\Delta &lt; 0$</td><td>$\mathrm{consumer.la} &gt; X.\mathrm{la} + N$</td><td><span class="en">Future-read: producer hasn't yet processed $B_{K-N}$ by consumer's progress. <code>deps.py</code> raises at construction.</span><span class="zh">future-read：producer 在 consumer 的 progress 时还没处理过 $B_{K-N}$。<code>deps.py</code> 构造时直接 raise。</span></td></tr>
+<tr><td>$\Delta = 0$</td><td>$\mathrm{consumer.la} = X.\mathrm{la} + N$</td><td><span class="en">Degenerate same-progress (no ring rotation). cross_iter contributes no topo-sort edge → producer/consumer order is undetermined within the same progress → silent wrong sync. Engine raises and directs user to <code>same_progress_sync</code>.</span><span class="zh">退化的同 progress 情形（中间没有 ring 旋转）。cross_iter 不进 topo DAG → 同 progress 内 producer/consumer 顺序不定 → silent wrong sync。引擎 raise，引导用户改用 <code>same_progress_sync</code>。</span></td></tr>
+<tr><td>$\Delta \ge 1$</td><td>$\mathrm{consumer.la} \le X.\mathrm{la} + N - 1$</td><td><span class="en">Strictly cross-progress — accepted.</span><span class="zh">严格跨 progress —— 接受。</span></td></tr>
+<tr><td colspan="2"><span class="en">Additional (cross-stream only): $\mathrm{slot\_offset} \ge 0$</span><span class="zh">额外（仅 cross-stream）：$\mathrm{slot\_offset} \ge 0$</span></td><td><span class="en">$\mathrm{consumer.la} \ge N$ — slot still in ring; otherwise event has been recycled. Same-stream skips this check (CUDA stream FIFO orders submissions without needing the event lookup).</span><span class="zh">$\mathrm{consumer.la} \ge N$ —— slot 仍在 ring 内；否则 event 已被回收。同 stream 跳过此检查（CUDA stream FIFO 直接保序，不需要查 event）。</span></td></tr>
 </tbody>
 </table>
 
@@ -2067,19 +2067,19 @@ $$</p>
 <section id="appendix-delta-plain">
 <h3><span class="en">A.4 Plain-language summary</span><span class="zh">A.4 通俗解释</span></h3>
 <p>
-<span class="en">Read <code>cross_iter_depends_on=(("X", -N),)</code> as: "the consumer task, when running on batch K, needs X's GPU work for batch K−N to be already finished and recorded into the ring." Δ tells the engine <em>how stale</em> X's record will be by the time consumer reads it — measured in progress() calls.</span>
-<span class="zh">把 <code>cross_iter_depends_on=(("X", -N),)</code> 读作："consumer 在 batch K 上跑时，需要 X 在 batch K−N 上的 GPU 工作已经做完并录进 ring。"Δ 告诉引擎：等 consumer 真正读这条 event 时，它在 ring 里待机了多少个 progress() 步。</span>
+<span class="en">Read <code>cross_iter_depends_on=(("X", -N),)</code> as: "the consumer task, when running on batch $K$, needs X's GPU work for batch $K - N$ to be already finished and recorded into the ring." $\Delta$ tells the engine <em>how stale</em> X's record will be by the time consumer reads it — measured in progress() calls.</span>
+<span class="zh">把 <code>cross_iter_depends_on=(("X", -N),)</code> 读作："consumer 在 batch $K$ 上跑时，需要 X 在 batch $K - N$ 上的 GPU 工作已经做完并录进 ring。"$\Delta$ 告诉引擎：等 consumer 真正读这条 event 时，它在 ring 里待机了多少个 progress() 步。</span>
 </p>
 <ul>
-  <li><span class="en"><strong>Δ = 1</strong>: producer ran in the immediately preceding progress. Most common case.</span><span class="zh"><strong>Δ = 1</strong>：producer 在紧邻的上一次 progress 跑完。最常见。</span></li>
-  <li><span class="en"><strong>Δ = 2, 3, ...</strong>: producer ran further back. Engine still finds the event in the ring as long as Δ ≤ X.la (the slot hasn't rotated out yet).</span><span class="zh"><strong>Δ = 2, 3, ...</strong>：producer 在更早的 progress 跑完。只要 Δ ≤ X.la（slot 还没被旋转出去），引擎仍能在 ring 里找到 event。</span></li>
-  <li><span class="en"><strong>Δ = 0</strong>: not really cross-iter — producer and consumer would be in the same progress. Use <code>same_progress_sync</code>: it expresses identical event lookup PLUS adds the topological-sort edge that ensures producer fires first.</span><span class="zh"><strong>Δ = 0</strong>：根本不是跨 iter —— producer 和 consumer 在同一次 progress 里。改用 <code>same_progress_sync</code>：它给出相同的 event 查询，同时贡献一条 topological_sort 边保证 producer 先跑。</span></li>
-  <li><span class="en"><strong>Δ &lt; 0</strong>: consumer would be asking for something producer hasn't computed yet. Logically impossible.</span><span class="zh"><strong>Δ &lt; 0</strong>：consumer 在等 producer 还没算出来的东西。逻辑上不可能。</span></li>
+  <li><span class="en"><strong>$\Delta = 1$</strong>: producer ran in the immediately preceding progress. Most common case.</span><span class="zh"><strong>$\Delta = 1$</strong>：producer 在紧邻的上一次 progress 跑完。最常见。</span></li>
+  <li><span class="en"><strong>$\Delta = 2, 3, \ldots$</strong>: producer ran further back. Engine still finds the event in the ring as long as $\Delta \le X.\mathrm{la}$ (the slot hasn't rotated out yet).</span><span class="zh"><strong>$\Delta = 2, 3, \ldots$</strong>：producer 在更早的 progress 跑完。只要 $\Delta \le X.\mathrm{la}$（slot 还没被旋转出去），引擎仍能在 ring 里找到 event。</span></li>
+  <li><span class="en"><strong>$\Delta = 0$</strong>: not really cross-iter — producer and consumer would be in the same progress. Use <code>same_progress_sync</code>: it expresses identical event lookup PLUS adds the topological-sort edge that ensures producer fires first.</span><span class="zh"><strong>$\Delta = 0$</strong>：根本不是跨 iter —— producer 和 consumer 在同一次 progress 里。改用 <code>same_progress_sync</code>：它给出相同的 event 查询，同时贡献一条 topological_sort 边保证 producer 先跑。</span></li>
+  <li><span class="en"><strong>$\Delta &lt; 0$</strong>: consumer would be asking for something producer hasn't computed yet. Logically impossible.</span><span class="zh"><strong>$\Delta &lt; 0$</strong>：consumer 在等 producer 还没算出来的东西。逻辑上不可能。</span></li>
 </ul>
 
 <p>
-<span class="en"><strong>Quick mnemonic</strong>: if you wrote <code>cross_iter_depends_on=(("X", -1),)</code>, you usually mean "wait for last progress's X". That works exactly when Δ = 1, which forces <code>X.la == consumer.la</code>. Any la mismatch causes Δ to drift and may collide with one of the boundary checks above.</span>
-<span class="zh"><strong>速记</strong>：写 <code>cross_iter_depends_on=(("X", -1),)</code> 通常是想表达"等上一次 progress 的 X"。这恰好对应 Δ = 1，强制 <code>X.la == consumer.la</code>。任何 la 不一致都会让 Δ 偏离，可能撞上上面的边界检查。</span>
+<span class="en"><strong>Quick mnemonic</strong>: if you wrote <code>cross_iter_depends_on=(("X", -1),)</code>, you usually mean "wait for last progress's X". That works exactly when $\Delta = 1$, which forces $X.\mathrm{la} = \mathrm{consumer.la}$. Any la mismatch causes $\Delta$ to drift and may collide with one of the boundary checks above.</span>
+<span class="zh"><strong>速记</strong>：写 <code>cross_iter_depends_on=(("X", -1),)</code> 通常是想表达"等上一次 progress 的 X"。这恰好对应 $\Delta = 1$，强制 $X.\mathrm{la} = \mathrm{consumer.la}$。任何 la 不一致都会让 $\Delta$ 偏离，可能撞上上面的边界检查。</span>
 </p>
 </section>
 
@@ -2087,11 +2087,11 @@ $$</p>
 <h3><span class="en">A.5 Worked examples</span><span class="zh">A.5 实例</span></h3>
 <table>
 <thead><tr>
-  <th>X.la</th>
-  <th>consumer.la</th>
-  <th>N</th>
-  <th>Δ</th>
-  <th>slot_offset</th>
+  <th>$X.\mathrm{la}$</th>
+  <th>$\mathrm{consumer.la}$</th>
+  <th>$N$</th>
+  <th>$\Delta$</th>
+  <th>$\mathrm{slot\_offset}$</th>
   <th><span class="en">Verdict</span><span class="zh">判定</span></th>
 </tr></thead>
 <tbody>

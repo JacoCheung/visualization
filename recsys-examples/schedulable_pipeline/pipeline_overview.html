@@ -154,6 +154,19 @@
   .badge-priv { background: #ffebe9; color: var(--critical); }
   .badge-int { background: #fff8c5; color: #6e5a00; }
 </style>
+<!-- KaTeX (math rendering) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"
+  onload="renderMathInElement(document.body, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '\\[', right: '\\]', display: true},
+      {left: '$', right: '$', display: false},
+      {left: '\\(', right: '\\)', display: false}
+    ],
+    throwOnError: false
+  });"></script>
 </head>
 <body>
 
@@ -1978,7 +1991,7 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <span class="en">For a consumer task that declares <code>cross_iter_depends_on=(("X", -N),)</code> with N&nbsp;&gt;&nbsp;0:</span>
 <span class="zh">对于声明了 <code>cross_iter_depends_on=(("X", -N),)</code> (N&nbsp;&gt;&nbsp;0) 的 consumer task：</span>
 </p>
-<pre><span class="kw">Δ</span> := X.lookahead + N − consumer.lookahead</pre>
+<p style="text-align:center;">$$\Delta \;\stackrel{\text{def}}{=}\; X.\mathrm{la} + N - \mathrm{consumer.la}$$</p>
 <p>
 <span class="en">Three equivalent physical meanings:</span>
 <span class="zh">三个等价的物理含义：</span>
@@ -1990,8 +2003,8 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 </ul>
 
 <p>
-<span class="en">Decomposition: <code>Δ = N + (X.la − consumer.la)</code>. When producer and consumer have equal lookahead, Δ = N exactly (the user's "wait for N batches ago"); when producer is deeper in the ring (X.la &gt; consumer.la), Δ &gt; N (extra rotations to bring the slot down).</span>
-<span class="zh">分解：<code>Δ = N + (X.la − consumer.la)</code>。producer 与 consumer lookahead 相等时 Δ = N（即用户字面意思的"N 个 batch 前"）；producer 在 ring 更深处 (X.la &gt; consumer.la) 时 Δ &gt; N（slot 多走了几步才到 consumer 视角）。</span>
+<span class="en">Decomposition: $\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$. When producer and consumer have equal lookahead, $\Delta = N$ exactly (the user's "wait for N batches ago"); when producer is deeper in the ring ($X.\mathrm{la} &gt; \mathrm{consumer.la}$), $\Delta &gt; N$ (extra rotations to bring the slot down).</span>
+<span class="zh">分解：$\Delta = N + (X.\mathrm{la} - \mathrm{consumer.la})$。producer 与 consumer lookahead 相等时 $\Delta = N$（即用户字面意思的"N 个 batch 前"）；producer 在 ring 更深处 ($X.\mathrm{la} &gt; \mathrm{consumer.la}$) 时 $\Delta &gt; N$（slot 多走了几步才到 consumer 视角）。</span>
 </p>
 </section>
 
@@ -2005,10 +2018,14 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <span class="en">Consumer at <code>P_n = q_c</code> processes <code>B_(n + consumer.la)</code>. The cross_iter declaration says it waits for X's work on <code>B_(n + consumer.la − N)</code>. The progress in which X processes <code>B_(n + consumer.la − N)</code> is <code>P_(n + consumer.la − N − X.la)</code>:</span>
 <span class="zh">consumer 在 <code>P_n = q_c</code> 处理 <code>B_(n + consumer.la)</code>。cross_iter 要等 X 在 <code>B_(n + consumer.la − N)</code> 上的工作。而处理 batch <code>B_(n + consumer.la − N)</code> 的 progress 是在 <code>P_(n + consumer.la − N − X.la)</code>：</span>
 </p>
-<pre>q_p = n + consumer.la − N − X.la
-Δ   = q_c − q_p
-    = n − (n + consumer.la − N − X.la)
-    = X.la + N − consumer.la</pre>
+<p style="text-align:center;">$$
+\begin{aligned}
+q_p &= n + \mathrm{consumer.la} - N - X.\mathrm{la} \\
+\Delta &= q_c - q_p \\
+       &= n - (n + \mathrm{consumer.la} - N - X.\mathrm{la}) \\
+       &= X.\mathrm{la} + N - \mathrm{consumer.la}
+\end{aligned}
+$$</p>
 <p>
 <span class="en">X.la cancels in the difference, which is why <code>slot_offset</code> (the consumer-side lookup index) depends only on <code>consumer.la − N</code>, not on producer.</span>
 <span class="zh">差里 X.la 消去，所以 <code>slot_offset</code>（consumer 一侧的查询位置）只依赖 <code>consumer.la − N</code>，与 producer 无关。</span>
@@ -2035,7 +2052,7 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <span class="en">Combined cross-stream interval:</span>
 <span class="zh">cross-stream 合并区间：</span>
 </p>
-<pre>N ≤ consumer.la ≤ X.la + N − 1   ⟺   1 ≤ Δ ≤ X.la</pre>
+<p style="text-align:center;">$$N \;\le\; \mathrm{consumer.la} \;\le\; X.\mathrm{la} + N - 1 \quad\Longleftrightarrow\quad 1 \;\le\; \Delta \;\le\; X.\mathrm{la}$$</p>
 <p>
 <span class="en">Same-stream relaxes to just Δ ≥ 1.</span>
 <span class="zh">同 stream 放宽为只需 Δ ≥ 1。</span>

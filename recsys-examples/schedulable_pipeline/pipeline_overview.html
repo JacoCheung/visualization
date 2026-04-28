@@ -1963,6 +1963,132 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 
 </section>
 
+<!-- =========================================================== -->
+<section id="appendix-delta">
+<h2><span class="en">Appendix A. Δ in <code>cross_iter_depends_on</code></span><span class="zh">附录 A. <code>cross_iter_depends_on</code> 中的 Δ</span></h2>
+
+<p>
+<span class="en">Δ is the engine's internal name for the "progress lag" between when a producer records its event and when a consumer reads it via a <code>cross_iter_depends_on=((X, -N),)</code> edge. Defined and bounded entirely by lookaheads and N; it never appears in the user-facing API but governs which configurations are accepted at <code>SchedulablePipeline.__init__</code>.</span>
+<span class="zh">Δ 是引擎内部用来描述 <code>cross_iter_depends_on=((X, -N),)</code> 这条边上"producer 录 event 到 consumer 读 event 之间的 progress 延迟"的量。完全由 lookahead 和 N 决定；用户接口里不出现，但决定了 <code>SchedulablePipeline.__init__</code> 时哪些配置会被接受。</span>
+</p>
+
+<section id="appendix-delta-def">
+<h3><span class="en">A.1 Definition</span><span class="zh">A.1 定义</span></h3>
+<p>
+<span class="en">For a consumer task that declares <code>cross_iter_depends_on=(("X", -N),)</code> with N&nbsp;&gt;&nbsp;0:</span>
+<span class="zh">对于声明了 <code>cross_iter_depends_on=(("X", -N),)</code> (N&nbsp;&gt;&nbsp;0) 的 consumer task：</span>
+</p>
+<pre><span class="kw">Δ</span> := X.lookahead + N − consumer.lookahead</pre>
+<p>
+<span class="en">Three equivalent physical meanings:</span>
+<span class="zh">三个等价的物理含义：</span>
+</p>
+<ul>
+  <li><span class="en"><strong>Progress lag</strong>: <code>Δ = q_c − q_p</code>, where <code>q_c</code> is the progress() index in which consumer reads the event and <code>q_p</code> is the progress() index in which producer recorded it. Cross-iter requires <code>q_p &lt; q_c</code>, i.e. Δ&nbsp;≥&nbsp;1.</span><span class="zh"><strong>progress 延迟</strong>：<code>Δ = q_c − q_p</code>，其中 <code>q_c</code> 是 consumer 读 event 时所在的 progress() 编号，<code>q_p</code> 是 producer 录 event 时所在的 progress() 编号。cross-iter 要求 <code>q_p &lt; q_c</code>，即 Δ&nbsp;≥&nbsp;1。</span></li>
+  <li><span class="en"><strong>Ring advance count</strong>: number of <code>ring.advance()</code> calls between producer's record and consumer's read (one per progress() call).</span><span class="zh"><strong>ring 旋转次数</strong>：producer 录到 consumer 读之间 <code>ring.advance()</code> 被调用的次数（每次 progress() 末尾调一次）。</span></li>
+  <li><span class="en"><strong>Slot displacement</strong>: producer wrote at <code>slot[X.la]</code> in its progress; after Δ advances the slot has rotated to position <code>X.la − Δ = consumer.la − N = slot_offset</code>.</span><span class="zh"><strong>slot 位移</strong>：producer 录在自己 progress 的 <code>slot[X.la]</code>；经过 Δ 次 advance 后该 slot 平移到 <code>X.la − Δ = consumer.la − N = slot_offset</code>。</span></li>
+</ul>
+
+<p>
+<span class="en">Decomposition: <code>Δ = N + (X.la − consumer.la)</code>. When producer and consumer have equal lookahead, Δ = N exactly (the user's "wait for N batches ago"); when producer is deeper in the ring (X.la &gt; consumer.la), Δ &gt; N (extra rotations to bring the slot down).</span>
+<span class="zh">分解：<code>Δ = N + (X.la − consumer.la)</code>。producer 与 consumer lookahead 相等时 Δ = N（即用户字面意思的"N 个 batch 前"）；producer 在 ring 更深处 (X.la &gt; consumer.la) 时 Δ &gt; N（slot 多走了几步才到 consumer 视角）。</span>
+</p>
+</section>
+
+<section id="appendix-delta-derivation">
+<h3><span class="en">A.2 Derivation</span><span class="zh">A.2 推导</span></h3>
+<p>
+<span class="en">Convention: in <code>P_n</code> (the n-th call to <code>progress()</code>, 0-indexed), a task with lookahead <code>k</code> processes batch <code>B_(n+k)</code> and records its event at <code>slot[k]</code>. Equivalently, <code>slot[k]</code> in <code>P_n</code> currently holds <code>B_(n+k)</code>.</span>
+<span class="zh">约定：在 <code>P_n</code>（第 n 次调用 <code>progress()</code>，0-indexed）里，lookahead 为 <code>k</code> 的 task 处理 batch <code>B_(n+k)</code>，并在 <code>slot[k]</code> 记录 event。等价地，<code>P_n</code> 里 <code>slot[k]</code> 当前装着 <code>B_(n+k)</code>。</span>
+</p>
+<p>
+<span class="en">Consumer at <code>P_n = q_c</code> processes <code>B_(n + consumer.la)</code>. The cross_iter declaration says it waits for X's work on <code>B_(n + consumer.la − N)</code>. Producer X (lookahead = X.la) processed batch <code>B_m</code> in <code>P_(m − X.la)</code>; substituting <code>m = n + consumer.la − N</code> gives</span>
+<span class="zh">consumer 在 <code>P_n = q_c</code> 处理 <code>B_(n + consumer.la)</code>。cross_iter 声明它等 X 在 <code>B_(n + consumer.la − N)</code> 上的工作。producer X (lookahead = X.la) 处理 batch <code>B_m</code> 是在 <code>P_(m − X.la)</code>；代入 <code>m = n + consumer.la − N</code>：</span>
+</p>
+<pre>q_p = (n + consumer.la − N) − X.la
+Δ   = q_c − q_p
+    = n − [(n + consumer.la − N) − X.la]
+    = X.la + N − consumer.la</pre>
+<p>
+<span class="en">X.la cancels in the difference, which is why <code>slot_offset</code> (the consumer-side lookup index) depends only on <code>consumer.la − N</code>, not on producer.</span>
+<span class="zh">差里 X.la 消去，所以 <code>slot_offset</code>（consumer 一侧的查询位置）只依赖 <code>consumer.la − N</code>，与 producer 无关。</span>
+</p>
+</section>
+
+<section id="appendix-delta-constraints">
+<h3><span class="en">A.3 Validity constraints</span><span class="zh">A.3 合法性约束</span></h3>
+<table>
+<thead><tr>
+  <th><span class="en">Condition</span><span class="zh">条件</span></th>
+  <th><span class="en">Requirement</span><span class="zh">要求</span></th>
+  <th><span class="en">Why / engine response</span><span class="zh">原因 / 引擎反应</span></th>
+</tr></thead>
+<tbody>
+<tr><td>Δ &lt; 0</td><td>consumer.la &gt; X.la + N</td><td><span class="en">Future-read: producer hasn't yet processed B_(K−N) by consumer's progress. <code>deps.py</code> raises at construction.</span><span class="zh">future-read：producer 在 consumer 的 progress 时还没处理过 B_(K−N)。<code>deps.py</code> 构造时直接 raise。</span></td></tr>
+<tr><td>Δ = 0</td><td>consumer.la = X.la + N</td><td><span class="en">Degenerate same-progress (no ring rotation). cross_iter contributes no topo-sort edge → producer/consumer order is undetermined within the same progress → silent wrong sync. Engine raises and directs user to <code>same_progress_sync</code>.</span><span class="zh">退化的同 progress 情形（中间没有 ring 旋转）。cross_iter 不进 topo DAG → 同 progress 内 producer/consumer 顺序不定 → silent wrong sync。引擎 raise，引导用户改用 <code>same_progress_sync</code>。</span></td></tr>
+<tr><td>Δ ≥ 1</td><td>consumer.la ≤ X.la + N − 1</td><td><span class="en">Strictly cross-progress — accepted.</span><span class="zh">严格跨 progress —— 接受。</span></td></tr>
+<tr><td colspan="2"><span class="en">Additional (cross-stream only): slot_offset ≥ 0</span><span class="zh">额外（仅 cross-stream）：slot_offset ≥ 0</span></td><td><span class="en">consumer.la ≥ N — slot still in ring; otherwise event has been recycled. Same-stream skips this check (CUDA stream FIFO orders submissions without needing the event lookup).</span><span class="zh">consumer.la ≥ N —— slot 仍在 ring 内；否则 event 已被回收。同 stream 跳过此检查（CUDA stream FIFO 直接保序，不需要查 event）。</span></td></tr>
+</tbody>
+</table>
+
+<p>
+<span class="en">Combined cross-stream interval:</span>
+<span class="zh">cross-stream 合并区间：</span>
+</p>
+<pre>N ≤ consumer.la ≤ X.la + N − 1   ⟺   1 ≤ Δ ≤ X.la</pre>
+<p>
+<span class="en">Same-stream relaxes to just Δ ≥ 1.</span>
+<span class="zh">同 stream 放宽为只需 Δ ≥ 1。</span>
+</p>
+
+<p>
+<span class="en"><strong>Validator code</strong>: <a href="../../engine/deps.py#L437"><code>deps.py</code> lines 437-501</a> (Δ=0 / Δ&lt;0), and <a href="../../engine/deps.py#L515"><code>deps.py</code> line 515</a> (slot_offset&lt;0).</span>
+<span class="zh"><strong>校验代码</strong>：<a href="../../engine/deps.py#L437"><code>deps.py</code> 437-501 行</a>（Δ=0 / Δ&lt;0），<a href="../../engine/deps.py#L515"><code>deps.py</code> 515 行</a>（slot_offset&lt;0）。</span>
+</p>
+</section>
+
+<section id="appendix-delta-plain">
+<h3><span class="en">A.4 Plain-language summary</span><span class="zh">A.4 通俗解释</span></h3>
+<p>
+<span class="en">Read <code>cross_iter_depends_on=(("X", -N),)</code> as: "the consumer task, when running on batch K, needs X's GPU work for batch K−N to be already finished and recorded into the ring." Δ tells the engine <em>how stale</em> X's record will be by the time consumer reads it — measured in progress() calls.</span>
+<span class="zh">把 <code>cross_iter_depends_on=(("X", -N),)</code> 读作："consumer 在 batch K 上跑时，需要 X 在 batch K−N 上的 GPU 工作已经做完并录进 ring。"Δ 告诉引擎：等 consumer 真正读这条 event 时，它在 ring 里待机了多少个 progress() 步。</span>
+</p>
+<ul>
+  <li><span class="en"><strong>Δ = 1</strong>: producer ran in the immediately preceding progress. Most common case.</span><span class="zh"><strong>Δ = 1</strong>：producer 在紧邻的上一次 progress 跑完。最常见。</span></li>
+  <li><span class="en"><strong>Δ = 2, 3, ...</strong>: producer ran further back. Engine still finds the event in the ring as long as Δ ≤ X.la (the slot hasn't rotated out yet).</span><span class="zh"><strong>Δ = 2, 3, ...</strong>：producer 在更早的 progress 跑完。只要 Δ ≤ X.la（slot 还没被旋转出去），引擎仍能在 ring 里找到 event。</span></li>
+  <li><span class="en"><strong>Δ = 0</strong>: not really cross-iter — producer and consumer would be in the same progress. Use <code>same_progress_sync</code>: it expresses identical event lookup PLUS adds the topological-sort edge that ensures producer fires first.</span><span class="zh"><strong>Δ = 0</strong>：根本不是跨 iter —— producer 和 consumer 在同一次 progress 里。改用 <code>same_progress_sync</code>：它给出相同的 event 查询，同时贡献一条 topological_sort 边保证 producer 先跑。</span></li>
+  <li><span class="en"><strong>Δ &lt; 0</strong>: consumer would be asking for something producer hasn't computed yet. Logically impossible.</span><span class="zh"><strong>Δ &lt; 0</strong>：consumer 在等 producer 还没算出来的东西。逻辑上不可能。</span></li>
+</ul>
+
+<p>
+<span class="en"><strong>Quick mnemonic</strong>: if you wrote <code>cross_iter_depends_on=(("X", -1),)</code>, you usually mean "wait for last progress's X". That works exactly when Δ = 1, which forces <code>X.la == consumer.la</code>. Any la mismatch causes Δ to drift and may collide with one of the boundary checks above.</span>
+<span class="zh"><strong>速记</strong>：写 <code>cross_iter_depends_on=(("X", -1),)</code> 通常是想表达"等上一次 progress 的 X"。这恰好对应 Δ = 1，强制 <code>X.la == consumer.la</code>。任何 la 不一致都会让 Δ 偏离，可能撞上上面的边界检查。</span>
+</p>
+</section>
+
+<section id="appendix-delta-examples">
+<h3><span class="en">A.5 Worked examples</span><span class="zh">A.5 实例</span></h3>
+<table>
+<thead><tr>
+  <th>X.la</th>
+  <th>consumer.la</th>
+  <th>N</th>
+  <th>Δ</th>
+  <th>slot_offset</th>
+  <th><span class="en">Verdict</span><span class="zh">判定</span></th>
+</tr></thead>
+<tbody>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td><td>−1</td><td><span class="en">cross-stream: REJECTED (slot rotated out). same-stream: OK (FIFO).</span><span class="zh">cross-stream：拒（slot 出 ring）。same-stream：通过（FIFO 保序）。</span></td></tr>
+<tr><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td><td><span class="en">OK. "Wait for last progress's X on same lookahead."</span><span class="zh">通过。"等上一 progress 的 X，同 lookahead。"</span></td></tr>
+<tr><td>2</td><td>2</td><td>2</td><td>2</td><td>0</td><td><span class="en">OK. "Wait for X two progresses back, same lookahead."</span><span class="zh">通过。"等 2 个 progress 前的 X，同 lookahead。"</span></td></tr>
+<tr><td>3</td><td>2</td><td>2</td><td>3</td><td>0</td><td><span class="en">OK. X is deeper, so its slot needs 3 advances to reach consumer's view; ring depth 4 holds it.</span><span class="zh">通过。X 在更深处，slot 需要旋转 3 次才到 consumer 视角；ring 深度 4 装得下。</span></td></tr>
+<tr><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td><span class="en">REJECTED — Δ=0 (same progress). Use <code>same_progress_sync</code>.</span><span class="zh">拒 —— Δ=0（同 progress）。改用 <code>same_progress_sync</code>。</span></td></tr>
+<tr><td>0</td><td>3</td><td>1</td><td>−2</td><td>2</td><td><span class="en">REJECTED — future-read (Δ&lt;0). Producer hasn't run yet at consumer's progress.</span><span class="zh">拒 —— future-read (Δ&lt;0)。consumer 的 progress 时 producer 还没跑过这个 batch。</span></td></tr>
+</tbody>
+</table>
+</section>
+</section>
+
 <hr>
 <p class="meta">
 <span class="en">Document generated to summarize the schedulable-pipeline rework on branch <code>junzhang/rework-mtms</code>. Source: <code>SPEC.md</code>, <code>SPEC_p2.md</code>, <code>SPEC_p3.md</code>, <code>tasks/followups.md</code>. SVG diagrams hand-authored to UML 2.5 conventions (lifelines + activations + sync/async/return arrows for sequence; class boxes with stereotype-free attribute/operation compartments for class diagrams).</span>

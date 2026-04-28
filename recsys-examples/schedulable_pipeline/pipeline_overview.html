@@ -2002,12 +2002,12 @@ pipe = <span class="ty">SchedulablePipeline</span>(schedule, pool, executor=<spa
 <span class="zh">约定：在 <code>P_n</code>（第 n 次调用 <code>progress()</code>，0-indexed）里，lookahead 为 <code>k</code> 的 task 处理 batch <code>B_(n+k)</code>，并在 <code>slot[k]</code> 记录 event。等价地，<code>P_n</code> 里 <code>slot[k]</code> 当前装着 <code>B_(n+k)</code>。</span>
 </p>
 <p>
-<span class="en">Consumer at <code>P_n = q_c</code> processes <code>B_(n + consumer.la)</code>. The cross_iter declaration says it waits for X's work on <code>B_(n + consumer.la − N)</code>. Producer X (lookahead = X.la) processed batch <code>B_m</code> in <code>P_(m − X.la)</code>; substituting <code>m = n + consumer.la − N</code> gives</span>
-<span class="zh">consumer 在 <code>P_n = q_c</code> 处理 <code>B_(n + consumer.la)</code>。cross_iter 声明它等 X 在 <code>B_(n + consumer.la − N)</code> 上的工作。producer X (lookahead = X.la) 处理 batch <code>B_m</code> 是在 <code>P_(m − X.la)</code>；代入 <code>m = n + consumer.la − N</code>：</span>
+<span class="en">Consumer at <code>P_n = q_c</code> processes <code>B_(n + consumer.la)</code>. The cross_iter declaration says it waits for X's work on <code>B_(n + consumer.la − N)</code>. The progress in which X processes <code>B_(n + consumer.la − N)</code> is <code>P_(n + consumer.la − N − X.la)</code>:</span>
+<span class="zh">consumer 在 <code>P_n = q_c</code> 处理 <code>B_(n + consumer.la)</code>。cross_iter 要等 X 在 <code>B_(n + consumer.la − N)</code> 上的工作。而处理 batch <code>B_(n + consumer.la − N)</code> 的 progress 是在 <code>P_(n + consumer.la − N − X.la)</code>：</span>
 </p>
-<pre>q_p = (n + consumer.la − N) − X.la
+<pre>q_p = n + consumer.la − N − X.la
 Δ   = q_c − q_p
-    = n − [(n + consumer.la − N) − X.la]
+    = n − (n + consumer.la − N − X.la)
     = X.la + N − consumer.la</pre>
 <p>
 <span class="en">X.la cancels in the difference, which is why <code>slot_offset</code> (the consumer-side lookup index) depends only on <code>consumer.la − N</code>, not on producer.</span>

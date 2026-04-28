@@ -830,24 +830,24 @@ commons.pipeline.hstu_pipeline
     <rect x="80" y="200" width="240" height="50" rx="4" class="uml-box-fill"/>
     <text x="92" y="220" font-family="ui-monospace,monospace" font-size="11" font-weight="700">slot[0]</text>
     <text x="200" y="220" text-anchor="middle" class="uml-text">B_(n-1)</text>
-    <text x="200" y="240" text-anchor="middle" class="uml-text-mute">forward_evt (already returned)</text>
+    <text x="200" y="240" text-anchor="middle" class="uml-text-mute">forward_evt</text>
   </g>
 
   <g>
     <rect x="480" y="80" width="240" height="50" rx="4" class="uml-box-fill"/>
     <text x="492" y="100" font-family="ui-monospace,monospace" font-size="11" font-weight="700">slot[2]</text>
-    <text x="600" y="100" text-anchor="middle" class="uml-text">B_(n+2) (newly pulled)</text>
+    <text x="600" y="100" text-anchor="middle" class="uml-text">B_(n+2)</text>
     <text x="600" y="120" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#cf222e">● h2d_evt</text>
 
     <rect x="480" y="140" width="240" height="50" rx="4" class="uml-box-fill"/>
     <text x="492" y="160" font-family="ui-monospace,monospace" font-size="11" font-weight="700">slot[1]</text>
-    <text x="600" y="160" text-anchor="middle" class="uml-text">B_(n+1) (rotated from slot[2])</text>
-    <text x="600" y="180" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#0969da">● prefetch_evt (P_n records here)</text>
+    <text x="600" y="160" text-anchor="middle" class="uml-text">B_(n+1)</text>
+    <text x="600" y="180" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#0969da">● prefetch_evt</text>
 
     <rect x="480" y="200" width="240" height="50" rx="4" class="uml-box-fill"/>
     <text x="492" y="220" font-family="ui-monospace,monospace" font-size="11" font-weight="700">slot[0]</text>
-    <text x="600" y="220" text-anchor="middle" class="uml-text">B_n (rotated from slot[1])</text>
-    <text x="600" y="240" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#0969da">prefetch_evt(B_n) carried over</text>
+    <text x="600" y="220" text-anchor="middle" class="uml-text">B_n</text>
+    <text x="600" y="240" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#0969da">● prefetch_evt(B_n)</text>
   </g>
 
   <path d="M320 105 Q400 130 480 165" stroke="#8c959f" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#arrRotGray)" opacity="0.6"/>

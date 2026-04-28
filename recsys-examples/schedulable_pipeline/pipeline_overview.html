@@ -791,8 +791,22 @@ commons.pipeline.hstu_pipeline
   </g>
 </svg>
 </div><figcaption>
-<span class="en">Five tasks from HSTU prefetch variant + one hypothetical <code>aux_stats</code> task (not in real HSTU; only here to illustrate <code>cross_iter_depends_on</code>). Why la=2? <code>cross_iter_depends_on=((X,-N))</code> requires <code>consumer.la ≥ N</code>, otherwise <code>slot_offset = consumer.la + neg_offset</code> goes negative (event already rotated out of ring) and deps.py raises. So a cross_iter consumer must be a high-lookahead "prefetch-side" task — streaming/aux statistics is the canonical use case. <code>topological_sort</code> only consumes the three solid edges (<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>, plus <code>prefetch_embeddings</code> → <code>backward</code>); the dashed edges contribute event triples but no in-progress ordering — their producer/consumer ordering across progress() calls is mediated by ring rotation, not by topo sort.</span>
-<span class="zh">HSTU prefetch 变体里抽出 5 个 task，加 1 个假想的 <code>aux_stats</code> task（HSTU 实际无此任务，这里只为演示 <code>cross_iter_depends_on</code>）。为什么是 la=2？<code>cross_iter_depends_on=((X,-N))</code> 要求 <code>consumer.la ≥ N</code>，否则 <code>slot_offset = consumer.la + neg_offset</code> 会变负（事件已转出 ring），deps.py 直接 raise。所以 cross_iter 的 consumer 必然是高 lookahead 的"prefetch 侧"任务——典型用例就是流式/辅助统计。<code>topological_sort</code> 只看 3 条实线边（<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>，加 <code>prefetch_embeddings</code> → <code>backward</code>）；虚线边只 emit 事件三元组，不参与 progress 内顺序——它们 producer/consumer 跨 progress 的顺序由 ring 旋转保证，不由 topo sort 排。</span>
+<span class="en">Five tasks from HSTU prefetch variant + one hypothetical <code>aux_stats</code> task (not in real HSTU; only here to illustrate <code>cross_iter_depends_on</code>).<br>
+<strong>Why la=2 for the cross_iter consumer?</strong> Two constraints, derived from the slot_offset math:
+<ol>
+  <li><code>cross_iter_depends_on=((X,-N))</code> code-level: <code>slot_offset = consumer.la − N ≥ 0</code> → <strong>consumer.la ≥ N</strong> (deps.py:446, otherwise rejected as out-of-ring).</li>
+  <li><code>depends_on</code> future-read: any same-batch <code>depends_on=("Y",)</code> requires <strong>consumer.la ≤ Y.la</strong> (deps.py:368). So a task that depends_on a low-la training task (backward/optimizer/forward, la=0) is itself constrained to la=0 — and would therefore <em>fail constraint (1)</em>.</li>
+</ol>
+Combined: a cross_iter consumer cannot have any same-batch <code>depends_on</code> on low-la training tasks. It must be a high-lookahead, prefetch-side task whose only same-batch deps are on other high-la tasks (h2d, prefetch). Streaming / auxiliary statistics is the canonical example.<br>
+<code>topological_sort</code> only consumes the three solid edges (<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>, plus <code>prefetch_embeddings</code> → <code>backward</code>); the dashed edges contribute event triples but no in-progress ordering — their producer/consumer ordering across progress() calls is mediated by ring rotation, not by topo sort.</span>
+<span class="zh">HSTU prefetch 变体里抽出 5 个 task，加 1 个假想的 <code>aux_stats</code> task（HSTU 实际无此任务，这里只为演示 <code>cross_iter_depends_on</code>）。<br>
+<strong>为什么 cross_iter consumer 是 la=2？</strong>由 slot_offset 数学推出两条约束：
+<ol>
+  <li><code>cross_iter_depends_on=((X,-N))</code> 代码层：<code>slot_offset = consumer.la − N ≥ 0</code> → <strong>consumer.la ≥ N</strong>（deps.py:446，否则视为出 ring 拒绝）。</li>
+  <li><code>depends_on</code> future-read：同 batch <code>depends_on=("Y",)</code> 要求 <strong>consumer.la ≤ Y.la</strong>（deps.py:368）。所以任何 depends_on 低 la 训练 task（backward/optimizer/forward，la=0）的 task，自身也被钉在 la=0——这就<em>违反约束 (1)</em>。</li>
+</ol>
+合起来：cross_iter consumer 在同 batch 内不能 <code>depends_on</code> 任何低 la 训练 task，必须是高 lookahead 的 prefetch 侧任务，同 batch 依赖只能落在其它高 la task（h2d、prefetch）上。流式/辅助统计就是典型用例。<br>
+<code>topological_sort</code> 只看 3 条实线边（<code>start_input_dist</code> → <code>wait_input_dist</code> → <code>prefetch_embeddings</code>，加 <code>prefetch_embeddings</code> → <code>backward</code>）；虚线边只 emit 事件三元组，不参与 progress 内顺序——它们 producer/consumer 跨 progress 的顺序由 ring 旋转保证，不由 topo sort 排。</span>
 </figcaption></figure>
 
 <figure><div class="svg-wrap">

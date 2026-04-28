@@ -929,6 +929,65 @@ Combined: a cross_iter consumer cannot have any same-batch <code>depends_on</cod
 <span class="zh">共同结构：producer 永远在<em>本次</em> progress 调用中往 <code>ring.at(producer.batch_offset)</code>（<code>executor.py:165</code>）录 event。consumer 的 <code>slot_offset</code> 答案就是"那个 slot 在 consumer 跑的时候已经转到哪儿"——上面四个公式分别是 ring 旋转次数 = 0（same_progress_sync）、<code>X.la − consumer.la</code>（depends_on 跨 la）、<code>N + X.la − consumer.la</code>（cross_iter）、由 <code>read_slot.batch_offset</code> 直接给出（reads/writes）这四种场景。</span>
 </p>
 </section>
+
+<section id="same-progress-sync-uses">
+<h3><span class="en">3.7 <code>same_progress_sync</code> — when to use it</span><span class="zh">3.7 <code>same_progress_sync</code> 的使用场景</span></h3>
+
+<p>
+<span class="en">Reads as: "this task must wait for X's work in <em>this same</em> progress() call to finish, regardless of which batches X and self are processing." Engine guarantees:</span>
+<span class="zh">语义："本 task 等 X <em>这同一次</em> progress() 内的工作做完，不管 X 和自己处理的是哪个 batch。"引擎承诺：</span>
+</p>
+<ul>
+  <li><span class="en">Adds a topo-DAG edge X → self (X is guaranteed to fire before self within the progress).</span><span class="zh">加一条 topo-DAG 边 X → self（保证 X 在 progress 内先于 self 触发）。</span></li>
+  <li><span class="en">For threaded execution, adds a CPU-side <code>threading.Event</code> wait (cross-thread case).</span><span class="zh">线程执行时跨线程加一条 CPU 端 <code>threading.Event</code> 等待。</span></li>
+  <li><span class="en">For cross-stream, emits <code>wait_event</code> at <code>slot[producer.la]</code>; same-stream relies on CUDA stream FIFO.</span><span class="zh">跨流时在 <code>slot[producer.la]</code> emit <code>wait_event</code>；同流靠 CUDA stream FIFO 保序。</span></li>
+</ul>
+
+<p>
+<span class="en">Three known use cases:</span>
+<span class="zh">三种已知用法：</span>
+</p>
+
+<table>
+<thead><tr>
+  <th>#</th>
+  <th><span class="en">Use case</span><span class="zh">用法</span></th>
+  <th><span class="en">Example</span><span class="zh">例子</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td>(a)</td>
+  <td><span class="en"><strong>Stream coherency on out-of-slot mutable state.</strong> Two tasks touch a shared object NOT declared in any <code>reads</code>/<code>writes</code> slot (e.g. dynamicemb cache, torchrec module attribute, global counter). Engine cannot infer a dataflow edge → use <code>same_progress_sync</code> to make the wait explicit. This is the original / canonical use; mirrors the legacy <code>default_stream.wait_stream(prefetch_stream)</code> pattern.</span><span class="zh"><strong>slot 之外可变状态的 stream 协同。</strong>两个 task 都触碰一个 <code>reads</code>/<code>writes</code> 没声明的对象（dynamicemb cache、torchrec module 属性、全局计数器等）。引擎看不见数据流边 → 用 <code>same_progress_sync</code> 把这条等待写出来。这是原始的、典型的用法；对应遗留代码的 <code>default_stream.wait_stream(prefetch_stream)</code> 模式。</span></td>
+  <td><span class="en"><code>backward.same_progress_sync=("prefetch_embeddings",)</code> in HSTU prefetch variant — drains prefetch's GPU work before backward / before the next progress.</span><span class="zh">HSTU prefetch 变体里的 <code>backward.same_progress_sync=("prefetch_embeddings",)</code> —— 在 backward / 下次 progress 之前把 prefetch 的 GPU 工作排空。</span></td>
+</tr>
+<tr>
+  <td>(b)</td>
+  <td><span class="en"><strong>Replacement for <code>cross_iter_depends_on</code> at $\Delta = 0$.</strong> When the user wants "this la=c task waits for that la=p task's current-progress output" with $c = p + N$ for some positive $N$, the natural reach is <code>cross_iter_depends_on=((X, -N),)</code>. That is rejected by the validator ($\Delta = 0$ degenerates same-progress; <code>cross_iter</code> contributes no topo edge so producer-before-consumer cannot be enforced). <code>same_progress_sync</code> expresses the same intent AND enforces ordering — same slot lookup ($\mathrm{slot[producer.la]}$), plus the topo edge.</span><span class="zh"><strong>取代 $\Delta=0$ 的 <code>cross_iter_depends_on</code>。</strong>当用户想表达"我这个 la=c 的 task 等那个 la=p 的 task 在本次 progress 的输出"，且 $c = p + N$ ($N>0$) 时，自然的写法 <code>cross_iter_depends_on=((X, -N),)</code> 会被 validator 拒绝（$\Delta=0$ 退化为同 progress；<code>cross_iter</code> 不进 topo DAG，无法保证 producer 先于 consumer 触发）。<code>same_progress_sync</code> 同时表达同一个意图并强制顺序——slot 查询位置相同（<code>slot[producer.la]</code>），外加一条 topo 边。</span></td>
+  <td><span class="en"><code>forward.same_progress_sync=("update",)</code> when fwd.la=1, update.la=0 — fwd uses post-update weights from the same progress. See <code>tests/commons/test_engine_same_progress_sync_correctness.py</code> for verified GPU equivalence to a manual la=1-pipelined SGD baseline.</span><span class="zh"><code>forward.same_progress_sync=("update",)</code>，fwd.la=1, update.la=0 —— fwd 用本次 progress update 后的 weight。<code>tests/commons/test_engine_same_progress_sync_correctness.py</code> 在 GPU 上验证了与手动 la=1 流水线 SGD baseline 完全等价。</span></td>
+</tr>
+<tr>
+  <td>(c)</td>
+  <td><span class="en"><strong>Same-progress logging / metric aggregation.</strong> A consumer (e.g. metric writer) wants the producer's current-progress event for coherent measurement, even if the two don't share any slot or out-of-slot state. Less common; aux statistics tasks typically.</span><span class="zh"><strong>同 progress 内的 logging / 指标汇总。</strong>consumer（如 metric writer）想拿到 producer 本次 progress 的 event 做一致性测量，即使两者没共享 slot 或其它状态。比较少见；多见于辅助统计任务。</span></td>
+  <td><span class="en">Hypothetical <code>metric_writer.same_progress_sync=("forward",)</code> for capturing forward stats per-progress.</span><span class="zh">假想 <code>metric_writer.same_progress_sync=("forward",)</code> 用于按 progress 抓取 forward 的统计量。</span></td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<span class="en"><strong>Direction convention.</strong> The field lives on the <em>consumer</em> side; <code>X.same_progress_sync=()</code> always lists <em>producers</em> the consumer is waiting on. <code>producer.la</code> and <code>consumer.la</code> may differ — the field is la-agnostic (in contrast to <code>depends_on</code> which requires <code>producer.la ≥ consumer.la</code> to avoid future-read).</span>
+<span class="zh"><strong>方向约定。</strong>字段写在 <em>consumer</em> 一侧；<code>X.same_progress_sync=()</code> 列的都是 X 等待的 <em>producer</em>。<code>producer.la</code> 与 <code>consumer.la</code> 可以不相等——这个字段对 lookahead 不敏感（区别于 <code>depends_on</code> 必须 <code>producer.la ≥ consumer.la</code> 以避免 future-read）。</span>
+</p>
+
+<p>
+<span class="en"><strong>Distinguishing from <code>depends_on</code> and <code>cross_iter_depends_on</code>:</strong></span>
+<span class="zh"><strong>与 <code>depends_on</code> 和 <code>cross_iter_depends_on</code> 的区别：</strong></span>
+</p>
+<ul>
+  <li><span class="en"><code>depends_on=("X",)</code> — same-batch logical wait. Both must process the same batch K. Constrained by <code>producer.la ≥ consumer.la</code>.</span><span class="zh"><code>depends_on=("X",)</code> —— 同 batch 逻辑等待。两者必须处理同一个 batch K。约束 <code>producer.la ≥ consumer.la</code>。</span></li>
+  <li><span class="en"><code>cross_iter_depends_on=((X, -N),)</code> — different-batch wait. "Consumer on batch K waits for X on batch K−N." Strictly cross-progress (Δ ≥ 1; Δ=0 rejected, use <code>same_progress_sync</code> instead).</span><span class="zh"><code>cross_iter_depends_on=((X, -N),)</code> —— 跨 batch 等待。"consumer 在 batch K 时等 X 在 batch K−N 的工作"。严格跨 progress（Δ ≥ 1；Δ=0 被拒，改用 <code>same_progress_sync</code>）。</span></li>
+  <li><span class="en"><code>same_progress_sync=("X",)</code> — same-progress wait, batch-agnostic. The two ARE allowed to process different batches; what matters is X completes its current-progress GPU work before consumer reads.</span><span class="zh"><code>same_progress_sync=("X",)</code> —— 同 progress 等待，不关心 batch。两者<em>允许</em>处理不同 batch；重点是 X 在本次 progress 的 GPU 工作完成后 consumer 才读。</span></li>
+</ul>
+</section>
 </section>
 
 <!-- =========================================================== -->

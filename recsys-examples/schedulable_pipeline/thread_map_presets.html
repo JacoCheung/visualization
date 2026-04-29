@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>HSTU Thread-Map Presets — Stream / Thread / Lookahead 布局</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a1a; --border: #cccccc;
+    --row-default:   #e8f0fe; --row-memcpy:    #e6f4ea;
+    --row-datadist:  #fce7e7; --row-prefetch:  #f3e7ff;
+
+    --thread-io:        #2e7d32;
+    --thread-compute:   #1565c0;
+    --thread-prefetch:  #6a1b9a;
+    --thread-data_dist: #c62828;
+    --thread-default:   #1565c0;
+    --thread-memcpy:    #2e7d32;
+    --thread-percell:   #444;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
+  .legend { font-size: 12px; color: #555; margin: 8px 0 24px; padding: 10px 14px; background: #f0f0f0; border-radius: 6px; line-height: 1.6; }
+  .legend code { background: #fff; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); }
+  h2 { font-size: 17px; margin: 28px 0 4px; padding: 6px 10px; background: #f5f5f5; border-left: 4px solid #555; }
+  .preset-meta { font-size: 12px; color: #777; margin-bottom: 8px; }
+  svg { display: block; margin: 8px 0 16px; }
+  .stream-label { font: bold 12px ui-monospace, monospace; fill: #333; }
+  .thread-label { font: 11px ui-monospace, monospace; fill: #fff; font-weight: 600; }
+  .task-label { font: 11px ui-monospace, monospace; fill: #1a1a1a; }
+  .la-label { font: bold 11px ui-monospace, monospace; fill: #b71c1c; }
+  .row-bg-default   { fill: var(--row-default); }
+  .row-bg-memcpy    { fill: var(--row-memcpy); }
+  .row-bg-datadist  { fill: var(--row-datadist); }
+  .row-bg-prefetch  { fill: var(--row-prefetch); }
+  .task-box { fill: #fff; stroke: #555; stroke-width: 1; }
+  .thread-pill { rx: 9px; ry: 9px; }
+</style>
+</head>
+<body>
+
+<h1>HSTU Thread-Map Presets — Stream / Thread / Lookahead 对照</h1>
+<p class="sub">14 个 HSTU task 在 6 个 thread_map preset 下的线程归属。stream 和 lookahead 是固定的，<strong>只有 thread 在变</strong>。Y 轴按 stream 分行；每个 task 框上方的小药丸是该 task 在当前 preset 下被分配的线程；右上角红字是 <code>@lookahead</code>。</p>
+
+<div class="legend">
+  <strong>Stream 颜色</strong>
+  <span style="background: var(--row-default); padding: 2px 8px; border-radius: 3px;">default</span>
+  <span style="background: var(--row-memcpy); padding: 2px 8px; border-radius: 3px;">memcpy</span>
+  <span style="background: var(--row-datadist); padding: 2px 8px; border-radius: 3px;">data_dist</span>
+  <span style="background: var(--row-prefetch); padding: 2px 8px; border-radius: 3px;">prefetch</span>
+  &nbsp;|&nbsp;
+  <strong>线程颜色</strong>
+  <span style="background: var(--thread-io); color: #fff; padding: 2px 8px; border-radius: 9px;">io</span>
+  <span style="background: var(--thread-compute); color: #fff; padding: 2px 8px; border-radius: 9px;">compute</span>
+  <span style="background: var(--thread-data_dist); color: #fff; padding: 2px 8px; border-radius: 9px;">data_dist</span>
+  <span style="background: var(--thread-prefetch); color: #fff; padding: 2px 8px; border-radius: 9px;">prefetch</span>
+  <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 9px;">tNN（per-task）</span>
+  <br>
+  <strong>lookahead</strong>: la=2 → 比 forward 早 2 个 progress；la=0 → 同 progress；越大越提前。
+</div>
+
+<!-- ========================================================== -->
+<script>
+// 14 tasks (HSTU prefetch variant, depth=1) — stream + lookahead are fixed.
+const TASKS = [
+  { name: "h2d",                        stream: "memcpy",    la: 2 },
+  { name: "start_shuffle",              stream: "memcpy",    la: 2 },
+  { name: "finish_shuffle",             stream: "memcpy",    la: 2 },
+  { name: "start_input_dist",           stream: "data_dist", la: 1 },
+  { name: "wait_input_dist",            stream: "data_dist", la: 1 },
+  { name: "zero_grad",                  stream: "default",   la: 0 },
+  { name: "global_tokens_allreduce",    stream: "default",   la: 0 },
+  { name: "nccl_safety_barrier",        stream: "default",   la: 0 },
+  { name: "forward",                    stream: "default",   la: 0 },
+  { name: "prefetch_embeddings",        stream: "prefetch",  la: 1 },
+  { name: "backward",                   stream: "default",   la: 0 },
+  { name: "finalize_model_grads",       stream: "default",   la: 0 },
+  { name: "optimizer_step",             stream: "default",   la: 0 },
+  { name: "watchdog_step",              stream: "default",   la: 0 },
+];
+
+const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
+
+// 6 thread maps
+const PRESETS = {
+  "default": {
+    desc: "HSTU_DEFAULT_THREAD_MAP — 2 threads (io / compute)",
+    map: {
+      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+      start_input_dist: "compute", wait_input_dist: "compute",
+      prefetch_embeddings: "compute",
+      zero_grad: "compute", global_tokens_allreduce: "compute",
+      nccl_safety_barrier: "compute", forward: "compute",
+      backward: "compute", finalize_model_grads: "compute",
+      optimizer_step: "compute", watchdog_step: "compute",
+    },
+  },
+  "by_stream": {
+    desc: "sentinel — each task → thread = its stream name (4 threads)",
+    map: {
+      h2d: "memcpy", start_shuffle: "memcpy", finish_shuffle: "memcpy",
+      start_input_dist: "data_dist", wait_input_dist: "data_dist",
+      prefetch_embeddings: "prefetch",
+      zero_grad: "default", global_tokens_allreduce: "default",
+      nccl_safety_barrier: "default", forward: "default",
+      backward: "default", finalize_model_grads: "default",
+      optimizer_step: "default", watchdog_step: "default",
+    },
+  },
+  "per_task": {
+    desc: "sentinel — each task on its own thread (14 threads — exceeds max_threads≤4 in v2 SPEC; round1/round2 sweep 仍跑)",
+    map: Object.fromEntries(TASKS.map((t, i) => [t.name, "t" + String(i + 1).padStart(2, "0")])),
+  },
+  "io_prefetch_compute": {
+    desc: "3 threads (io / prefetch / compute)",
+    map: {
+      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+      prefetch_embeddings: "prefetch",
+      start_input_dist: "compute", wait_input_dist: "compute",
+      zero_grad: "compute", global_tokens_allreduce: "compute",
+      nccl_safety_barrier: "compute", forward: "compute",
+      backward: "compute", finalize_model_grads: "compute",
+      optimizer_step: "compute", watchdog_step: "compute",
+    },
+  },
+  "io_data_dist_compute": {
+    desc: "3 threads (io / data_dist / compute) —— prefetch 折进 compute",
+    map: {
+      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+      start_input_dist: "data_dist", wait_input_dist: "data_dist",
+      prefetch_embeddings: "compute",
+      zero_grad: "compute", global_tokens_allreduce: "compute",
+      nccl_safety_barrier: "compute", forward: "compute",
+      backward: "compute", finalize_model_grads: "compute",
+      optimizer_step: "compute", watchdog_step: "compute",
+    },
+  },
+  "io_data_dist_prefetch_compute": {
+    desc: "= full_split — 4 threads (io / data_dist / prefetch / compute)",
+    map: {
+      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+      start_input_dist: "data_dist", wait_input_dist: "data_dist",
+      prefetch_embeddings: "prefetch",
+      zero_grad: "compute", global_tokens_allreduce: "compute",
+      nccl_safety_barrier: "compute", forward: "compute",
+      backward: "compute", finalize_model_grads: "compute",
+      optimizer_step: "compute", watchdog_step: "compute",
+    },
+  },
+};
+
+const THREAD_COLOR = {
+  "io":        "#2e7d32",
+  "compute":   "#1565c0",
+  "prefetch":  "#6a1b9a",
+  "data_dist": "#c62828",
+  "default":   "#1565c0",
+  "memcpy":    "#2e7d32",
+};
+function threadColor(t) {
+  if (THREAD_COLOR[t]) return THREAD_COLOR[t];
+  return "#444";  // per-task tNN
+}
+
+function renderPreset(presetName, preset) {
+  const W = 1080, ROW_H = 70, HEADER_H = 24, COL_W = 78;
+  const tasksByStream = {};
+  for (const s of STREAM_ORDER) tasksByStream[s] = [];
+  for (const t of TASKS) tasksByStream[t.stream].push(t);
+  const NROWS = STREAM_ORDER.length;
+  const H = HEADER_H + NROWS * ROW_H + 8;
+
+  let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // header strip
+  svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#333"/>`;
+  svg += `<text x="12" y="16" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName}</text>`;
+  svg += `<text x="${W - 8}" y="16" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">14 task × ${preset.desc.split("—")[0].trim()}</text>`;
+
+  // stream rows
+  for (let r = 0; r < NROWS; r++) {
+    const stream = STREAM_ORDER[r];
+    const yTop = HEADER_H + r * ROW_H;
+    const bgClass = stream === "default" ? "row-bg-default"
+                   : stream === "memcpy" ? "row-bg-memcpy"
+                   : stream === "data_dist" ? "row-bg-datadist"
+                   : "row-bg-prefetch";
+    svg += `<rect x="0" y="${yTop}" width="${W}" height="${ROW_H}" class="${bgClass}"/>`;
+    // stream name
+    svg += `<text x="8" y="${yTop + 18}" class="stream-label">${stream}</text>`;
+    svg += `<text x="8" y="${yTop + 32}" class="stream-label" style="font-size: 10px; fill: #777;">stream</text>`;
+    // task boxes
+    let xCursor = 130;
+    const tasks = tasksByStream[stream];
+    for (const t of tasks) {
+      const thread = preset.map[t.name];
+      const color = threadColor(thread);
+      const boxX = xCursor, boxY = yTop + 8, boxW = COL_W, boxH = 40;
+      // thread pill (above box)
+      const pillW = Math.max(28, thread.length * 6.4 + 12);
+      svg += `<rect class="thread-pill" x="${boxX + (boxW - pillW) / 2}" y="${boxY - 14}" width="${pillW}" height="14" fill="${color}"/>`;
+      svg += `<text x="${boxX + boxW / 2}" y="${boxY - 4}" text-anchor="middle" class="thread-label">${thread}</text>`;
+      // task box
+      svg += `<rect class="task-box" x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="3"/>`;
+      const nm = t.name.length <= 11 ? t.name : t.name.slice(0, 10) + "…";
+      svg += `<text x="${boxX + boxW / 2}" y="${boxY + 18}" text-anchor="middle" class="task-label">${nm}</text>`;
+      svg += `<text x="${boxX + boxW - 4}" y="${boxY + boxH - 4}" text-anchor="end" class="la-label">@${t.la}</text>`;
+      xCursor += boxW + 6;
+    }
+  }
+  svg += "</svg>";
+  return svg;
+}
+
+function render() {
+  let html = "";
+  for (const [name, preset] of Object.entries(PRESETS)) {
+    html += `<h2>${name}</h2>`;
+    html += `<p class="preset-meta">${preset.desc}</p>`;
+    html += renderPreset(name, preset);
+  }
+  document.getElementById("panels").innerHTML = html;
+}
+window.addEventListener("DOMContentLoaded", render);
+</script>
+
+<div id="panels"></div>
+
+<p style="font-size: 12px; color: #777; margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--border);">
+源数据来自 <a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/hstu_pipeline/pipeline.py">examples/commons/pipeline/hstu_pipeline/pipeline.py</a>（HSTU_DEFAULT_THREAD_MAP / HSTU_THREAD_MAP_PRESETS / la 计算式）。
+</p>
+
+</body>
+</html>

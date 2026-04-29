@@ -187,13 +187,43 @@ function renderPreset(presetName, preset) {
   const NROWS = STREAM_ORDER.length;
   const H = HEADER_H + NROWS * ROW_H + 8;
 
+  // First pass: compute box geometry + thread fire order per task.
+  // TASKS is in declaration / topological order, so the per-thread fire
+  // order = TASKS' own iteration order filtered by thread.
+  const threadFireIndex = {};   // {taskName: index_within_its_thread (1-based)}
+  const threadCounters = {};
+  for (const t of TASKS) {
+    const th = preset.map[t.name];
+    threadCounters[th] = (threadCounters[th] || 0) + 1;
+    threadFireIndex[t.name] = threadCounters[th];
+  }
+
+  // Box geometry by task name (computed up-front so the chain pass can
+  // reuse it).
+  const geom = {};   // {taskName: {cx, cy, top, bottom, left, right}}
+
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // arrow marker definitions, one per thread color (we generate the
+  // unique color set on the fly from the preset's thread map values).
+  const usedThreads = new Set(Object.values(preset.map));
+  svg += `<defs>`;
+  for (const th of usedThreads) {
+    const c = threadColor(th);
+    const safeId = `arr_${presetName}_${th}`.replace(/[^a-zA-Z0-9_]/g, "_");
+    svg += `<marker id="${safeId}" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="${c}"/>
+            </marker>`;
+  }
+  svg += `</defs>`;
+
   // header strip
   svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#333"/>`;
   svg += `<text x="12" y="16" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName}</text>`;
   svg += `<text x="${W - 8}" y="16" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">14 task × ${preset.desc.split("—")[0].trim()}</text>`;
 
-  // stream rows
+  // stream rows + task boxes
   for (let r = 0; r < NROWS; r++) {
     const stream = STREAM_ORDER[r];
     const yTop = HEADER_H + r * ROW_H;
@@ -202,23 +232,22 @@ function renderPreset(presetName, preset) {
                    : stream === "data_dist" ? "row-bg-datadist"
                    : "row-bg-prefetch";
     svg += `<rect x="0" y="${yTop}" width="${W}" height="${ROW_H}" class="${bgClass}"/>`;
-    // stream name
     svg += `<text x="10" y="${yTop + 22}" class="stream-label">${stream}</text>`;
     svg += `<text x="10" y="${yTop + 38}" class="stream-label" style="font-size: 10px; fill: #777;">stream</text>`;
-    // task boxes
+
     let xCursor = 130;
     const tasks = tasksByStream[stream];
     for (const t of tasks) {
       const thread = preset.map[t.name];
       const color = threadColor(thread);
       const boxX = xCursor, boxY = yTop + 16, boxW = COL_W, boxH = 52;
-      // thread pill (above box)
+      // thread pill
       const pillW = Math.max(34, thread.length * 6.6 + 14);
       svg += `<rect class="thread-pill" x="${boxX + (boxW - pillW) / 2}" y="${boxY - 14}" width="${pillW}" height="14" fill="${color}"/>`;
       svg += `<text x="${boxX + boxW / 2}" y="${boxY - 4}" text-anchor="middle" class="thread-label">${thread}</text>`;
       // task box
       svg += `<rect class="task-box" x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="3"/>`;
-      // task name — split into up to 2 lines, no truncation.
+      // 2-line task name
       const lines = splitLabel(t.name);
       if (lines.length === 1) {
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + boxH / 2 + 4}" text-anchor="middle" class="task-label">${lines[0]}</text>`;
@@ -226,10 +255,62 @@ function renderPreset(presetName, preset) {
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + 18}" text-anchor="middle" class="task-label">${lines[0]}_</text>`;
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + 32}" text-anchor="middle" class="task-label">${lines[1]}</text>`;
       }
+      // lookahead (bottom-right)
       svg += `<text x="${boxX + boxW - 5}" y="${boxY + boxH - 4}" text-anchor="end" class="la-label">@${t.la}</text>`;
+      // fire-order badge (bottom-left circle, thread-coloured)
+      const idx = threadFireIndex[t.name];
+      svg += `<circle cx="${boxX + 11}" cy="${boxY + boxH - 11}" r="9" fill="${color}" stroke="#fff" stroke-width="1.2"/>`;
+      svg += `<text x="${boxX + 11}" y="${boxY + boxH - 7}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#fff">${idx}</text>`;
+
+      geom[t.name] = {
+        cx: boxX + boxW / 2,
+        cy: boxY + boxH / 2,
+        top: boxY,
+        bottom: boxY + boxH,
+        left: boxX,
+        right: boxX + boxW,
+      };
+
       xCursor += boxW + 8;
     }
   }
+
+  // Second pass: draw the per-thread fire chain. Group TASKS by
+  // thread (preserving TASKS' declaration order), connect successive
+  // tasks with a curved path of the thread's colour. Skip threads with
+  // a single task (no chain to draw).
+  const tasksByThread = {};
+  for (const t of TASKS) {
+    const th = preset.map[t.name];
+    (tasksByThread[th] = tasksByThread[th] || []).push(t);
+  }
+  for (const [th, taskList] of Object.entries(tasksByThread)) {
+    if (taskList.length < 2) continue;
+    const c = threadColor(th);
+    const safeId = `arr_${presetName}_${th}`.replace(/[^a-zA-Z0-9_]/g, "_");
+    for (let i = 1; i < taskList.length; i++) {
+      const a = geom[taskList[i - 1].name];
+      const b = geom[taskList[i].name];
+      // Anchor: from right edge of A to left edge of B if going right;
+      // otherwise from bottom of A to top of B (cross-row hop).
+      let x1, y1, x2, y2;
+      if (b.left >= a.right - 2) {
+        x1 = a.right; y1 = a.cy;
+        x2 = b.left;  y2 = b.cy;
+      } else {
+        x1 = a.cx; y1 = a.bottom;
+        x2 = b.cx; y2 = b.top;
+      }
+      const dx = x2 - x1, dy = y2 - y1;
+      // smooth cubic curve
+      const c1x = x1 + dx * 0.4, c1y = y1;
+      const c2x = x1 + dx * 0.6, c2y = y2;
+      svg += `<path d="M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}"
+                    fill="none" stroke="${c}" stroke-width="1.6" stroke-opacity="0.65"
+                    marker-end="url(#${safeId})"/>`;
+    }
+  }
+
   svg += "</svg>";
   return svg;
 }

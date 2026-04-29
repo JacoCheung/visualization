@@ -1322,6 +1322,203 @@ for round in search_rounds:
   <span class="en"><code>max_threads &le; 4</code>, <code>max_in_flight &le; 5</code>, bit-exact default-stream anchors at <code>la=0</code>, and same-communicator NCCL serialization from the existing overlap matrix.</span>
   <span class="zh"><code>max_threads &le; 4</code>、<code>max_in_flight &le; 5</code>、bit-exact 任务固定 default stream 且 <code>la=0</code>，并沿用现有 overlap matrix 中的同 communicator NCCL 串行规则。</span>
 </div>
+
+<h4><span class="en">Full pseudocode (6 procedures)</span><span class="zh">完整伪代码（6 个过程）</span></h4>
+<p>
+  <span class="en">Python-like, but not runnable. The pseudocode below mirrors <code>tasks/SPEC_autosched_joint_search.md</code>; use <code>&lt;details&gt;</code> to expand each procedure individually.</span>
+  <span class="zh">Python 风格但非可运行代码；与 <code>tasks/SPEC_autosched_joint_search.md</code> 一致。点击下方 <code>&lt;details&gt;</code> 展开每个过程。</span>
+</p>
+
+<details open>
+<summary><strong>1. <code>JOINT_HSTU_SEARCH</code></strong> — <span class="en">main beam loop</span><span class="zh">主 beam 循环</span></summary>
+<pre>procedure JOINT_HSTU_SEARCH(
+    base_schedule,
+    cost_model,
+    hstu_thread_presets,
+    beam_width,
+    max_threads = 4,
+    max_in_flight = 5,
+):
+    require max_threads &lt;= 4
+    require max_in_flight &lt;= 5
+
+    frozen = {
+        "forward",
+        "backward",
+        "finalize_model_grads",
+        "optimizer_step",
+    }
+
+    legal_thread_presets = []
+    for preset_name, preset in hstu_thread_presets:
+        if preset_name == "per_task":
+            continue                       # exceeds max_threads &lt;= 4
+        legal_thread_presets.append((preset_name, preset))
+
+    canonical = Candidate(
+        thread_map    = HSTU_DEFAULT_THREAD_MAP,
+        stream_map    = CURRENT_HSTU_STREAMS(base_schedule),
+        fire_ordering = DECLARATION_ORDER(base_schedule),
+        lookahead_map = CURRENT_LOOKAHEADS(base_schedule),
+    )
+
+    canonical = NORMALIZE_AND_SCORE(
+        canonical, base_schedule, cost_model,
+        frozen, max_threads, max_in_flight,
+    )
+
+    beam = TOP_BY_SCORE([canonical], beam_width)
+    best = canonical
+
+    for round in 1..SEARCH_ROUNDS:
+        expanded = []
+        for candidate in beam:
+            expanded += MUTATE_THREAD_MAP(candidate, legal_thread_presets)
+            expanded += MUTATE_STREAM_MAP(candidate)
+            expanded += MUTATE_FIRE_ORDERING(candidate)
+
+        scored = []
+        for candidate in UNIQUE(expanded):
+            normalized = NORMALIZE_AND_SCORE(
+                candidate, base_schedule, cost_model,
+                frozen, max_threads, max_in_flight,
+            )
+            if normalized is valid:
+                scored.append(normalized)
+
+        beam = TOP_BY_SCORE(DOMINANCE_PRUNE(scored), beam_width)
+
+        if beam is empty:                    break
+        if SCORE(beam[0]) &lt; SCORE(best):    best = beam[0]
+        if NO_SCORE_IMPROVEMENT_FOR_PATIENCE_ROUNDS():  break
+
+    return best
+</pre>
+</details>
+
+<details>
+<summary><strong>2. <code>NORMALIZE_AND_SCORE</code></strong> — <span class="en">composes with <code>auto_assign_lookaheads</code></span><span class="zh">复用现有 <code>auto_assign_lookaheads</code> 作为 lookahead oracle</span></summary>
+<pre>procedure NORMALIZE_AND_SCORE(
+    candidate, base_schedule, cost_model,
+    frozen, max_threads, max_in_flight,
+):
+    if VIOLATES_FROZEN_STREAM_OR_LOOKAHEAD(candidate, frozen):
+        return invalid
+
+    resolved_thread_map = RESOLVE_THREAD_MAP(candidate.thread_map,
+                                            candidate.stream_map)
+    if COUNT_THREADS(resolved_thread_map) &gt; max_threads:
+        return invalid
+
+    provisional_schedule = REBUILD_SCHEDULE(
+        base_schedule,
+        stream_map    = candidate.stream_map,
+        fire_ordering = candidate.fire_ordering,
+        lookahead_map = CURRENT_LOOKAHEADS(base_schedule),
+    )
+
+    try:
+        derived_lookahead = auto_assign_lookaheads(
+            provisional_schedule, cost_model,
+            max_in_flight = max_in_flight,
+        )
+    except SchedulerRejectsCandidate:
+        return invalid
+
+    if ANY(derived_lookahead[t] != 0 for t in frozen):
+        return invalid
+
+    scored_schedule = REBUILD_SCHEDULE(
+        base_schedule,
+        stream_map    = candidate.stream_map,
+        fire_ordering = candidate.fire_ordering,
+        lookahead_map = derived_lookahead,
+    )
+
+    overlap_matrix = compute_overlap_matrix(scored_schedule.tasks)
+    latency = RESOURCE_LIST_SCHEDULE_LATENCY(
+        scored_schedule, cost_model,
+        resolved_thread_map, overlap_matrix, max_in_flight,
+    )
+
+    candidate.lookahead_map = derived_lookahead
+    candidate.score         = latency
+    return candidate
+</pre>
+</details>
+
+<details>
+<summary><strong>3. <code>MUTATE_THREAD_MAP</code></strong> — <span class="en">enumerate the 5 surviving presets</span><span class="zh">枚举 5 个合法 preset</span></summary>
+<pre>procedure MUTATE_THREAD_MAP(candidate, legal_thread_presets):
+    for preset_name, preset in legal_thread_presets:
+        yield candidate with thread_map = preset
+</pre>
+</details>
+
+<details>
+<summary><strong>4. <code>MUTATE_STREAM_MAP</code></strong> — <span class="en">group-level moves, not full Cartesian</span><span class="zh">按 prep group 整体迁移，避免笛卡尔爆炸</span></summary>
+<pre>procedure MUTATE_STREAM_MAP(candidate):
+    movable_groups = [
+        {"h2d", "start_shuffle", "finish_shuffle"},
+        {"start_input_dist", "wait_input_dist"},
+        {"prefetch_embeddings"},
+    ]
+
+    for group in movable_groups:
+        if group is absent from schedule:
+            continue
+
+        for stream_choice in LEGAL_STREAM_CHOICES(group):
+            next_map = COPY(candidate.stream_map)
+            for task in group:
+                if task in BIT_EXACT_FROZEN_TASKS:
+                    continue                  # never move forward/bwd/opt/finalize
+                next_map[task] = stream_choice
+
+            yield candidate with stream_map = next_map
+</pre>
+</details>
+
+<details>
+<summary><strong>5. <code>MUTATE_FIRE_ORDERING</code></strong> — <span class="en">topological tie-break policies + adjacent-pair swaps</span><span class="zh">5 种拓扑 tie-break 策略 + 相邻可换对的交换</span></summary>
+<pre>procedure MUTATE_FIRE_ORDERING(candidate):
+    policies = [
+        CRITICAL_DEFAULT_CHAIN_FIRST,
+        LONGEST_OFF_DEFAULT_FIRST,
+        NCCL_QUEUE_EARLY_WITH_TICKET_ORDER,
+        PCIE_PREP_EARLY,
+        MIN_SLACK_FIRST,
+    ]
+
+    for policy in policies:
+        priority = BUILD_PRIORITY_VECTOR(candidate, policy)
+        yield candidate with fire_ordering = priority
+
+    # local search refinement: any topo-incomparable adjacent pair
+    # in the current order is allowed to swap
+    for adjacent_pair in INCOMPARABLE_ADJACENT_PAIRS(candidate.fire_ordering):
+        yield candidate with that pair swapped
+</pre>
+</details>
+
+<details>
+<summary><strong>6. <code>DOMINANCE_PRUNE</code></strong> — <span class="en">conservative dedup before scoring</span><span class="zh">打分前的保守去重</span></summary>
+<pre>procedure DOMINANCE_PRUNE(candidates):
+    grouped = GROUP_BY(
+        candidates,
+        keys = (thread_map, stream_map, lookahead_map),
+    )
+    for group in grouped:
+        keep the lowest-score fire_ordering
+        discard candidates with same or worse score and no lower thread count
+</pre>
+</details>
+
+<p style="margin-top: 12px;">
+  <span class="en">Full SPEC (objective definition, constraint encoding, complexity bound, worked example): <a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/tasks/SPEC_autosched_joint_search.md">tasks/SPEC_autosched_joint_search.md</a> (685 lines).</span>
+  <span class="zh">完整 SPEC（目标函数、约束编码、复杂度边界、worked example）：<a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/tasks/SPEC_autosched_joint_search.md">tasks/SPEC_autosched_joint_search.md</a>（685 行）。</span>
+</p>
+
 <p>
   <span class="en">→ <a href="pipeline_visualization.html">Interactive visualization</a> (Diagram 5: search-space landscape).</span>
   <span class="zh">→ <a href="pipeline_visualization.html">交互式可视化</a>（图 5：搜索空间）。</span>

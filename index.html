@@ -55,6 +55,11 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
     <h2>Schedulable Pipeline Engine</h2>
     <p>recsys-examples 三层重写设计文档（中英双语切换）：HugeCTR 风格的 Task/Schedule 引擎、多线程执行器（NCCL ordered lock）、HSTU 适配层。含 UML 时序图、类图、首次 progress() 引导流程、稳态迭代、票据锁状态机与 API 示例。</p>
   </a>
+  <a class="card" href="recsys-examples/schedulable_pipeline/thread_map_presets.html">
+    <span class="tag tag-doc">Visualization</span>
+    <h2>HSTU Thread-Map Presets</h2>
+    <p>6 个 thread_map preset（default / by_stream / per_task / io_prefetch_compute / io_data_dist_compute / io_data_dist_prefetch_compute）的 stream × thread × lookahead 对照图。stream 和 la 固定，只有 thread 在变；一眼看出谁压在 compute 单线程、谁均衡分布。</p>
+  </a>
   <a class="card" href="torchrec-internals/sharded_ec_internals.html">
     <span class="tag tag-doc">Documentation</span>
     <h2>ShardedEmbeddingCollection 内部机制</h2>

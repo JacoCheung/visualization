@@ -162,8 +162,25 @@ function threadColor(t) {
   return "#444";  // per-task tNN
 }
 
+function splitLabel(name) {
+  // Single line if short enough.
+  if (name.length <= 12) return [name];
+  // Otherwise pick the underscore split that produces the two most
+  // balanced halves (minimizes |len(a) - len(b)|).
+  const parts = name.split("_");
+  if (parts.length < 2) return [name];
+  let best = null, bestDiff = null;
+  for (let i = 1; i < parts.length; i++) {
+    const a = parts.slice(0, i).join("_");
+    const b = parts.slice(i).join("_");
+    const d = Math.abs(a.length - b.length);
+    if (best === null || d < bestDiff) { bestDiff = d; best = [a, b]; }
+  }
+  return best;
+}
+
 function renderPreset(presetName, preset) {
-  const W = 1080, ROW_H = 70, HEADER_H = 24, COL_W = 78;
+  const W = 1140, ROW_H = 84, HEADER_H = 24, COL_W = 110;
   const tasksByStream = {};
   for (const s of STREAM_ORDER) tasksByStream[s] = [];
   for (const t of TASKS) tasksByStream[t.stream].push(t);
@@ -186,25 +203,31 @@ function renderPreset(presetName, preset) {
                    : "row-bg-prefetch";
     svg += `<rect x="0" y="${yTop}" width="${W}" height="${ROW_H}" class="${bgClass}"/>`;
     // stream name
-    svg += `<text x="8" y="${yTop + 18}" class="stream-label">${stream}</text>`;
-    svg += `<text x="8" y="${yTop + 32}" class="stream-label" style="font-size: 10px; fill: #777;">stream</text>`;
+    svg += `<text x="10" y="${yTop + 22}" class="stream-label">${stream}</text>`;
+    svg += `<text x="10" y="${yTop + 38}" class="stream-label" style="font-size: 10px; fill: #777;">stream</text>`;
     // task boxes
     let xCursor = 130;
     const tasks = tasksByStream[stream];
     for (const t of tasks) {
       const thread = preset.map[t.name];
       const color = threadColor(thread);
-      const boxX = xCursor, boxY = yTop + 8, boxW = COL_W, boxH = 40;
+      const boxX = xCursor, boxY = yTop + 16, boxW = COL_W, boxH = 52;
       // thread pill (above box)
-      const pillW = Math.max(28, thread.length * 6.4 + 12);
+      const pillW = Math.max(34, thread.length * 6.6 + 14);
       svg += `<rect class="thread-pill" x="${boxX + (boxW - pillW) / 2}" y="${boxY - 14}" width="${pillW}" height="14" fill="${color}"/>`;
       svg += `<text x="${boxX + boxW / 2}" y="${boxY - 4}" text-anchor="middle" class="thread-label">${thread}</text>`;
       // task box
       svg += `<rect class="task-box" x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="3"/>`;
-      const nm = t.name.length <= 11 ? t.name : t.name.slice(0, 10) + "…";
-      svg += `<text x="${boxX + boxW / 2}" y="${boxY + 18}" text-anchor="middle" class="task-label">${nm}</text>`;
-      svg += `<text x="${boxX + boxW - 4}" y="${boxY + boxH - 4}" text-anchor="end" class="la-label">@${t.la}</text>`;
-      xCursor += boxW + 6;
+      // task name — split into up to 2 lines, no truncation.
+      const lines = splitLabel(t.name);
+      if (lines.length === 1) {
+        svg += `<text x="${boxX + boxW / 2}" y="${boxY + boxH / 2 + 4}" text-anchor="middle" class="task-label">${lines[0]}</text>`;
+      } else {
+        svg += `<text x="${boxX + boxW / 2}" y="${boxY + 18}" text-anchor="middle" class="task-label">${lines[0]}_</text>`;
+        svg += `<text x="${boxX + boxW / 2}" y="${boxY + 32}" text-anchor="middle" class="task-label">${lines[1]}</text>`;
+      }
+      svg += `<text x="${boxX + boxW - 5}" y="${boxY + boxH - 4}" text-anchor="end" class="la-label">@${t.la}</text>`;
+      xCursor += boxW + 8;
     }
   }
   svg += "</svg>";

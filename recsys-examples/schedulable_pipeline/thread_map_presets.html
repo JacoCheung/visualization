@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>HSTU Thread-Map Presets — Stream / Thread / Lookahead 布局</title>
+<title>HSTU Thread-Map Presets — Gantt + Stream/Thread/Lookahead 布局</title>
 <style>
   :root {
     --bg: #fafafa; --fg: #1a1a1a; --border: #cccccc;
@@ -17,14 +17,15 @@
     --thread-memcpy:    #2e7d32;
     --thread-percell:   #444;
   }
-  body { background: var(--bg); color: var(--fg); font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  body { background: var(--bg); color: var(--fg); font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
   h1 { font-size: 22px; margin-bottom: 4px; }
   .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
   .legend { font-size: 12px; color: #555; margin: 8px 0 24px; padding: 10px 14px; background: #f0f0f0; border-radius: 6px; line-height: 1.6; }
   .legend code { background: #fff; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); }
   h2 { font-size: 17px; margin: 28px 0 4px; padding: 6px 10px; background: #f5f5f5; border-left: 4px solid #555; }
+  h3 { font-size: 13px; margin: 12px 0 4px; color: #555; font-weight: 600; }
   .preset-meta { font-size: 12px; color: #777; margin-bottom: 8px; }
-  svg { display: block; margin: 8px 0 16px; }
+  svg { display: block; margin: 4px 0 12px; }
   .stream-label { font: bold 12px ui-monospace, monospace; fill: #333; }
   .thread-label { font: 11px ui-monospace, monospace; fill: #fff; font-weight: 600; }
   .task-label { font: 11px ui-monospace, monospace; fill: #1a1a1a; }
@@ -39,8 +40,9 @@
 </head>
 <body>
 
-<h1>HSTU Thread-Map Presets — Stream / Thread / Lookahead 对照</h1>
-<p class="sub">14 个 HSTU task 在 6 个 thread_map preset 下的线程归属。stream 和 lookahead 是固定的，<strong>只有 thread 在变</strong>。Y 轴按 stream 分行；每个 task 框上方的小药丸是该 task 在当前 preset 下被分配的线程；右上角红字是 <code>@lookahead</code>。</p>
+<h1>HSTU Thread-Map Presets — Gantt 时间轴 + Stream / Thread / Lookahead 拓扑</h1>
+<p class="sub">每个 preset 两张图：上图 <strong>Gantt</strong>（一次 <code>progress()</code> 在各线程上的时间分布，大致 CPU 时间 + 跨线程同 la 等待）；下图 <strong>拓扑</strong>（task → stream / thread / lookahead 静态分配）。<br>
+6-la cascade（pipeline.py:386-391）：<code>h2d@5 → start_shuffle@4 → finish_shuffle@3</code> | <code>start_input_dist@3 → wait_input_dist@2</code> | <code>prefetch@1</code> | <code>fwd/bwd/opt@0</code>。</p>
 
 <div class="legend">
   <strong>Stream 颜色</strong>
@@ -56,18 +58,21 @@
   <span style="background: var(--thread-prefetch); color: #fff; padding: 2px 8px; border-radius: 9px;">prefetch</span>
   <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 9px;">tNN（per-task）</span>
   <br>
-  <strong>lookahead</strong>: la=2 → 比 forward 早 2 个 progress；la=0 → 同 progress；越大越提前。
+  <strong>lookahead</strong>: <code>la=k</code> 表示该 task 比同 progress 的 <code>la=0</code> task 提前处理 batch index +k；<code>la=0</code> = 处理本步 batch。<br>
+  <strong>Gantt 中的红色虚线</strong>：跨线程 <strong>同 la</strong> 数据依赖（生产者完成前消费者 CPU 空转）；目前 <code>finish_shuffle@3 → start_input_dist@3</code> 是唯一一对，是 <code>default</code> map 下 compute 线程被 io 线程拖慢 4ms 的根因。<br>
+  <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
 <!-- ========================================================== -->
 <script>
-// 14 tasks (HSTU prefetch variant, depth=1) — stream + lookahead are fixed.
+// 14 tasks (HSTU prefetch variant, depth=1, 6-la cascade).
+// la 来自 pipeline.py:386-391; stream 来自 hstu_pipeline/tasks.py 的 make_*_task。
 const TASKS = [
-  { name: "h2d",                        stream: "memcpy",    la: 2 },
-  { name: "start_shuffle",              stream: "memcpy",    la: 2 },
-  { name: "finish_shuffle",             stream: "memcpy",    la: 2 },
-  { name: "start_input_dist",           stream: "data_dist", la: 1 },
-  { name: "wait_input_dist",            stream: "data_dist", la: 1 },
+  { name: "h2d",                        stream: "memcpy",    la: 5 },
+  { name: "start_shuffle",              stream: "memcpy",    la: 4 },
+  { name: "finish_shuffle",             stream: "memcpy",    la: 3 },
+  { name: "start_input_dist",           stream: "data_dist", la: 3 },
+  { name: "wait_input_dist",            stream: "data_dist", la: 2 },
   { name: "zero_grad",                  stream: "default",   la: 0 },
   { name: "global_tokens_allreduce",    stream: "default",   la: 0 },
   { name: "nccl_safety_barrier",        stream: "default",   la: 0 },
@@ -79,12 +84,38 @@ const TASKS = [
   { name: "watchdog_step",              stream: "default",   la: 0 },
 ];
 
+// 粗略 CPU host-thread 时间（ms），仅做相对比较。HSTU H100 1-node prefetch=True
+// 大致量级：fwd/bwd 主要 CPU 开销是 kernel queueing；GPU 真实执行时间另算。
+const TASK_COST_MS = {
+  h2d:                       0.5,
+  start_shuffle:             1.0,
+  finish_shuffle:            1.5,
+  start_input_dist:          0.5,
+  wait_input_dist:           0.5,
+  zero_grad:                 0.2,
+  global_tokens_allreduce:   0.4,
+  nccl_safety_barrier:       0.1,
+  forward:                   5.0,
+  prefetch_embeddings:       1.0,
+  backward:                  5.0,
+  finalize_model_grads:      2.0,
+  optimizer_step:            1.0,
+  watchdog_step:             0.1,
+};
+
+// 跨线程 SAME-la 数据依赖（同一个 progress 内，生产者→消费者 同 la）。
+// +1 la cascade 已经把 same-thread 的链拆开（生产者总在前一 progress 完成），
+// 所以 in-progress wait 只剩 cross-thread same-la。
+const SAME_LA_CROSS_PAIRS = [
+  ["finish_shuffle", "start_input_dist"],
+];
+
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
 
 // 6 thread maps
 const PRESETS = {
   "default": {
-    desc: "HSTU_DEFAULT_THREAD_MAP — 2 threads (io / compute)",
+    desc: "HSTU_DEFAULT_THREAD_MAP — 2 threads (io / compute) — compute 线程同 la 等 io，~3ms CPU 空转",
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       start_input_dist: "compute", wait_input_dist: "compute",
@@ -112,7 +143,7 @@ const PRESETS = {
     map: Object.fromEntries(TASKS.map((t, i) => [t.name, "t" + String(i + 1).padStart(2, "0")])),
   },
   "io_prefetch_compute": {
-    desc: "3 threads (io / prefetch / compute)",
+    desc: "3 threads (io / prefetch / compute) — prefetch 拆出去和 backward 重叠",
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       prefetch_embeddings: "prefetch",
@@ -124,7 +155,7 @@ const PRESETS = {
     },
   },
   "io_data_dist_compute": {
-    desc: "3 threads (io / data_dist / compute) —— prefetch 折进 compute",
+    desc: "3 threads (io / data_dist / compute) — data_dist 拆出去，compute 不再被 io 阻塞",
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       start_input_dist: "data_dist", wait_input_dist: "data_dist",
@@ -161,12 +192,171 @@ function threadColor(t) {
   if (THREAD_COLOR[t]) return THREAD_COLOR[t];
   return "#444";  // per-task tNN
 }
+function streamFill(s) {
+  return s === "default"   ? "#dde7fb"
+       : s === "memcpy"    ? "#d4ecdb"
+       : s === "data_dist" ? "#f6d4d4"
+       : s === "prefetch"  ? "#e7d4f4"
+       : "#eee";
+}
+
+// ============================================================
+//                    Gantt — 时间轴
+// ============================================================
+
+function placeTasks(preset) {
+  // Per-thread sequential (declaration order = fire order within thread);
+  // intra-progress same-la cross-thread waits push consumer's start.
+  const placement = {};                  // {taskName: {start, end, thread}}
+  const lastEndOnThread = {};            // {thread: last end ms}
+  for (const t of TASKS) {
+    const th = preset.map[t.name];
+    let start = lastEndOnThread[th] || 0;
+    for (const [prod, cons] of SAME_LA_CROSS_PAIRS) {
+      if (cons === t.name) {
+        const pp = placement[prod];
+        if (pp && pp.thread !== th) {
+          start = Math.max(start, pp.end);
+        }
+      }
+    }
+    const end = start + (TASK_COST_MS[t.name] ?? 0.3);
+    placement[t.name] = { start, end, thread: th };
+    lastEndOnThread[th] = end;
+  }
+  return placement;
+}
+
+function orderThreads(threadList) {
+  const rank = (t) => {
+    if (t === "io") return 0;
+    if (t === "memcpy") return 0;
+    if (t === "data_dist") return 1;
+    if (t === "prefetch") return 2;
+    if (t === "compute" || t === "default") return 3;
+    if (/^t\d+$/.test(t)) return 4 + parseInt(t.slice(1));
+    return 100;
+  };
+  return [...threadList].sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    return a.localeCompare(b);
+  });
+}
+
+function renderGantt(presetName, preset) {
+  const placement = placeTasks(preset);
+  const threadList = orderThreads([...new Set(Object.values(preset.map))]);
+  const totalEnd = Math.max(...Object.values(placement).map(p => p.end), 1);
+
+  const W = 1180, leftMargin = 130, rightMargin = 30;
+  const innerW = W - leftMargin - rightMargin;
+  const SCALE = innerW / totalEnd;
+  const ROW_H = 38;
+  const HEADER_H = 26;
+  const AXIS_H = 20;
+  const NROWS = threadList.length;
+  const H = HEADER_H + NROWS * ROW_H + AXIS_H + 6;
+
+  let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // header
+  svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#222"/>`;
+  svg += `<text x="12" y="17" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName} — Gantt（一次 progress，CPU 估时）</text>`;
+  svg += `<text x="${W - 8}" y="17" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">总 CPU ≈ ${totalEnd.toFixed(1)} ms（critical path = max thread）</text>`;
+
+  // thread rows
+  for (let i = 0; i < NROWS; i++) {
+    const th = threadList[i];
+    const yTop = HEADER_H + i * ROW_H;
+    const yMid = yTop + ROW_H / 2;
+    svg += `<rect x="0" y="${yTop}" width="${W}" height="${ROW_H}" fill="${i % 2 ? "#f5f5f5" : "#fff"}"/>`;
+    // thread pill on the left
+    const pillW = leftMargin - 18;
+    svg += `<rect class="thread-pill" x="6" y="${yTop + 7}" width="${pillW}" height="${ROW_H - 14}" fill="${threadColor(th)}"/>`;
+    svg += `<text x="${6 + pillW / 2}" y="${yMid + 4}" text-anchor="middle" class="thread-label">${th}</text>`;
+    // thread total
+    let threadEnd = 0;
+    for (const t of TASKS) {
+      if (placement[t.name].thread === th) threadEnd = Math.max(threadEnd, placement[t.name].end);
+    }
+    let threadStart = Infinity;
+    for (const t of TASKS) {
+      if (placement[t.name].thread === th) threadStart = Math.min(threadStart, placement[t.name].start);
+    }
+    const idle = threadStart;
+    if (idle > 0.01) {
+      // hatch idle prefix
+      const ix = leftMargin, iw = idle * SCALE;
+      svg += `<rect x="${ix}" y="${yTop + 8}" width="${iw}" height="${ROW_H - 16}" fill="url(#idle_hatch)" stroke="#b71c1c" stroke-width="0.6" stroke-dasharray="2 2"/>`;
+      if (iw > 30) {
+        svg += `<text x="${ix + iw / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#b71c1c" font-weight="700">空转 ${idle.toFixed(1)}ms</text>`;
+      }
+    }
+    // task boxes
+    for (const t of TASKS) {
+      const p = placement[t.name];
+      if (p.thread !== th) continue;
+      const x = leftMargin + p.start * SCALE;
+      const w = (p.end - p.start) * SCALE;
+      svg += `<rect x="${x}" y="${yTop + 8}" width="${Math.max(w, 1)}" height="${ROW_H - 16}" fill="${streamFill(t.stream)}" stroke="#444" stroke-width="0.7" rx="2"/>`;
+      const label = `${shortTask(t.name)}@${t.la}`;
+      if (w > 60) {
+        svg += `<text x="${x + w / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#1a1a1a">${label}</text>`;
+      } else if (w > 14) {
+        svg += `<text x="${x + w / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#1a1a1a">${shortTask(t.name)}</text>`;
+      }
+    }
+  }
+
+  // hatch pattern + axis defs
+  svg += `<defs>
+    <pattern id="idle_hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#fff8f8"/>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#f4b6b6" stroke-width="2"/>
+    </pattern>
+  </defs>`;
+
+  // cross-thread same-la wait arrows
+  for (const [prodName, consName] of SAME_LA_CROSS_PAIRS) {
+    const pp = placement[prodName], cp = placement[consName];
+    if (!pp || !cp || pp.thread === cp.thread) continue;
+    const yProd = HEADER_H + threadList.indexOf(pp.thread) * ROW_H + ROW_H / 2;
+    const yCons = HEADER_H + threadList.indexOf(cp.thread) * ROW_H + ROW_H / 2;
+    const xEdge = leftMargin + pp.end * SCALE;
+    svg += `<path d="M ${xEdge} ${yProd} L ${xEdge} ${yCons}" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="4 3" fill="none"/>`;
+    svg += `<circle cx="${xEdge}" cy="${yProd}" r="3" fill="#b71c1c"/>`;
+    svg += `<polygon points="${xEdge - 4},${yCons - 4} ${xEdge + 4},${yCons - 4} ${xEdge},${yCons + 1}" fill="#b71c1c"/>`;
+  }
+
+  // axis ticks
+  const yAxis = HEADER_H + NROWS * ROW_H + 4;
+  let tickStep = totalEnd > 30 ? 5 : totalEnd > 12 ? 2 : 1;
+  for (let t = 0; t <= totalEnd + 0.001; t += tickStep) {
+    const x = leftMargin + t * SCALE;
+    svg += `<line x1="${x}" y1="${HEADER_H}" x2="${x}" y2="${yAxis}" stroke="#ddd" stroke-width="0.5"/>`;
+    svg += `<text x="${x}" y="${yAxis + 12}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#888">${t}ms</text>`;
+  }
+
+  svg += "</svg>";
+  return svg;
+}
+
+function shortTask(name) {
+  return name
+    .replace("global_tokens_allreduce", "g_tok_AR")
+    .replace("nccl_safety_barrier", "nccl_bar")
+    .replace("finalize_model_grads", "finalize")
+    .replace("prefetch_embeddings", "prefetch")
+    .replace("optimizer_step", "opt")
+    .replace("watchdog_step", "watchdog");
+}
+
+// ============================================================
+//                  Topology — stream × thread × la
+// ============================================================
 
 function splitLabel(name) {
-  // Single line if short enough.
   if (name.length <= 12) return [name];
-  // Otherwise pick the underscore split that produces the two most
-  // balanced halves (minimizes |len(a) - len(b)|).
   const parts = name.split("_");
   if (parts.length < 2) return [name];
   let best = null, bestDiff = null;
@@ -179,18 +369,15 @@ function splitLabel(name) {
   return best;
 }
 
-function renderPreset(presetName, preset) {
-  const W = 1140, ROW_H = 84, HEADER_H = 24, COL_W = 110;
+function renderTopology(presetName, preset) {
+  const W = 1180, ROW_H = 84, HEADER_H = 24, COL_W = 110;
   const tasksByStream = {};
   for (const s of STREAM_ORDER) tasksByStream[s] = [];
   for (const t of TASKS) tasksByStream[t.stream].push(t);
   const NROWS = STREAM_ORDER.length;
   const H = HEADER_H + NROWS * ROW_H + 8;
 
-  // First pass: compute box geometry + thread fire order per task.
-  // TASKS is in declaration / topological order, so the per-thread fire
-  // order = TASKS' own iteration order filtered by thread.
-  const threadFireIndex = {};   // {taskName: index_within_its_thread (1-based)}
+  const threadFireIndex = {};
   const threadCounters = {};
   for (const t of TASKS) {
     const th = preset.map[t.name];
@@ -198,14 +385,9 @@ function renderPreset(presetName, preset) {
     threadFireIndex[t.name] = threadCounters[th];
   }
 
-  // Box geometry by task name (computed up-front so the chain pass can
-  // reuse it).
-  const geom = {};   // {taskName: {cx, cy, top, bottom, left, right}}
-
+  const geom = {};
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
 
-  // arrow marker definitions, one per thread color (we generate the
-  // unique color set on the fly from the preset's thread map values).
   const usedThreads = new Set(Object.values(preset.map));
   svg += `<defs>`;
   for (const th of usedThreads) {
@@ -218,12 +400,11 @@ function renderPreset(presetName, preset) {
   }
   svg += `</defs>`;
 
-  // header strip
+  // header
   svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#333"/>`;
-  svg += `<text x="12" y="16" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName}</text>`;
+  svg += `<text x="12" y="16" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName} — 拓扑（stream × thread × la）</text>`;
   svg += `<text x="${W - 8}" y="16" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">14 task × ${preset.desc.split("—")[0].trim()}</text>`;
 
-  // stream rows + task boxes
   for (let r = 0; r < NROWS; r++) {
     const stream = STREAM_ORDER[r];
     const yTop = HEADER_H + r * ROW_H;
@@ -241,13 +422,10 @@ function renderPreset(presetName, preset) {
       const thread = preset.map[t.name];
       const color = threadColor(thread);
       const boxX = xCursor, boxY = yTop + 16, boxW = COL_W, boxH = 52;
-      // thread pill
       const pillW = Math.max(34, thread.length * 6.6 + 14);
       svg += `<rect class="thread-pill" x="${boxX + (boxW - pillW) / 2}" y="${boxY - 14}" width="${pillW}" height="14" fill="${color}"/>`;
       svg += `<text x="${boxX + boxW / 2}" y="${boxY - 4}" text-anchor="middle" class="thread-label">${thread}</text>`;
-      // task box
       svg += `<rect class="task-box" x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="3"/>`;
-      // 2-line task name
       const lines = splitLabel(t.name);
       if (lines.length === 1) {
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + boxH / 2 + 4}" text-anchor="middle" class="task-label">${lines[0]}</text>`;
@@ -255,30 +433,21 @@ function renderPreset(presetName, preset) {
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + 18}" text-anchor="middle" class="task-label">${lines[0]}_</text>`;
         svg += `<text x="${boxX + boxW / 2}" y="${boxY + 32}" text-anchor="middle" class="task-label">${lines[1]}</text>`;
       }
-      // lookahead (bottom-right)
       svg += `<text x="${boxX + boxW - 5}" y="${boxY + boxH - 4}" text-anchor="end" class="la-label">@${t.la}</text>`;
-      // fire-order badge (bottom-left circle, thread-coloured)
       const idx = threadFireIndex[t.name];
       svg += `<circle cx="${boxX + 11}" cy="${boxY + boxH - 11}" r="9" fill="${color}" stroke="#fff" stroke-width="1.2"/>`;
       svg += `<text x="${boxX + 11}" y="${boxY + boxH - 7}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#fff">${idx}</text>`;
 
       geom[t.name] = {
-        cx: boxX + boxW / 2,
-        cy: boxY + boxH / 2,
-        top: boxY,
-        bottom: boxY + boxH,
-        left: boxX,
-        right: boxX + boxW,
+        cx: boxX + boxW / 2, cy: boxY + boxH / 2,
+        top: boxY, bottom: boxY + boxH,
+        left: boxX, right: boxX + boxW,
       };
-
       xCursor += boxW + 8;
     }
   }
 
-  // Second pass: draw the per-thread fire chain. Group TASKS by
-  // thread (preserving TASKS' declaration order), connect successive
-  // tasks with a curved path of the thread's colour. Skip threads with
-  // a single task (no chain to draw).
+  // per-thread fire chain arrows
   const tasksByThread = {};
   for (const t of TASKS) {
     const th = preset.map[t.name];
@@ -291,18 +460,10 @@ function renderPreset(presetName, preset) {
     for (let i = 1; i < taskList.length; i++) {
       const a = geom[taskList[i - 1].name];
       const b = geom[taskList[i].name];
-      // Anchor: from right edge of A to left edge of B if going right;
-      // otherwise from bottom of A to top of B (cross-row hop).
       let x1, y1, x2, y2;
-      if (b.left >= a.right - 2) {
-        x1 = a.right; y1 = a.cy;
-        x2 = b.left;  y2 = b.cy;
-      } else {
-        x1 = a.cx; y1 = a.bottom;
-        x2 = b.cx; y2 = b.top;
-      }
+      if (b.left >= a.right - 2) { x1 = a.right; y1 = a.cy; x2 = b.left; y2 = b.cy; }
+      else { x1 = a.cx; y1 = a.bottom; x2 = b.cx; y2 = b.top; }
       const dx = x2 - x1, dy = y2 - y1;
-      // smooth cubic curve
       const c1x = x1 + dx * 0.4, c1y = y1;
       const c2x = x1 + dx * 0.6, c2y = y2;
       svg += `<path d="M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}"
@@ -315,12 +476,19 @@ function renderPreset(presetName, preset) {
   return svg;
 }
 
+// ============================================================
+//                          render
+// ============================================================
+
 function render() {
   let html = "";
   for (const [name, preset] of Object.entries(PRESETS)) {
     html += `<h2>${name}</h2>`;
     html += `<p class="preset-meta">${preset.desc}</p>`;
-    html += renderPreset(name, preset);
+    html += `<h3>① Gantt — 一次 progress() 在各线程上的时间分布</h3>`;
+    html += renderGantt(name, preset);
+    html += `<h3>② 拓扑 — task ↔ stream / thread / lookahead</h3>`;
+    html += renderTopology(name, preset);
   }
   document.getElementById("panels").innerHTML = html;
 }
@@ -330,7 +498,11 @@ window.addEventListener("DOMContentLoaded", render);
 <div id="panels"></div>
 
 <p style="font-size: 12px; color: #777; margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--border);">
-源数据来自 <a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/hstu_pipeline/pipeline.py">examples/commons/pipeline/hstu_pipeline/pipeline.py</a>（HSTU_DEFAULT_THREAD_MAP / HSTU_THREAD_MAP_PRESETS / la 计算式）。
+源数据：
+<a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/hstu_pipeline/pipeline.py">pipeline.py</a>（HSTU_DEFAULT_THREAD_MAP / HSTU_THREAD_MAP_PRESETS / 6-la cascade lookaheads）
+·
+<a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/hstu_pipeline/tasks.py">tasks.py</a>（每个 task 的 stream + reads/writes）。
+Gantt 用的 task CPU 估时是粗略数（HSTU H100 单节点，prefetch=True），相对长度比绝对值更有意义；GPU 真实执行时间另算（fwd/bwd 在 default stream 上 ~25ms 各自占主导）。
 </p>
 
 </body>

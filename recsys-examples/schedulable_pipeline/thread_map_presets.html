@@ -59,7 +59,7 @@
   <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 9px;">tNN（per-task）</span>
   <br>
   <strong>lookahead</strong>: <code>la=k</code> 表示该 task 比同 progress 的 <code>la=0</code> task 提前处理 batch index +k；<code>la=0</code> = 处理本步 batch。<br>
-  <strong>Gantt 中的红色虚线</strong>：跨线程 <strong>同 la</strong> 数据依赖（生产者完成前消费者 CPU 空转）；目前 <code>finish_shuffle@3 → start_input_dist@3</code> 是唯一一对，是 <code>default</code> map 下 compute 线程被 io 线程拖慢 4ms 的根因。<br>
+  <strong>Gantt 中的红色虚线</strong>：跨线程 <strong>同 progress</strong> 数据/控制依赖中**导致 wait** 的那一条 binding 边（其它能被同线程顺序自动满足的不画）。覆盖 <code>finish_shuffle@3 → start_input_dist@3</code> 这种同 la slot 边、la=0 cluster 的 <code>depends_on</code> / slot 链（zero_grad/global_tokens/nccl_safety_barrier/forward → backward → finalize → opt → watchdog）、以及 prefetch=True 时的 <code>prefetch_embeddings → backward</code>（cross-la same_progress_sync）。在 default map 下只表现为 io→compute 的一条线；在 per_task 下能看到 forward→backward 把 backward 锁在 forward 之后。<br>
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
@@ -103,11 +103,25 @@ const TASK_COST_MS = {
   watchdog_step:             0.1,
 };
 
-// 跨线程 SAME-la 数据依赖（同一个 progress 内，生产者→消费者 同 la）。
-// +1 la cascade 已经把 same-thread 的链拆开（生产者总在前一 progress 完成），
-// 所以 in-progress wait 只剩 cross-thread same-la。
-const SAME_LA_CROSS_PAIRS = [
-  ["finish_shuffle", "start_input_dist"],
+// 同 progress 内的 task→task CPU 依赖（来自 hstu_pipeline/tasks.py 的
+// depends_on / reads-writes slot 边 / same_progress_sync）。在 default
+// 这种把它们都堆在 compute 一条线程上的 map 里，这些依赖被同线程顺序
+// 自动满足；在 per_task / 拆分 variant 里，跨线程边会强制下游等。
+//
+// 包含三类同 progress 边：
+//   1) la=3 slot edge:  finish_shuffle → start_input_dist (reads shuffled_batch)
+//   2) la=0 cluster:    depends_on 链 + slot edge（forward 写 losses, backward 读）
+//   3) cross-la 但 same_progress_sync (prefetch=True): prefetch → backward
+const SAME_PROGRESS_CROSS_PAIRS = [
+  ["finish_shuffle",          "start_input_dist"],     // la=3 (slot: shuffled_batch)
+  ["zero_grad",               "backward"],             // la=0 (depends_on)
+  ["global_tokens_allreduce", "backward"],             // la=0 (slot: global_tokens)
+  ["nccl_safety_barrier",     "forward"],              // la=0 (depends_on)
+  ["forward",                 "backward"],             // la=0 (slot: losses)
+  ["backward",                "finalize_model_grads"], // la=0 (depends_on)
+  ["finalize_model_grads",    "optimizer_step"],       // la=0 (depends_on)
+  ["optimizer_step",          "watchdog_step"],        // la=0 (depends_on)
+  ["prefetch_embeddings",     "backward"],             // cross-la same_progress_sync (prefetch=True)
 ];
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
@@ -212,7 +226,7 @@ function placeTasks(preset) {
   for (const t of TASKS) {
     const th = preset.map[t.name];
     let start = lastEndOnThread[th] || 0;
-    for (const [prod, cons] of SAME_LA_CROSS_PAIRS) {
+    for (const [prod, cons] of SAME_PROGRESS_CROSS_PAIRS) {
       if (cons === t.name) {
         const pp = placement[prod];
         if (pp && pp.thread !== th) {
@@ -292,19 +306,41 @@ function renderGantt(presetName, preset) {
         svg += `<text x="${ix + iw / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#b71c1c" font-weight="700">空转 ${idle.toFixed(1)}ms</text>`;
       }
     }
-    // task boxes
+    // task boxes — text fitting is strict: only render text that fits
+    // inside the box (estimated from char count × font width). Anything
+    // longer falls back to the next-shorter form, then to no text +
+    // <title> hover tooltip.
     for (const t of TASKS) {
       const p = placement[t.name];
       if (p.thread !== th) continue;
       const x = leftMargin + p.start * SCALE;
-      const w = (p.end - p.start) * SCALE;
-      svg += `<rect x="${x}" y="${yTop + 8}" width="${Math.max(w, 1)}" height="${ROW_H - 16}" fill="${streamFill(t.stream)}" stroke="#444" stroke-width="0.7" rx="2"/>`;
-      const label = `${shortTask(t.name)}@${t.la}`;
-      if (w > 60) {
-        svg += `<text x="${x + w / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#1a1a1a">${label}</text>`;
-      } else if (w > 14) {
-        svg += `<text x="${x + w / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#1a1a1a">${shortTask(t.name)}</text>`;
+      const w = Math.max((p.end - p.start) * SCALE, 1);
+      const tooltip = `${t.name}@${t.la} (${TASK_COST_MS[t.name] ?? 0}ms, stream=${t.stream}, thread=${th})`;
+      svg += `<g><title>${tooltip}</title>`;
+      svg += `<rect x="${x}" y="${yTop + 8}" width="${w}" height="${ROW_H - 16}" fill="${streamFill(t.stream)}" stroke="#444" stroke-width="0.7" rx="2"/>`;
+      const usable = w - 4;                // 2px padding each side
+      const fullLabel = `${shortTask(t.name)}@${t.la}`;
+      const shortLabel = shortTask(t.name);
+      let label = null, fontSize = 10;
+      // Empirical: ui-monospace at font-size=10 ≈ 6.0px per char.
+      const fits10 = (s) => s.length * 6.0 <= usable;
+      const fits9  = (s) => s.length * 5.5 <= usable;
+      if (fits10(fullLabel))         { label = fullLabel;  fontSize = 10; }
+      else if (fits10(shortLabel))   { label = shortLabel; fontSize = 10; }
+      else if (fits9(shortLabel))    { label = shortLabel; fontSize = 9; }
+      else {
+        // Try abbreviating shortLabel + dropping trailing chars with "…"
+        const maxChars9 = Math.floor(usable / 5.5);
+        if (maxChars9 >= 4) {
+          label = shortLabel.slice(0, maxChars9 - 1) + "…";
+          fontSize = 9;
+        }
+        // else: too narrow — leave blank, rely on tooltip
       }
+      if (label) {
+        svg += `<text x="${x + w / 2}" y="${yMid + 3}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="${fontSize}" fill="#1a1a1a">${label}</text>`;
+      }
+      svg += `</g>`;
     }
   }
 
@@ -316,14 +352,30 @@ function renderGantt(presetName, preset) {
     </pattern>
   </defs>`;
 
-  // cross-thread same-la wait arrows
-  for (const [prodName, consName] of SAME_LA_CROSS_PAIRS) {
-    const pp = placement[prodName], cp = placement[consName];
-    if (!pp || !cp || pp.thread === cp.thread) continue;
-    const yProd = HEADER_H + threadList.indexOf(pp.thread) * ROW_H + ROW_H / 2;
+  // cross-thread same-progress wait arrows: only draw the BINDING edge
+  // per consumer (the producer whose end == consumer.start). 多个生产者
+  // 同时存在时只画导致 wait 的那一条，避免视觉噪音。
+  const consumerToProducers = {};
+  for (const [prod, cons] of SAME_PROGRESS_CROSS_PAIRS) {
+    (consumerToProducers[cons] = consumerToProducers[cons] || []).push(prod);
+  }
+  for (const [consName, producers] of Object.entries(consumerToProducers)) {
+    const cp = placement[consName];
+    if (!cp) continue;
+    let binding = null, bindingName = null;
+    for (const prodName of producers) {
+      const pp = placement[prodName];
+      if (!pp || pp.thread === cp.thread) continue;
+      // float-tolerant equality
+      if (Math.abs(pp.end - cp.start) < 0.005) {
+        if (!binding || pp.end > binding.end) { binding = pp; bindingName = prodName; }
+      }
+    }
+    if (!binding) continue;
+    const yProd = HEADER_H + threadList.indexOf(binding.thread) * ROW_H + ROW_H / 2;
     const yCons = HEADER_H + threadList.indexOf(cp.thread) * ROW_H + ROW_H / 2;
-    const xEdge = leftMargin + pp.end * SCALE;
-    svg += `<path d="M ${xEdge} ${yProd} L ${xEdge} ${yCons}" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="4 3" fill="none"/>`;
+    const xEdge = leftMargin + binding.end * SCALE;
+    svg += `<path d="M ${xEdge} ${yProd} L ${xEdge} ${yCons}" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="4 3" fill="none"><title>${bindingName}@${TASKS.find(t=>t.name===bindingName).la} → ${consName}@${TASKS.find(t=>t.name===consName).la}</title></path>`;
     svg += `<circle cx="${xEdge}" cy="${yProd}" r="3" fill="#b71c1c"/>`;
     svg += `<polygon points="${xEdge - 4},${yCons - 4} ${xEdge + 4},${yCons - 4} ${xEdge},${yCons + 1}" fill="#b71c1c"/>`;
   }

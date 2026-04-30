@@ -63,6 +63,267 @@
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
+<h2>📐 La cascade 推导：每对 +1 la 修的是哪个 host sync</h2>
+<p style="font-size: 13px; color: #555; margin: 6px 0 12px;">每条链上的 task 都有"等前一个完成"的隐式 host sync。同 la → 同 iter → 等的对象 0ms 完成时间 → host 真等。<strong>+1 la 让 producer 跑在前一 iter</strong>，等的对象有整整 1 iter 在后台跑完，host 到时秒回。</p>
+
+<svg width="1180" height="320" xmlns="http://www.w3.org/2000/svg" style="display:block; margin: 0 0 16px;">
+  <defs>
+    <marker id="arrow_cascade" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#666"/>
+    </marker>
+    <marker id="arrow_la_jump" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b71c1c"/>
+    </marker>
+  </defs>
+
+  <!-- la level lanes -->
+  <g font-family="ui-monospace, monospace" font-size="11" fill="#888">
+    <text x="20" y="48" text-anchor="start">la=5</text>
+    <text x="20" y="48" text-anchor="start"></text>
+  </g>
+
+  <!-- task boxes — each at its la position (y) and chain order (x) -->
+  <g font-family="ui-monospace, monospace">
+    <!-- h2d @ la=5 -->
+    <rect x="60" y="32" width="120" height="38" fill="#d4ecdb" stroke="#2e7d32" stroke-width="1.5" rx="4"/>
+    <text x="120" y="50" text-anchor="middle" font-size="12" font-weight="700">h2d</text>
+    <text x="120" y="64" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=5</text>
+
+    <!-- start_shuffle @ la=4 -->
+    <rect x="240" y="80" width="120" height="38" fill="#d4ecdb" stroke="#2e7d32" stroke-width="1.5" rx="4"/>
+    <text x="300" y="98" text-anchor="middle" font-size="12" font-weight="700">start_shuffle</text>
+    <text x="300" y="112" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=4</text>
+
+    <!-- finish_shuffle @ la=3 -->
+    <rect x="420" y="128" width="120" height="38" fill="#d4ecdb" stroke="#2e7d32" stroke-width="1.5" rx="4"/>
+    <text x="480" y="146" text-anchor="middle" font-size="12" font-weight="700">finish_shuffle</text>
+    <text x="480" y="160" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=3</text>
+
+    <!-- start_input_dist @ la=3 (same la! cross-stream same iter) -->
+    <rect x="600" y="128" width="120" height="38" fill="#f6d4d4" stroke="#c62828" stroke-width="1.5" rx="4"/>
+    <text x="660" y="146" text-anchor="middle" font-size="12" font-weight="700">start_input_dist</text>
+    <text x="660" y="160" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=3</text>
+
+    <!-- wait_input_dist @ la=2 -->
+    <rect x="780" y="176" width="120" height="38" fill="#f6d4d4" stroke="#c62828" stroke-width="1.5" rx="4"/>
+    <text x="840" y="194" text-anchor="middle" font-size="12" font-weight="700">wait_input_dist</text>
+    <text x="840" y="208" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=2</text>
+
+    <!-- prefetch @ la=1 -->
+    <rect x="960" y="224" width="120" height="38" fill="#e7d4f4" stroke="#6a1b9a" stroke-width="1.5" rx="4"/>
+    <text x="1020" y="242" text-anchor="middle" font-size="12" font-weight="700">prefetch</text>
+    <text x="1020" y="256" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=1</text>
+
+    <!-- forward @ la=0 -->
+    <rect x="1080" y="272" width="80" height="38" fill="#dde7fb" stroke="#1565c0" stroke-width="1.5" rx="4"/>
+    <text x="1120" y="290" text-anchor="middle" font-size="12" font-weight="700">forward...</text>
+    <text x="1120" y="304" text-anchor="middle" font-size="10" fill="#b71c1c" font-weight="700">la=0</text>
+  </g>
+
+  <!-- arrows: dependency chain (red = +1 la cross-iter fix) -->
+  <g stroke-width="2" fill="none">
+    <!-- h2d (la5) -> start_shuffle (la4) : +1 la, cross-iter, fixes tolist() host wait -->
+    <path d="M 180 51 Q 210 51, 240 99" stroke="#b71c1c" marker-end="url(#arrow_la_jump)"/>
+    <!-- start_shuffle (la4) -> finish_shuffle (la3) : +1 la, cross-iter, fixes KK wait -->
+    <path d="M 360 99 Q 390 99, 420 147" stroke="#b71c1c" marker-end="url(#arrow_la_jump)"/>
+    <!-- finish_shuffle (la3) -> start_input_dist (la3) : SAME la, cross-stream, same iter -->
+    <path d="M 540 147 L 600 147" stroke="#888" stroke-dasharray="4 3" marker-end="url(#arrow_cascade)"/>
+    <!-- start_input_dist (la3) -> wait_input_dist (la2) : +1 la, cross-iter, fixes splits.wait -->
+    <path d="M 720 147 Q 750 147, 780 195" stroke="#b71c1c" marker-end="url(#arrow_la_jump)"/>
+    <!-- wait_input_dist (la2) -> prefetch (la1) : +1 la, cross-iter, fixes tensor.wait -->
+    <path d="M 900 195 Q 930 195, 960 243" stroke="#b71c1c" marker-end="url(#arrow_la_jump)"/>
+    <!-- prefetch (la1) -> forward (la0) : +1 la, cross-iter (already correct in legacy) -->
+    <path d="M 1080 243 Q 1090 243, 1080 291" stroke="#b71c1c" marker-end="url(#arrow_la_jump)"/>
+  </g>
+
+  <!-- annotations on each +1 la edge -->
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#b71c1c">
+    <text x="200" y="78" text-anchor="middle">+1: tolist() ~1ms</text>
+    <text x="380" y="126" text-anchor="middle">+1: KK wait 1-3ms</text>
+    <text x="740" y="174" text-anchor="middle">+1: splits.wait()</text>
+    <text x="920" y="222" text-anchor="middle">+1: tensor.wait() ms 级</text>
+    <text x="1100" y="270" text-anchor="middle" fill="#888">+1: 已 cross-iter</text>
+  </g>
+
+  <!-- same-la edge annotation -->
+  <g font-family="ui-monospace, monospace" font-size="10" fill="#666">
+    <text x="570" y="138" text-anchor="middle">same la (cross-stream)</text>
+  </g>
+</svg>
+
+<div style="font-size: 12px; color: #666; margin: -8px 0 24px; padding: 8px 12px; background: #f7f7f7; border-radius: 4px; line-height: 1.7;">
+  <strong>红色箭头</strong>：跨 la 边（cascade 的关键），让 producer 跑在前一 iter，consumer 这一 iter 拿到的 result 已经在后台完成 → host wait 秒回。<br>
+  <strong>灰色虚线</strong>：同 la 边（finish_shuffle@3 → start_input_dist@3），两个 task 在同 iter 同 batch 但跨 stream 跨 thread；如果在 4-thread map 上，host issue 是并发的、不阻塞；GPU 端用 wait_event 跨流同步。<br>
+  <strong>注意</strong>：legacy 路径里 prefetch@1 → forward@0 已经是 cross-iter（这是 prefetch 模式的根源），cascade 没动这条；新增的 4 条 +1 la 是 (h2d↔start_shuffle, start_shuffle↔finish_shuffle, start_input_dist↔wait_input_dist, wait_input_dist↔prefetch)。
+</div>
+
+<h2>🔄 稳态 pipeline：6 batch 同时在飞</h2>
+<p style="font-size: 13px; color: #555; margin: 6px 0 12px;">每行一条 la 链，每列一个 progress() iter。同列的 task 是 <strong>同一 iter</strong> 内并发触发的，处理 <strong>不同 batch</strong>（行号 = la 偏移）。稳态时 6 个 batch (B<sub>k</sub>..B<sub>k+5</sub>) 同时在不同位置流动，新 batch 从右侧入，最老的 batch 在 forward/backward 出。</p>
+
+<svg width="1180" height="400" xmlns="http://www.w3.org/2000/svg" style="display:block; margin: 0 0 16px;">
+  <defs>
+    <marker id="arrow_pipe_flow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1565c0"/>
+    </marker>
+  </defs>
+
+  <!-- header: iter columns -->
+  <g font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#333">
+    <rect x="0" y="0" width="1180" height="28" fill="#222"/>
+    <text x="120" y="18" text-anchor="middle" fill="#fff">iter k-2</text>
+    <text x="290" y="18" text-anchor="middle" fill="#fff">iter k-1</text>
+    <text x="460" y="18" text-anchor="middle" fill="#fff">iter k (current)</text>
+    <text x="630" y="18" text-anchor="middle" fill="#fff">iter k+1</text>
+    <text x="800" y="18" text-anchor="middle" fill="#fff">iter k+2</text>
+    <text x="970" y="18" text-anchor="middle" fill="#fff">iter k+3</text>
+    <text x="1130" y="18" text-anchor="middle" fill="#fff">→</text>
+
+    <text x="14" y="54" font-size="10" fill="#888" font-weight="600">la=5 / memcpy / io thread</text>
+    <text x="14" y="106" font-size="10" fill="#888" font-weight="600">la=4 / memcpy / io thread</text>
+    <text x="14" y="158" font-size="10" fill="#888" font-weight="600">la=3 / memcpy + data_dist</text>
+    <text x="14" y="210" font-size="10" fill="#888" font-weight="600">la=2 / data_dist</text>
+    <text x="14" y="262" font-size="10" fill="#888" font-weight="600">la=1 / prefetch</text>
+    <text x="14" y="314" font-size="10" fill="#888" font-weight="600">la=0 / default (compute)</text>
+    <text x="14" y="370" font-size="10" fill="#1565c0" font-weight="600">batch flow direction →</text>
+  </g>
+
+  <!-- la=5 row: h2d for batch (iter+5) -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <!-- iter k-2 → batch B(k+3) -->
+    <rect x="40" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="120" y="76" text-anchor="middle">h2d B<tspan font-weight="700" fill="#1565c0">k+3</tspan></text>
+    <!-- iter k-1 → B(k+4) -->
+    <rect x="210" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="290" y="76" text-anchor="middle">h2d B<tspan font-weight="700" fill="#1565c0">k+4</tspan></text>
+    <!-- iter k → B(k+5) -->
+    <rect x="380" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" stroke-width="2" rx="3"/>
+    <text x="460" y="76" text-anchor="middle" font-weight="700">h2d B<tspan fill="#1565c0">k+5</tspan></text>
+    <!-- iter k+1 → B(k+6) -->
+    <rect x="550" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="630" y="76" text-anchor="middle">h2d B<tspan font-weight="700" fill="#1565c0">k+6</tspan></text>
+    <rect x="720" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="800" y="76" text-anchor="middle">h2d B<tspan font-weight="700" fill="#1565c0">k+7</tspan></text>
+    <rect x="890" y="58" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="970" y="76" text-anchor="middle">h2d B<tspan font-weight="700" fill="#1565c0">k+8</tspan></text>
+  </g>
+
+  <!-- la=4 row: start_shuffle -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <rect x="40" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="120" y="128" text-anchor="middle">start_shuf B<tspan font-weight="700" fill="#1565c0">k+2</tspan></text>
+    <rect x="210" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="290" y="128" text-anchor="middle">start_shuf B<tspan font-weight="700" fill="#1565c0">k+3</tspan></text>
+    <rect x="380" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" stroke-width="2" rx="3"/>
+    <text x="460" y="128" text-anchor="middle" font-weight="700">start_shuf B<tspan fill="#1565c0">k+4</tspan></text>
+    <rect x="550" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="630" y="128" text-anchor="middle">start_shuf B<tspan font-weight="700" fill="#1565c0">k+5</tspan></text>
+    <rect x="720" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="800" y="128" text-anchor="middle">start_shuf B<tspan font-weight="700" fill="#1565c0">k+6</tspan></text>
+    <rect x="890" y="110" width="160" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="970" y="128" text-anchor="middle">start_shuf B<tspan font-weight="700" fill="#1565c0">k+7</tspan></text>
+  </g>
+
+  <!-- la=3 row: finish_shuffle + start_input_dist (split into two adjacent boxes per iter) -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <rect x="40" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="80" y="180" text-anchor="middle" font-size="9">finsh B<tspan font-weight="700" fill="#1565c0">k+1</tspan></text>
+    <rect x="120" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="160" y="180" text-anchor="middle" font-size="9">st_in B<tspan font-weight="700" fill="#1565c0">k+1</tspan></text>
+
+    <rect x="210" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="250" y="180" text-anchor="middle" font-size="9">finsh B<tspan font-weight="700" fill="#1565c0">k+2</tspan></text>
+    <rect x="290" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="330" y="180" text-anchor="middle" font-size="9">st_in B<tspan font-weight="700" fill="#1565c0">k+2</tspan></text>
+
+    <rect x="380" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" stroke-width="2" rx="3"/>
+    <text x="420" y="180" text-anchor="middle" font-size="9" font-weight="700">finsh B<tspan fill="#1565c0">k+3</tspan></text>
+    <rect x="460" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" stroke-width="2" rx="3"/>
+    <text x="500" y="180" text-anchor="middle" font-size="9" font-weight="700">st_in B<tspan fill="#1565c0">k+3</tspan></text>
+
+    <rect x="550" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="590" y="180" text-anchor="middle" font-size="9">finsh B<tspan font-weight="700" fill="#1565c0">k+4</tspan></text>
+    <rect x="630" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="670" y="180" text-anchor="middle" font-size="9">st_in B<tspan font-weight="700" fill="#1565c0">k+4</tspan></text>
+
+    <rect x="720" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="760" y="180" text-anchor="middle" font-size="9">finsh B<tspan font-weight="700" fill="#1565c0">k+5</tspan></text>
+    <rect x="800" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="840" y="180" text-anchor="middle" font-size="9">st_in B<tspan font-weight="700" fill="#1565c0">k+5</tspan></text>
+
+    <rect x="890" y="162" width="80" height="28" fill="#d4ecdb" stroke="#2e7d32" rx="3"/>
+    <text x="930" y="180" text-anchor="middle" font-size="9">finsh B<tspan font-weight="700" fill="#1565c0">k+6</tspan></text>
+    <rect x="970" y="162" width="80" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="1010" y="180" text-anchor="middle" font-size="9">st_in B<tspan font-weight="700" fill="#1565c0">k+6</tspan></text>
+  </g>
+
+  <!-- la=2 row: wait_input_dist -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <rect x="40" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="120" y="232" text-anchor="middle">wait_in B<tspan font-weight="700" fill="#1565c0">k</tspan></text>
+    <rect x="210" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="290" y="232" text-anchor="middle">wait_in B<tspan font-weight="700" fill="#1565c0">k+1</tspan></text>
+    <rect x="380" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" stroke-width="2" rx="3"/>
+    <text x="460" y="232" text-anchor="middle" font-weight="700">wait_in B<tspan fill="#1565c0">k+2</tspan></text>
+    <rect x="550" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="630" y="232" text-anchor="middle">wait_in B<tspan font-weight="700" fill="#1565c0">k+3</tspan></text>
+    <rect x="720" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="800" y="232" text-anchor="middle">wait_in B<tspan font-weight="700" fill="#1565c0">k+4</tspan></text>
+    <rect x="890" y="214" width="160" height="28" fill="#f6d4d4" stroke="#c62828" rx="3"/>
+    <text x="970" y="232" text-anchor="middle">wait_in B<tspan font-weight="700" fill="#1565c0">k+5</tspan></text>
+  </g>
+
+  <!-- la=1 row: prefetch -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <rect x="40" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" rx="3"/>
+    <text x="120" y="284" text-anchor="middle">prefetch B<tspan font-weight="700" fill="#1565c0">k-1</tspan></text>
+    <rect x="210" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" rx="3"/>
+    <text x="290" y="284" text-anchor="middle">prefetch B<tspan font-weight="700" fill="#1565c0">k</tspan></text>
+    <rect x="380" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" stroke-width="2" rx="3"/>
+    <text x="460" y="284" text-anchor="middle" font-weight="700">prefetch B<tspan fill="#1565c0">k+1</tspan></text>
+    <rect x="550" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" rx="3"/>
+    <text x="630" y="284" text-anchor="middle">prefetch B<tspan font-weight="700" fill="#1565c0">k+2</tspan></text>
+    <rect x="720" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" rx="3"/>
+    <text x="800" y="284" text-anchor="middle">prefetch B<tspan font-weight="700" fill="#1565c0">k+3</tspan></text>
+    <rect x="890" y="266" width="160" height="28" fill="#e7d4f4" stroke="#6a1b9a" rx="3"/>
+    <text x="970" y="284" text-anchor="middle">prefetch B<tspan font-weight="700" fill="#1565c0">k+4</tspan></text>
+  </g>
+
+  <!-- la=0 row: forward..backward..opt -->
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <rect x="40" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" rx="3"/>
+    <text x="120" y="336" text-anchor="middle">fwd/bwd/opt B<tspan font-weight="700" fill="#1565c0">k-2</tspan></text>
+    <rect x="210" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" rx="3"/>
+    <text x="290" y="336" text-anchor="middle">fwd/bwd/opt B<tspan font-weight="700" fill="#1565c0">k-1</tspan></text>
+    <rect x="380" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" stroke-width="2" rx="3"/>
+    <text x="460" y="336" text-anchor="middle" font-weight="700">fwd/bwd/opt B<tspan fill="#1565c0">k</tspan></text>
+    <rect x="550" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" rx="3"/>
+    <text x="630" y="336" text-anchor="middle">fwd/bwd/opt B<tspan font-weight="700" fill="#1565c0">k+1</tspan></text>
+    <rect x="720" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" rx="3"/>
+    <text x="800" y="336" text-anchor="middle">fwd/bwd/opt B<tspan font-weight="700" fill="#1565c0">k+2</tspan></text>
+    <rect x="890" y="318" width="160" height="28" fill="#dde7fb" stroke="#1565c0" rx="3"/>
+    <text x="970" y="336" text-anchor="middle">fwd/bwd/opt B<tspan font-weight="700" fill="#1565c0">k+3</tspan></text>
+  </g>
+
+  <!-- diagonal arrows showing batch flow, only on iter k column -->
+  <g stroke="#1565c0" stroke-width="1.5" fill="none" opacity="0.5">
+    <path d="M 460 86 L 460 110" marker-end="url(#arrow_pipe_flow)"/>
+    <path d="M 460 138 L 460 162" marker-end="url(#arrow_pipe_flow)"/>
+    <path d="M 460 190 L 460 214" marker-end="url(#arrow_pipe_flow)"/>
+    <path d="M 460 242 L 460 266" marker-end="url(#arrow_pipe_flow)"/>
+    <path d="M 460 294 L 460 318" marker-end="url(#arrow_pipe_flow)"/>
+  </g>
+
+  <!-- highlight column for iter k -->
+  <rect x="378" y="32" width="164" height="320" fill="none" stroke="#d4a017" stroke-width="2" stroke-dasharray="4 3" rx="4"/>
+  <text x="460" y="395" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#d4a017" font-weight="700">↑ 同 progress() 内并发触发，处理 6 个不同 batch ↑</text>
+</svg>
+
+<div style="font-size: 12px; color: #666; margin: -8px 0 24px; padding: 8px 12px; background: #f7f7f7; border-radius: 4px; line-height: 1.7;">
+  <strong>稳态读法</strong>：竖看（同 iter）= 当前 progress() 触发的 6 个并发 task，作用于 6 个不同 batch（B<sub>k</sub> 在 default，B<sub>k+1</sub> 在 prefetch，..., B<sub>k+5</sub> 在 h2d）。横看（同 la）= 同一条 chain 在连续 iter 上往前推一个 batch，<strong>一条 chain 内部完全是顺序的</strong>。<br>
+  <strong>跨 la 同 batch 的关系</strong>：一个 batch B<sub>k+5</sub> 从 iter k 的 h2d 入口进入 → iter k+1 的 start_shuffle → iter k+2 的 finish_shuffle / start_input_dist → iter k+3 的 wait_input_dist → iter k+4 的 prefetch → iter k+5 的 forward。**每跨一 iter 就跨 1 la**，正是 cascade 的全部含义。<br>
+  <strong>资源利用</strong>：每个 iter 同时 6 路并发，理论上 default-stream forward + memcpy AllGather + data_dist NCCL + prefetch UVM 全部 overlap；实际能不能全 overlap 取决于 thread map（`default` map 把后 4 行挤在 compute 一条线程上 → 退化）。
+</div>
+
 <div style="background: #fff8dc; border-left: 4px solid #d4a017; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6;">
   <strong>📊 Benchmark observation (cw-dfw H100 ×8, job 11447285, 2026-04-30)</strong><br>
   ▸ <strong>实测配置</strong>：上述 6-la cascade × <code>HSTU_THREAD_MAP_VARIANT=default</code>（2 threads: io / compute），nsys profile 50 iter，<code>profile_step_start=150 profile_step_end=200</code><br>

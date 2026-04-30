@@ -63,6 +63,16 @@
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
+<div style="background: #fff8dc; border-left: 4px solid #d4a017; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6;">
+  <strong>📊 Benchmark observation (cw-dfw H100 ×8, job 11447285, 2026-04-30)</strong><br>
+  ▸ <strong>实测配置</strong>：上述 6-la cascade × <code>HSTU_THREAD_MAP_VARIANT=default</code>（2 threads: io / compute），nsys profile 50 iter，<code>profile_step_start=150 profile_step_end=200</code><br>
+  ▸ <strong>parity</strong>：<code>test_hstu_pipeline_matches_none_pipeline</code> 通过 — bit-exact 跟 legacy <code>JaggedMegatronTrainNonePipeline</code> 一致 ✓<br>
+  ▸ <strong>la cascade 机制有效</strong>：<code>wait_input_dist</code> host block 从 ~8ms（cascade 之前）压到 <strong>0.4ms</strong>（splits a2a 已飞 1 整 iter，秒回）<br>
+  ▸ <strong>但总吞吐没显著改善</strong>：avg6 TFLOPS = 1849 (la cascade) vs 1876 (round2 default 基线) ≈ -1.4% (噪声范围)<br>
+  ▸ <strong>原因诊断</strong>：8ms host block 本来就在 critical path 之外（跟 default-stream forward/backward 并行）。真正的长杆是 (a) <code>zero_grad</code> 等上一 iter DDP grad allreduce 4.7ms idle、(b) shuffle/input_dist 的 NCCL 跟 default-stream compute 0% overlap（NCCL 跑在 default 流的 idle 窗口里，没真正藏到计算后面）<br>
+  ▸ <strong>下一刀</strong>：要让 NCCL 完全藏住，必须先消除 default 流自身的 idle gap（zero_grad 等待 + Python launch overhead），然后 NCCL 才有机会跟连续 compute kernel overlap。
+</div>
+
 <!-- ========================================================== -->
 <script>
 // 14 tasks (HSTU prefetch variant, depth=1, 6-la cascade).

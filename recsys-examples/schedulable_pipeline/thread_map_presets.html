@@ -64,35 +64,71 @@
 </div>
 
 <div style="background: #fff8dc; border-left: 4px solid #d4a017; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6;">
-  <strong>📊 Benchmark observation (cw-dfw H100 ×8, job 11447285, 2026-04-30)</strong><br>
-  ▸ <strong>实测配置</strong>：上述 6-la cascade × <code>HSTU_THREAD_MAP_VARIANT=default</code>（2 threads: io / compute），nsys profile 50 iter，<code>profile_step_start=150 profile_step_end=200</code><br>
-  ▸ <strong>parity</strong>：<code>test_hstu_pipeline_matches_none_pipeline</code> 通过 — bit-exact 跟 legacy <code>JaggedMegatronTrainNonePipeline</code> 一致 ✓<br>
-  ▸ <strong>la cascade 机制有效</strong>：<code>wait_input_dist</code> host block 从 ~8ms（cascade 之前）压到 <strong>0.4ms</strong>（splits a2a 已飞 1 整 iter，秒回）<br>
-  ▸ <strong>但总吞吐没显著改善</strong>：avg6 TFLOPS = 1849 (la cascade) vs 1876 (round2 default 基线) ≈ -1.4% (噪声范围)<br>
-  ▸ <strong>原因诊断</strong>：8ms host block 本来就在 critical path 之外（跟 default-stream forward/backward 并行）。真正的长杆是 (a) <code>zero_grad</code> 等上一 iter DDP grad allreduce 4.7ms idle、(b) shuffle/input_dist 的 NCCL 跟 default-stream compute 0% overlap（NCCL 跑在 default 流的 idle 窗口里，没真正藏到计算后面）<br>
-  ▸ <strong>下一刀</strong>：要让 NCCL 完全藏住，必须先消除 default 流自身的 idle gap（zero_grad 等待 + Python launch overhead），然后 NCCL 才有机会跟连续 compute kernel overlap。
+  <strong>📊 Round3 benchmark sweep (cw-dfw H100 ×8, 2026-04-30, sweep <code>mtms_sweep_round3_20260430_140637</code>)</strong><br>
+  ▸ <strong>9 variants</strong>，全部 nsys ON，每个 50 iter profile 区间，TFLOPS = avg(iter 599/699/799)。<br>
+  ▸ <strong>la cascade 机制本身有效</strong>：NVTX 上 <code>wait_input_dist</code> host block 从 ~8ms 压到 ~0.4ms（splits a2a 已飞 1 整 iter）<br>
+  ▸ <strong>但 default 2-thread map 下增益被吞</strong>：11 个 task 串行在 compute 线程，任意一个剩余 host sync 都拦住后面 task 发射 → 加 thread 拆开后才能真正受益。
+  <table style="margin-top: 10px; border-collapse: collapse; font-size: 12px;">
+    <tr style="background: #f0e0a0;"><th style="padding: 4px 10px; border: 1px solid #ccc;">variant</th><th style="padding: 4px 10px; border: 1px solid #ccc;">la cascade</th><th style="padding: 4px 10px; border: 1px solid #ccc;">thread_map</th><th style="padding: 4px 10px; border: 1px solid #ccc;">TFLOPS</th><th style="padding: 4px 10px; border: 1px solid #ccc;">vs new_default</th></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">legacy_none</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">— (legacy)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1976</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−2.2%</td></tr>
+    <tr style="background: #f5f5f5;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>new_default</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2021</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">baseline</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_by_stream</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">by_stream (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_per_task</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">per_task (14)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1945</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−3.8%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_prefetch_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / prefetch / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1999</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.1%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_data_dist_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / data_dist / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">2017</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.2%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_data_dist_prefetch_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
+    <tr style="background: #fff0e0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>la_cascade</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>NEW</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2019</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.1%</td></tr>
+    <tr style="background: #ffe0d0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>la_cascade_full_split</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>NEW</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><i>pending re-run</i></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">—</td></tr>
+  </table>
+  ▸ <strong>关键观察</strong>：(1) la_cascade 单独不显著（−0.1%），跟 new_default 在噪声范围内；(2) per_task 最差（−3.8%，14 thread dispatch 开销 dominates）；(3) <code>io_data_dist_compute</code> 最接近 new_default（−0.2%），把 input_dist 拆出去看起来微正向；(4) <strong>la_cascade_full_split</strong> 是关键测试——能否 cascade × 4-thread 联合做出净收益。<br>
+  ▸ <strong>下一步攻 default-stream idle gap</strong>：(a) <code>zero_grad</code> 等上一 iter DDP grad allreduce 的 ~4.7ms idle；(b) shuffle/input_dist NCCL 跟 default-stream compute overlap 率 ≈0%（NCCL 跑在 default 流的 idle 窗口里，没真正藏到计算后面）<br>
+  ▸ <strong>注</strong>：上面 8 个 OLD-la 数据来自 round3 第一次跑，executor.py 还没带本会话加的 <code>[engine]</code> orange + <code>inline_thread="compute"</code> 改动；patched 重跑结果出来后会刷新此表。
 </div>
 
 <!-- ========================================================== -->
 <script>
-// 14 tasks (HSTU prefetch variant, depth=1, 6-la cascade).
-// la 来自 pipeline.py:386-391; stream 来自 hstu_pipeline/tasks.py 的 make_*_task。
+// 14 tasks (HSTU prefetch variant, depth=1). stream 来自
+// hstu_pipeline/tasks.py 的 make_*_task；la 由 preset 单独提供
+// （OLD = depth+1 cascade vs NEW = 6-la cascade）。
 const TASKS = [
-  { name: "h2d",                        stream: "memcpy",    la: 5 },
-  { name: "start_shuffle",              stream: "memcpy",    la: 4 },
-  { name: "finish_shuffle",             stream: "memcpy",    la: 3 },
-  { name: "start_input_dist",           stream: "data_dist", la: 3 },
-  { name: "wait_input_dist",            stream: "data_dist", la: 2 },
-  { name: "zero_grad",                  stream: "default",   la: 0 },
-  { name: "global_tokens_allreduce",    stream: "default",   la: 0 },
-  { name: "nccl_safety_barrier",        stream: "default",   la: 0 },
-  { name: "forward",                    stream: "default",   la: 0 },
-  { name: "prefetch_embeddings",        stream: "prefetch",  la: 1 },
-  { name: "backward",                   stream: "default",   la: 0 },
-  { name: "finalize_model_grads",       stream: "default",   la: 0 },
-  { name: "optimizer_step",             stream: "default",   la: 0 },
-  { name: "watchdog_step",              stream: "default",   la: 0 },
+  { name: "h2d",                        stream: "memcpy"    },
+  { name: "start_shuffle",              stream: "memcpy"    },
+  { name: "finish_shuffle",             stream: "memcpy"    },
+  { name: "start_input_dist",           stream: "data_dist" },
+  { name: "wait_input_dist",            stream: "data_dist" },
+  { name: "zero_grad",                  stream: "default"   },
+  { name: "global_tokens_allreduce",    stream: "default"   },
+  { name: "nccl_safety_barrier",        stream: "default"   },
+  { name: "forward",                    stream: "default"   },
+  { name: "prefetch_embeddings",        stream: "prefetch"  },
+  { name: "backward",                   stream: "default"   },
+  { name: "finalize_model_grads",       stream: "default"   },
+  { name: "optimizer_step",             stream: "default"   },
+  { name: "watchdog_step",              stream: "default"   },
 ];
+
+// Lookahead 两套：OLD = round2 代码原始 cascade (depth+1=2 for h2d);
+// NEW = 6-la cascade (pipeline.py:386-391, 每个跨 la pair 都 +1)。
+// round3 sweep: 7 个 variant 用 OLD（同 round2 clone 代码），la_cascade
+// 用 NEW（rework-mtms HEAD）。未列出的 task la=0。
+const LA_PRESETS = {
+  OLD: {
+    h2d: 2, start_shuffle: 2, finish_shuffle: 2,
+    start_input_dist: 1, wait_input_dist: 1,
+    prefetch_embeddings: 1,
+  },
+  NEW: {
+    h2d: 5, start_shuffle: 4, finish_shuffle: 3,
+    start_input_dist: 3, wait_input_dist: 2,
+    prefetch_embeddings: 1,
+  },
+};
+function getLa(taskName, laPresetName) {
+  return LA_PRESETS[laPresetName]?.[taskName] ?? 0;
+}
+function tasksWithLa(laPresetName) {
+  return TASKS.map(t => ({ ...t, la: getLa(t.name, laPresetName) }));
+}
 
 // 粗略 CPU host-thread 时间（ms），仅做相对比较。HSTU H100 1-node prefetch=True
 // 大致量级：fwd/bwd 主要 CPU 开销是 kernel queueing；GPU 真实执行时间另算。
@@ -136,22 +172,38 @@ const SAME_PROGRESS_CROSS_PAIRS = [
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
 
-// 6 thread maps
+// 8 round3 variants. la_preset: "OLD" = round2 代码原始 cascade (depth+1);
+// "NEW" = 6-la cascade (rework-mtms HEAD)。tflops 取 round3 sweep iter 599/699/799
+// 平均 (cw-dfw H100 ×8, mtms_sweep_round3_20260430_140637)。
+const ALL_ON = (thread) => Object.fromEntries(TASKS.map(t => [t.name, thread]));
+
+const NEW_DEFAULT_MAP = {
+  h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+  start_input_dist: "compute", wait_input_dist: "compute",
+  prefetch_embeddings: "compute",
+  zero_grad: "compute", global_tokens_allreduce: "compute",
+  nccl_safety_barrier: "compute", forward: "compute",
+  backward: "compute", finalize_model_grads: "compute",
+  optimizer_step: "compute", watchdog_step: "compute",
+};
+
 const PRESETS = {
-  "default": {
-    desc: "HSTU_DEFAULT_THREAD_MAP — 2 threads (io / compute) — compute 线程同 la 等 io，~3ms CPU 空转",
-    map: {
-      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
-      start_input_dist: "compute", wait_input_dist: "compute",
-      prefetch_embeddings: "compute",
-      zero_grad: "compute", global_tokens_allreduce: "compute",
-      nccl_safety_barrier: "compute", forward: "compute",
-      backward: "compute", finalize_model_grads: "compute",
-      optimizer_step: "compute", watchdog_step: "compute",
-    },
+  "legacy_none": {
+    desc: "Legacy pipeline (RECSYS_PIPELINE_BACKEND=legacy) — 单 thread, 无 engine, OLD la cascade",
+    la_preset: "OLD",
+    tflops: 1976,
+    map: ALL_ON("main"),
   },
-  "by_stream": {
-    desc: "sentinel — each task → thread = its stream name (4 threads)",
+  "new_default": {
+    desc: "engine + HSTU_DEFAULT_THREAD_MAP (io / compute), OLD la — round3 baseline",
+    la_preset: "OLD",
+    tflops: 2021,
+    map: NEW_DEFAULT_MAP,
+  },
+  "new_by_stream": {
+    desc: "engine + by_stream sentinel (4 threads, 每 task → 它自己的 stream 名)",
+    la_preset: "OLD",
+    tflops: 1997,
     map: {
       h2d: "memcpy", start_shuffle: "memcpy", finish_shuffle: "memcpy",
       start_input_dist: "data_dist", wait_input_dist: "data_dist",
@@ -162,12 +214,16 @@ const PRESETS = {
       optimizer_step: "default", watchdog_step: "default",
     },
   },
-  "per_task": {
-    desc: "sentinel — each task on its own thread (14 threads — exceeds max_threads≤4 in v2 SPEC; round1/round2 sweep 仍跑)",
+  "new_per_task": {
+    desc: "engine + per_task sentinel — 14 threads, 每 task 一条线程（dispatch 开销最大）",
+    la_preset: "OLD",
+    tflops: 1945,
     map: Object.fromEntries(TASKS.map((t, i) => [t.name, "t" + String(i + 1).padStart(2, "0")])),
   },
-  "io_prefetch_compute": {
-    desc: "3 threads (io / prefetch / compute) — prefetch 拆出去和 backward 重叠",
+  "new_io_prefetch_compute": {
+    desc: "engine 3 threads (io / prefetch / compute) — prefetch 拆出去和 backward 重叠",
+    la_preset: "OLD",
+    tflops: 1999,
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       prefetch_embeddings: "prefetch",
@@ -178,8 +234,10 @@ const PRESETS = {
       optimizer_step: "compute", watchdog_step: "compute",
     },
   },
-  "io_data_dist_compute": {
-    desc: "3 threads (io / data_dist / compute) — data_dist 拆出去，compute 不再被 io 阻塞",
+  "new_io_data_dist_compute": {
+    desc: "engine 3 threads (io / data_dist / compute) — data_dist 拆出去，compute 不再被 io 阻塞",
+    la_preset: "OLD",
+    tflops: 2017,
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       start_input_dist: "data_dist", wait_input_dist: "data_dist",
@@ -190,8 +248,30 @@ const PRESETS = {
       optimizer_step: "compute", watchdog_step: "compute",
     },
   },
-  "io_data_dist_prefetch_compute": {
-    desc: "= full_split — 4 threads (io / data_dist / prefetch / compute)",
+  "new_io_data_dist_prefetch_compute": {
+    desc: "engine 4 threads (io / data_dist / prefetch / compute) — full split",
+    la_preset: "OLD",
+    tflops: 1997,
+    map: {
+      h2d: "io", start_shuffle: "io", finish_shuffle: "io",
+      start_input_dist: "data_dist", wait_input_dist: "data_dist",
+      prefetch_embeddings: "prefetch",
+      zero_grad: "compute", global_tokens_allreduce: "compute",
+      nccl_safety_barrier: "compute", forward: "compute",
+      backward: "compute", finalize_model_grads: "compute",
+      optimizer_step: "compute", watchdog_step: "compute",
+    },
+  },
+  "la_cascade": {
+    desc: "engine + default thread_map (2 thread) + NEW 6-la cascade — 11 个 task 全在 compute 线程串行，host sync 容易 block",
+    la_preset: "NEW",
+    tflops: 2019,
+    map: NEW_DEFAULT_MAP,
+  },
+  "la_cascade_full_split": {
+    desc: "engine + io_data_dist_prefetch_compute (4 thread) + NEW 6-la cascade — 把可能 host sync 的 task 拆到独立线程，避免一拦众",
+    la_preset: "NEW",
+    tflops: null,  // round3 re-run pending
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
       start_input_dist: "data_dist", wait_input_dist: "data_dist",
@@ -231,9 +311,10 @@ function streamFill(s) {
 function placeTasks(preset) {
   // Per-thread sequential (declaration order = fire order within thread);
   // intra-progress same-la cross-thread waits push consumer's start.
+  const tasks = tasksWithLa(preset.la_preset);
   const placement = {};                  // {taskName: {start, end, thread}}
   const lastEndOnThread = {};            // {thread: last end ms}
-  for (const t of TASKS) {
+  for (const t of tasks) {
     const th = preset.map[t.name];
     let start = lastEndOnThread[th] || 0;
     for (const [prod, cons] of SAME_PROGRESS_CROSS_PAIRS) {
@@ -269,6 +350,7 @@ function orderThreads(threadList) {
 }
 
 function renderGantt(presetName, preset) {
+  const tasks = tasksWithLa(preset.la_preset);
   const placement = placeTasks(preset);
   const threadList = orderThreads([...new Set(Object.values(preset.map))]);
   const totalEnd = Math.max(...Object.values(placement).map(p => p.end), 1);
@@ -283,10 +365,12 @@ function renderGantt(presetName, preset) {
   const H = HEADER_H + NROWS * ROW_H + AXIS_H + 6;
 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
-  // header
+  // header — preset name + la_preset tag + measured TFLOPS
   svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#222"/>`;
-  svg += `<text x="12" y="17" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName} — Gantt（一次 progress，CPU 估时）</text>`;
-  svg += `<text x="${W - 8}" y="17" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">总 CPU ≈ ${totalEnd.toFixed(1)} ms（critical path = max thread）</text>`;
+  const laTag = preset.la_preset === "NEW" ? "NEW 6-la cascade" : "OLD la (depth+1)";
+  const tflopsTag = preset.tflops ? `${preset.tflops} TFLOPS (round3 measured)` : "TFLOPS pending";
+  svg += `<text x="12" y="17" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName} — Gantt · ${laTag} · ${tflopsTag}</text>`;
+  svg += `<text x="${W - 8}" y="17" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">总 CPU ≈ ${totalEnd.toFixed(1)} ms (critical path = max thread)</text>`;
 
   // thread rows
   for (let i = 0; i < NROWS; i++) {
@@ -300,11 +384,11 @@ function renderGantt(presetName, preset) {
     svg += `<text x="${6 + pillW / 2}" y="${yMid + 4}" text-anchor="middle" class="thread-label">${th}</text>`;
     // thread total
     let threadEnd = 0;
-    for (const t of TASKS) {
+    for (const t of tasks) {
       if (placement[t.name].thread === th) threadEnd = Math.max(threadEnd, placement[t.name].end);
     }
     let threadStart = Infinity;
-    for (const t of TASKS) {
+    for (const t of tasks) {
       if (placement[t.name].thread === th) threadStart = Math.min(threadStart, placement[t.name].start);
     }
     const idle = threadStart;
@@ -320,7 +404,7 @@ function renderGantt(presetName, preset) {
     // inside the box (estimated from char count × font width). Anything
     // longer falls back to the next-shorter form, then to no text +
     // <title> hover tooltip.
-    for (const t of TASKS) {
+    for (const t of tasks) {
       const p = placement[t.name];
       if (p.thread !== th) continue;
       const x = leftMargin + p.start * SCALE;
@@ -385,7 +469,7 @@ function renderGantt(presetName, preset) {
     const yProd = HEADER_H + threadList.indexOf(binding.thread) * ROW_H + ROW_H / 2;
     const yCons = HEADER_H + threadList.indexOf(cp.thread) * ROW_H + ROW_H / 2;
     const xEdge = leftMargin + binding.end * SCALE;
-    svg += `<path d="M ${xEdge} ${yProd} L ${xEdge} ${yCons}" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="4 3" fill="none"><title>${bindingName}@${TASKS.find(t=>t.name===bindingName).la} → ${consName}@${TASKS.find(t=>t.name===consName).la}</title></path>`;
+    svg += `<path d="M ${xEdge} ${yProd} L ${xEdge} ${yCons}" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="4 3" fill="none"><title>${bindingName}@${tasks.find(t=>t.name===bindingName).la} → ${consName}@${tasks.find(t=>t.name===consName).la}</title></path>`;
     svg += `<circle cx="${xEdge}" cy="${yProd}" r="3" fill="#b71c1c"/>`;
     svg += `<polygon points="${xEdge - 4},${yCons - 4} ${xEdge + 4},${yCons - 4} ${xEdge},${yCons + 1}" fill="#b71c1c"/>`;
   }
@@ -432,16 +516,17 @@ function splitLabel(name) {
 }
 
 function renderTopology(presetName, preset) {
+  const tasks = tasksWithLa(preset.la_preset);
   const W = 1180, ROW_H = 84, HEADER_H = 24, COL_W = 110;
   const tasksByStream = {};
   for (const s of STREAM_ORDER) tasksByStream[s] = [];
-  for (const t of TASKS) tasksByStream[t.stream].push(t);
+  for (const t of tasks) tasksByStream[t.stream].push(t);
   const NROWS = STREAM_ORDER.length;
   const H = HEADER_H + NROWS * ROW_H + 8;
 
   const threadFireIndex = {};
   const threadCounters = {};
-  for (const t of TASKS) {
+  for (const t of tasks) {
     const th = preset.map[t.name];
     threadCounters[th] = (threadCounters[th] || 0) + 1;
     threadFireIndex[t.name] = threadCounters[th];
@@ -511,7 +596,7 @@ function renderTopology(presetName, preset) {
 
   // per-thread fire chain arrows
   const tasksByThread = {};
-  for (const t of TASKS) {
+  for (const t of tasks) {
     const th = preset.map[t.name];
     (tasksByThread[th] = tasksByThread[th] || []).push(t);
   }

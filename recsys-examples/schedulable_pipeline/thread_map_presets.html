@@ -90,6 +90,14 @@
   ▸ <strong>注</strong>：上面 8 个 OLD-la 数据来自 round3 第一次跑，executor.py 还没带本会话加的 <code>[engine]</code> orange + <code>inline_thread="compute"</code> 改动；patched 重跑结果出来后会刷新此表。
 </div>
 
+<div style="background: #ffe4e1; border-left: 4px solid #c62828; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6;">
+  <strong>🩺 la cascade silent bug 诊断 + 真正的 fix（2026-05-01）</strong><br>
+  ▸ <strong>Bug</strong>：NEW 6-la cascade 把 <code>finish_shuffle.la=3</code> 和 <code>start_input_dist.la=3</code> 设成同 la，触发 engine <code>_compute_cpu_deps</code> 的 <strong>slot-edge same-progress CPU edge</strong>（<a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/engine/executor.py#L253-L257">executor.py:253-257</a>）—— compute 线程的 start_input_dist 必须等 io 线程的 finish_shuffle body 在 same progress 内完成，5ms 起点 idle gap 直接来自这条边。SPEC 把这对故意保持 same-la 是个失误（"+1 la 仅给 same-thread chain pair" 把 cross-thread 这对漏了）。<br>
+  ▸ <strong>Fix（NEW_V2）</strong>：<code>start_input_dist.la=2</code>（slot 读 offset=2），<code>finish_shuffle.la=3</code>（slot 写 offset=3）。<code>DataSlot("shuffled_batch", 2)</code> ≠ <code>DataSlot("shuffled_batch", 3)</code>，无 writer match，无 CPU edge。compute 线程读 slot[2] 是上一 progress finish_shuffle@3 经 ring rotation 写入的数据 — 同 progress 内不再 wait。<br>
+  ▸ <strong>但只动 la 还不够</strong>：<code>_NcclOrderedLock</code> 全局 ticket 链（<code>start_shuffle→finish_shuffle→start_input_dist→...</code>）按 declaration order 串行 acquire/release，<strong>不分 la 不分 comm</strong>。即使 slot edge 删了，NCCL ticket 还是会强制 compute 线程等 io 线程的 finish_shuffle body 完。要彻底解锁需要叠加 <strong>Codex Option B</strong>：把 <code>finish_shuffle</code> body 拆成 [KK wait + plan resolve（无锁）] + [a2a NCCL window（窄 ticket 锁）]，KK wait 1.5ms 移出锁，io 线程的 ticket 提前 1.5ms 释放。<br>
+  ▸ <strong>新 variant</strong> <code>new_default_la_v2</code> 跑 NEW_V2 la + default thread_map + 当前 task-level lock，单独验证 la 改动的 parity（不会改善 wall-clock，但 bit-exact 应通过）；下一步加 finish_shuffle 拆分跑 round5。
+</div>
+
 <!-- ========================================================== -->
 <script>
 // 14 tasks (HSTU prefetch variant, depth=1). stream 来自
@@ -124,7 +132,20 @@ const LA_PRESETS = {
   },
   NEW: {
     h2d: 5, start_shuffle: 4, finish_shuffle: 3,
-    start_input_dist: 3, wait_input_dist: 2,
+    start_input_dist: 3, wait_input_dist: 2,   // ← BUG: same-la as finish_shuffle
+    prefetch_embeddings: 1,
+  },
+  // NEW_V2 — fix the NEW cascade's silent bug: finish_shuffle@3 → start_input_dist@3
+  // is cross-thread same-la (engine creates same-progress slot CPU edge via
+  // executor.py:253-257, NOT filtered by cross-la rule). Lower
+  // start_input_dist→2 / wait_input_dist→2: producer.la (3) > consumer.la (2)
+  // for "shuffled_batch" slot, so DataSlot keys (slot, offset) differ →
+  // no writer match → no CPU edge → compute thread no longer waits for io
+  // thread's finish_shuffle body in this progress (reads slot[2] = data
+  // written by finish_shuffle@3 in prior progress, ring-rotated).
+  NEW_V2: {
+    h2d: 5, start_shuffle: 4, finish_shuffle: 3,
+    start_input_dist: 2, wait_input_dist: 2,
     prefetch_embeddings: 1,
   },
 };
@@ -310,6 +331,12 @@ const PRESETS = {
       backward: "compute", finalize_model_grads: "compute",
       optimizer_step: "compute", watchdog_step: "compute",
     },
+  },
+  "new_default_la_v2": {
+    desc: "engine + default thread_map (io / compute) + NEW_V2 la (start_input_dist@2, wait_input_dist@2) — 修掉 NEW la cascade 里 finish_shuffle@3↔start_input_dist@3 的 same-la cross-thread slot CPU edge bug。compute 线程的 start_input_dist 不再被 io 线程的 finish_shuffle body 在 same progress 内 gate（slot[2] 由上一 progress finish_shuffle@3 经 ring rotation 写入）。但 _NcclOrderedLock task 级 ticket 链仍然 serialize 整个 io→compute NCCL chain，所以单 la fix 不够 — 需要配合 finish_shuffle 拆分 (Codex Option B) 才能彻底解锁 wall-clock 收益。",
+    la_preset: "NEW_V2",
+    tflops: null,  // round4 pending
+    map: NEW_DEFAULT_MAP,
   },
 };
 

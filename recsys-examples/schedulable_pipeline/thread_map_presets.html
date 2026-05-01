@@ -59,9 +59,11 @@
   <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 9px;">tNN（per-task）</span>
   <br>
   <strong>lookahead</strong>: <code>la=k</code> 表示该 task 比同 progress 的 <code>la=0</code> task 提前处理 batch index +k；<code>la=0</code> = 处理本步 batch。<br>
-  <strong>Gantt 中的红色虚线</strong>：跨线程同 progress 数据/控制依赖中**导致 wait** 的 binding 边。规则：<code>ord</code> 类（slot edge / depends_on）只在 producer.la == consumer.la 时画 wait；不同 la 由 engine ring rotation 跨 progress 满足，本 progress 内**不**画 wait。<code>sync</code> 类（<code>same_progress_sync</code>，比如 prefetch=True 时 prefetch_embeddings→backward）不分 la 永远画。<br>
-  → 例：<code>finish_shuffle → start_input_dist</code> 在 OLD la (2 vs 1) 下不画，**只有 NEW la cascade (3 vs 3 同 la) 才画**。所以前 7 个 OLD-la variant 没有 io→compute 的同 progress wait，只有 la_cascade / la_cascade_full_split 有。<br>
-  la=0 cluster 内部（zero_grad / global_tokens / nccl_safety_barrier / forward → backward → finalize → opt → watchdog）所有任务都同 la=0，跨线程时画 wait（per_task 下 forward→backward 把 backward 锁在 forward 之后）。<br>
+  <strong>Gantt 中的红色虚线</strong>：跨线程同 progress 内**导致 wait** 的 binding 边。共 4 类边模型：<br>
+  <code>ord</code>（slot/depends_on）— 只在 producer.la == consumer.la 时画 wait；不同 la 由 engine ring rotation 跨 progress 满足。<br>
+  <code>sync</code>（<code>same_progress_sync</code>，如 prefetch_embeddings→backward）— 不分 la 永远画。<br>
+  <code>fifo</code>（同 stream 不同线程）— engine 强制提交顺序（executor.py:310-322），不分 la 永远画。<br>
+  <code>nccl</code>（<code>_NcclOrderedLock</code> 全局 ticket 链 executor.py:367-413）— 所有 nccl=True task 按 declaration order 串行 acquire/release，**critical section 是整个 task body**（含 host sync），不分 la / 不分 comm。这是 OLD la 和 NEW la 都有的 io→compute ~3ms gap 真正成因（ticket 链：start_shuffle→finish_shuffle→start_input_dist→wait_input_dist→global_tokens→backward→finalize）。**la cascade 没解决这个问题**——它只压了 host sync 时长，没缩 NCCL ticket 链。<br>
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
@@ -69,7 +71,8 @@
   <strong>📊 Round3 benchmark sweep (cw-dfw H100 ×8, 2026-04-30, sweep <code>mtms_sweep_round3_20260430_140637</code>)</strong><br>
   ▸ <strong>9 variants</strong>，全部 nsys ON，每个 50 iter profile 区间，TFLOPS = avg(iter 599/699/799)。<br>
   ▸ <strong>la cascade 机制本身有效</strong>：NVTX 上 <code>wait_input_dist</code> host block 从 ~8ms 压到 ~0.4ms（splits a2a 已飞 1 整 iter）<br>
-  ▸ <strong>但 default 2-thread map 下增益被吞</strong>：11 个 task 串行在 compute 线程，任意一个剩余 host sync 都拦住后面 task 发射 → 加 thread 拆开后才能真正受益。
+  ▸ <strong>但 wall-clock 没收益（−0.1%）</strong>：nsys SQLite 量化（rank0 la_cascade.sqlite）：<code>start_input_dist</code> on data_dist stream 实际启动延迟 3-4ms，跟 OLD la new_default 一样。原因是 <code>_NcclOrderedLock</code> task 级 critical section（executor.py:367-413）：compute 线程要 acquire ticket 2 必须等 io 线程释放 ticket 1，而 ticket 1 包了整个 finish_shuffle body 含 KK background wait。<strong>la cascade 砍了 host sync 时长但没缩 NCCL ticket 链</strong>。<br>
+  ▸ <strong>下一刀方向</strong>：把 NCCL lock 从 task 级降到 op 级（每个 <code>dist.X()</code> 单独 acquire/release），或加 <code>release_early()</code> API 让 task 在 NCCL queue 完后立刻释放，host sync 不持锁。
   <table style="margin-top: 10px; border-collapse: collapse; font-size: 12px;">
     <tr style="background: #f0e0a0;"><th style="padding: 4px 10px; border: 1px solid #ccc;">variant</th><th style="padding: 4px 10px; border: 1px solid #ccc;">la cascade</th><th style="padding: 4px 10px; border: 1px solid #ccc;">thread_map</th><th style="padding: 4px 10px; border: 1px solid #ccc;">TFLOPS</th><th style="padding: 4px 10px; border: 1px solid #ccc;">vs new_default</th></tr>
     <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">legacy_none</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">— (legacy)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1976</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−2.2%</td></tr>
@@ -151,7 +154,7 @@ const TASK_COST_MS = {
   watchdog_step:             0.1,
 };
 
-// 同 progress 内的 task→task CPU 依赖。三类：
+// 同 progress 内的 task→task CPU 依赖。四类：
 //   "ord"  — slot edge / depends_on：only intra-progress wait when
 //            producer.la == consumer.la；不同 la 由 engine ring rotation
 //            跨 progress 满足，本 progress 内不 wait（executor.py:255-262）
@@ -160,6 +163,11 @@ const TASK_COST_MS = {
 //   "fifo" — same-stream submission order：engine adds CPU dep when same-
 //            stream tasks are split across threads, regardless of la
 //            (executor.py:310-322)
+//   "nccl" — _NcclOrderedLock 全局 ticket 链 (executor.py:367-413)：所有
+//            nccl=True task 按 declaration order 串行 acquire/release。
+//            critical section 是 *整个 task body*（含 KK background wait /
+//            host sync 之类），所以 ticket N 的 task 要等 ticket N-1 整个
+//            task body 跑完才能 acquire。跨线程 → wait, 不分 la, 不分 comm.
 const SAME_PROGRESS_CROSS_PAIRS = [
   // ord — slot reads/writes + depends_on (subject to cross-la ring rotation)
   ["h2d",                     "start_shuffle",         "ord"],   // slot: batch_gpu (start_shuffle reads)
@@ -180,6 +188,15 @@ const SAME_PROGRESS_CROSS_PAIRS = [
   // fifo — same default-stream tasks; engine forces submission order
   ["zero_grad",               "global_tokens_allreduce", "fifo"],
   ["global_tokens_allreduce", "nccl_safety_barrier",   "fifo"],
+  // nccl — _NcclOrderedLock ticket chain (consecutive NCCL=True tasks in
+  // declaration order). non-identity shuffler 假设。critical section
+  // covers whole task body → 任何 host sync / kk wait 都在锁内, 严重 serialize。
+  ["start_shuffle",           "finish_shuffle",        "nccl"],   // ticket 0→1
+  ["finish_shuffle",          "start_input_dist",      "nccl"],   // ticket 1→2
+  ["start_input_dist",        "wait_input_dist",       "nccl"],   // ticket 2→3
+  ["wait_input_dist",         "global_tokens_allreduce", "nccl"], // ticket 3→4
+  ["global_tokens_allreduce", "backward",              "nccl"],   // ticket 4→5
+  ["backward",                "finalize_model_grads",  "nccl"],   // ticket 5→6
 ];
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
@@ -334,9 +351,9 @@ function placeTasks(preset) {
         const pp = placement[prod];
         if (pp && pp.thread !== th) {
           // "ord" pairs: wait only when same la (cross-la → ring rotation).
-          // "sync" / "fifo" pairs: always wait when cross-thread.
+          // "sync" / "fifo" / "nccl" pairs: always wait when cross-thread.
           const sameLa = getLa(prod, preset.la_preset) === getLa(cons, preset.la_preset);
-          if (type === "sync" || type === "fifo" || sameLa) {
+          if (type === "sync" || type === "fifo" || type === "nccl" || sameLa) {
             start = Math.max(start, pp.end);
           }
         }
@@ -477,16 +494,16 @@ function renderGantt(presetName, preset) {
   for (const [consName, producerEntries] of Object.entries(consumerToProducers)) {
     const cp = placement[consName];
     if (!cp) continue;
-    let binding = null, bindingName = null;
+    let binding = null, bindingName = null, bindingType = null;
     for (const [prodName, type] of producerEntries) {
       const pp = placement[prodName];
       if (!pp || pp.thread === cp.thread) continue;
       // skip cross-la "ord" pairs (ring-rotation satisfied, no wait drawn)
-      // "sync" and "fifo" types always apply (no la check).
+      // "sync" / "fifo" / "nccl" types always apply (no la check).
       if (type === "ord" && getLa(prodName, preset.la_preset) !== getLa(consName, preset.la_preset)) continue;
       // float-tolerant equality
       if (Math.abs(pp.end - cp.start) < 0.005) {
-        if (!binding || pp.end > binding.end) { binding = pp; bindingName = prodName; }
+        if (!binding || pp.end > binding.end) { binding = pp; bindingName = prodName; bindingType = type; }
       }
     }
     if (!binding) continue;

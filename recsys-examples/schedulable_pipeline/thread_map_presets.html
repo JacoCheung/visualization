@@ -151,25 +151,35 @@ const TASK_COST_MS = {
   watchdog_step:             0.1,
 };
 
-// 同 progress 内的 task→task CPU 依赖。两类：
-//   "ord" — slot edge / depends_on：only intra-progress wait when
-//           producer.la == consumer.la；不同 la 由 engine ring rotation
-//           跨 progress 满足，本 progress 内不 wait（executor.py:255-262）。
+// 同 progress 内的 task→task CPU 依赖。三类：
+//   "ord"  — slot edge / depends_on：only intra-progress wait when
+//            producer.la == consumer.la；不同 la 由 engine ring rotation
+//            跨 progress 满足，本 progress 内不 wait（executor.py:255-262）
 //   "sync" — same_progress_sync：always intra-progress wait, 不分 la
-//           (executor.py:273)
-//
-// 这就解释了 OLD la cascade 下 finish_shuffle@2 → start_input_dist@1
-// 不同 la 不应触发 wait；NEW 6-la cascade 下两者同 la=3 才 wait。
+//            (executor.py:273)
+//   "fifo" — same-stream submission order：engine adds CPU dep when same-
+//            stream tasks are split across threads, regardless of la
+//            (executor.py:310-322)
 const SAME_PROGRESS_CROSS_PAIRS = [
-  ["finish_shuffle",          "start_input_dist",     "ord"],   // slot: shuffled_batch
-  ["zero_grad",               "backward",             "ord"],   // depends_on (la=0)
-  ["global_tokens_allreduce", "backward",             "ord"],   // slot: global_tokens (la=0)
-  ["nccl_safety_barrier",     "forward",              "ord"],   // depends_on (la=0)
-  ["forward",                 "backward",             "ord"],   // slot: losses (la=0)
-  ["backward",                "finalize_model_grads", "ord"],   // depends_on (la=0)
-  ["finalize_model_grads",    "optimizer_step",       "ord"],   // depends_on (la=0)
-  ["optimizer_step",          "watchdog_step",        "ord"],   // depends_on (la=0)
-  ["prefetch_embeddings",     "backward",             "sync"],  // same_progress_sync (cross-la, always wait)
+  // ord — slot reads/writes + depends_on (subject to cross-la ring rotation)
+  ["h2d",                     "start_shuffle",         "ord"],   // slot: batch_gpu (start_shuffle reads)
+  ["h2d",                     "finish_shuffle",        "ord"],   // slot: batch_gpu (finish_shuffle reads)
+  ["start_shuffle",           "finish_shuffle",        "ord"],   // slot: shuffle_handle
+  ["finish_shuffle",          "start_input_dist",      "ord"],   // slot: shuffled_batch
+  ["start_input_dist",        "wait_input_dist",       "ord"],   // depends_on (tasks.py:357)
+  ["wait_input_dist",         "prefetch_embeddings",   "ord"],   // depends_on (tasks.py:417, prefetch=True)
+  ["zero_grad",               "backward",              "ord"],   // depends_on (la=0)
+  ["global_tokens_allreduce", "backward",              "ord"],   // slot: global_tokens (la=0)
+  ["nccl_safety_barrier",     "forward",               "ord"],   // depends_on (tasks.py:459, la=0)
+  ["forward",                 "backward",              "ord"],   // slot: losses (la=0)
+  ["backward",                "finalize_model_grads",  "ord"],   // depends_on (la=0)
+  ["finalize_model_grads",    "optimizer_step",        "ord"],   // depends_on (la=0)
+  ["optimizer_step",          "watchdog_step",         "ord"],   // depends_on (la=0)
+  // sync — same_progress_sync (cross-la always-wait, prefetch=True)
+  ["prefetch_embeddings",     "backward",              "sync"],
+  // fifo — same default-stream tasks; engine forces submission order
+  ["zero_grad",               "global_tokens_allreduce", "fifo"],
+  ["global_tokens_allreduce", "nccl_safety_barrier",   "fifo"],
 ];
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
@@ -217,10 +227,10 @@ const PRESETS = {
     },
   },
   "new_per_task": {
-    desc: "engine + per_task sentinel — 14 threads, 每 task 一条线程（dispatch 开销最大）",
+    desc: "engine + per_task sentinel — 14 threads，thread id == task.name (executor.py:_resolve_thread_id 197-198)",
     la_preset: "OLD",
     tflops: 1945,
-    map: Object.fromEntries(TASKS.map((t, i) => [t.name, "t" + String(i + 1).padStart(2, "0")])),
+    map: Object.fromEntries(TASKS.map(t => [t.name, t.name])),
   },
   "new_io_prefetch_compute": {
     desc: "engine 3 threads (io / prefetch / compute) — prefetch 拆出去和 backward 重叠",
@@ -323,10 +333,10 @@ function placeTasks(preset) {
       if (cons === t.name) {
         const pp = placement[prod];
         if (pp && pp.thread !== th) {
-          // "ord" pairs: only intra-progress wait when SAME la (cross-la
-          // satisfied via ring rotation, no wait). "sync" pairs always
-          // intra-progress wait regardless of la.
-          if (type === "sync" || getLa(prod, preset.la_preset) === getLa(cons, preset.la_preset)) {
+          // "ord" pairs: wait only when same la (cross-la → ring rotation).
+          // "sync" / "fifo" pairs: always wait when cross-thread.
+          const sameLa = getLa(prod, preset.la_preset) === getLa(cons, preset.la_preset);
+          if (type === "sync" || type === "fifo" || sameLa) {
             start = Math.max(start, pp.end);
           }
         }
@@ -340,12 +350,16 @@ function placeTasks(preset) {
 }
 
 function orderThreads(threadList) {
+  // Order: io/memcpy → data_dist → prefetch → compute/default → per_task
+  // (named after task.name, in TASKS declaration order) → other.
+  const taskOrder = Object.fromEntries(TASKS.map((t, i) => [t.name, 10 + i]));
   const rank = (t) => {
     if (t === "io") return 0;
     if (t === "memcpy") return 0;
     if (t === "data_dist") return 1;
     if (t === "prefetch") return 2;
     if (t === "compute" || t === "default") return 3;
+    if (t in taskOrder) return taskOrder[t];   // per_task: rank by TASKS order
     if (/^t\d+$/.test(t)) return 4 + parseInt(t.slice(1));
     return 100;
   };
@@ -468,6 +482,7 @@ function renderGantt(presetName, preset) {
       const pp = placement[prodName];
       if (!pp || pp.thread === cp.thread) continue;
       // skip cross-la "ord" pairs (ring-rotation satisfied, no wait drawn)
+      // "sync" and "fifo" types always apply (no la check).
       if (type === "ord" && getLa(prodName, preset.la_preset) !== getLa(consName, preset.la_preset)) continue;
       // float-tolerant equality
       if (Math.abs(pp.end - cp.start) < 0.005) {

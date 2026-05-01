@@ -59,7 +59,9 @@
   <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 9px;">tNN（per-task）</span>
   <br>
   <strong>lookahead</strong>: <code>la=k</code> 表示该 task 比同 progress 的 <code>la=0</code> task 提前处理 batch index +k；<code>la=0</code> = 处理本步 batch。<br>
-  <strong>Gantt 中的红色虚线</strong>：跨线程 <strong>同 progress</strong> 数据/控制依赖中**导致 wait** 的那一条 binding 边（其它能被同线程顺序自动满足的不画）。覆盖 <code>finish_shuffle@3 → start_input_dist@3</code> 这种同 la slot 边、la=0 cluster 的 <code>depends_on</code> / slot 链（zero_grad/global_tokens/nccl_safety_barrier/forward → backward → finalize → opt → watchdog）、以及 prefetch=True 时的 <code>prefetch_embeddings → backward</code>（cross-la same_progress_sync）。在 default map 下只表现为 io→compute 的一条线；在 per_task 下能看到 forward→backward 把 backward 锁在 forward 之后。<br>
+  <strong>Gantt 中的红色虚线</strong>：跨线程同 progress 数据/控制依赖中**导致 wait** 的 binding 边。规则：<code>ord</code> 类（slot edge / depends_on）只在 producer.la == consumer.la 时画 wait；不同 la 由 engine ring rotation 跨 progress 满足，本 progress 内**不**画 wait。<code>sync</code> 类（<code>same_progress_sync</code>，比如 prefetch=True 时 prefetch_embeddings→backward）不分 la 永远画。<br>
+  → 例：<code>finish_shuffle → start_input_dist</code> 在 OLD la (2 vs 1) 下不画，**只有 NEW la cascade (3 vs 3 同 la) 才画**。所以前 7 个 OLD-la variant 没有 io→compute 的同 progress wait，只有 la_cascade / la_cascade_full_split 有。<br>
+  la=0 cluster 内部（zero_grad / global_tokens / nccl_safety_barrier / forward → backward → finalize → opt → watchdog）所有任务都同 la=0，跨线程时画 wait（per_task 下 forward→backward 把 backward 锁在 forward 之后）。<br>
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
 
@@ -149,25 +151,25 @@ const TASK_COST_MS = {
   watchdog_step:             0.1,
 };
 
-// 同 progress 内的 task→task CPU 依赖（来自 hstu_pipeline/tasks.py 的
-// depends_on / reads-writes slot 边 / same_progress_sync）。在 default
-// 这种把它们都堆在 compute 一条线程上的 map 里，这些依赖被同线程顺序
-// 自动满足；在 per_task / 拆分 variant 里，跨线程边会强制下游等。
+// 同 progress 内的 task→task CPU 依赖。两类：
+//   "ord" — slot edge / depends_on：only intra-progress wait when
+//           producer.la == consumer.la；不同 la 由 engine ring rotation
+//           跨 progress 满足，本 progress 内不 wait（executor.py:255-262）。
+//   "sync" — same_progress_sync：always intra-progress wait, 不分 la
+//           (executor.py:273)
 //
-// 包含三类同 progress 边：
-//   1) la=3 slot edge:  finish_shuffle → start_input_dist (reads shuffled_batch)
-//   2) la=0 cluster:    depends_on 链 + slot edge（forward 写 losses, backward 读）
-//   3) cross-la 但 same_progress_sync (prefetch=True): prefetch → backward
+// 这就解释了 OLD la cascade 下 finish_shuffle@2 → start_input_dist@1
+// 不同 la 不应触发 wait；NEW 6-la cascade 下两者同 la=3 才 wait。
 const SAME_PROGRESS_CROSS_PAIRS = [
-  ["finish_shuffle",          "start_input_dist"],     // la=3 (slot: shuffled_batch)
-  ["zero_grad",               "backward"],             // la=0 (depends_on)
-  ["global_tokens_allreduce", "backward"],             // la=0 (slot: global_tokens)
-  ["nccl_safety_barrier",     "forward"],              // la=0 (depends_on)
-  ["forward",                 "backward"],             // la=0 (slot: losses)
-  ["backward",                "finalize_model_grads"], // la=0 (depends_on)
-  ["finalize_model_grads",    "optimizer_step"],       // la=0 (depends_on)
-  ["optimizer_step",          "watchdog_step"],        // la=0 (depends_on)
-  ["prefetch_embeddings",     "backward"],             // cross-la same_progress_sync (prefetch=True)
+  ["finish_shuffle",          "start_input_dist",     "ord"],   // slot: shuffled_batch
+  ["zero_grad",               "backward",             "ord"],   // depends_on (la=0)
+  ["global_tokens_allreduce", "backward",             "ord"],   // slot: global_tokens (la=0)
+  ["nccl_safety_barrier",     "forward",              "ord"],   // depends_on (la=0)
+  ["forward",                 "backward",             "ord"],   // slot: losses (la=0)
+  ["backward",                "finalize_model_grads", "ord"],   // depends_on (la=0)
+  ["finalize_model_grads",    "optimizer_step",       "ord"],   // depends_on (la=0)
+  ["optimizer_step",          "watchdog_step",        "ord"],   // depends_on (la=0)
+  ["prefetch_embeddings",     "backward",             "sync"],  // same_progress_sync (cross-la, always wait)
 ];
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
@@ -191,19 +193,19 @@ const PRESETS = {
   "legacy_none": {
     desc: "Legacy pipeline (RECSYS_PIPELINE_BACKEND=legacy) — 单 thread, 无 engine, OLD la cascade",
     la_preset: "OLD",
-    tflops: 1976,
+    tflops: 1975,
     map: ALL_ON("main"),
   },
   "new_default": {
-    desc: "engine + HSTU_DEFAULT_THREAD_MAP (io / compute), OLD la — round3 baseline",
+    desc: "engine + HSTU_DEFAULT_THREAD_MAP (io / compute), OLD la — round3 baseline / 冠军",
     la_preset: "OLD",
-    tflops: 2021,
+    tflops: 2037,
     map: NEW_DEFAULT_MAP,
   },
   "new_by_stream": {
     desc: "engine + by_stream sentinel (4 threads, 每 task → 它自己的 stream 名)",
     la_preset: "OLD",
-    tflops: 1997,
+    tflops: 2002,
     map: {
       h2d: "memcpy", start_shuffle: "memcpy", finish_shuffle: "memcpy",
       start_input_dist: "data_dist", wait_input_dist: "data_dist",
@@ -317,11 +319,16 @@ function placeTasks(preset) {
   for (const t of tasks) {
     const th = preset.map[t.name];
     let start = lastEndOnThread[th] || 0;
-    for (const [prod, cons] of SAME_PROGRESS_CROSS_PAIRS) {
+    for (const [prod, cons, type] of SAME_PROGRESS_CROSS_PAIRS) {
       if (cons === t.name) {
         const pp = placement[prod];
         if (pp && pp.thread !== th) {
-          start = Math.max(start, pp.end);
+          // "ord" pairs: only intra-progress wait when SAME la (cross-la
+          // satisfied via ring rotation, no wait). "sync" pairs always
+          // intra-progress wait regardless of la.
+          if (type === "sync" || getLa(prod, preset.la_preset) === getLa(cons, preset.la_preset)) {
+            start = Math.max(start, pp.end);
+          }
         }
       }
     }
@@ -450,16 +457,18 @@ function renderGantt(presetName, preset) {
   // per consumer (the producer whose end == consumer.start). 多个生产者
   // 同时存在时只画导致 wait 的那一条，避免视觉噪音。
   const consumerToProducers = {};
-  for (const [prod, cons] of SAME_PROGRESS_CROSS_PAIRS) {
-    (consumerToProducers[cons] = consumerToProducers[cons] || []).push(prod);
+  for (const [prod, cons, type] of SAME_PROGRESS_CROSS_PAIRS) {
+    (consumerToProducers[cons] = consumerToProducers[cons] || []).push([prod, type]);
   }
-  for (const [consName, producers] of Object.entries(consumerToProducers)) {
+  for (const [consName, producerEntries] of Object.entries(consumerToProducers)) {
     const cp = placement[consName];
     if (!cp) continue;
     let binding = null, bindingName = null;
-    for (const prodName of producers) {
+    for (const [prodName, type] of producerEntries) {
       const pp = placement[prodName];
       if (!pp || pp.thread === cp.thread) continue;
+      // skip cross-la "ord" pairs (ring-rotation satisfied, no wait drawn)
+      if (type === "ord" && getLa(prodName, preset.la_preset) !== getLa(consName, preset.la_preset)) continue;
       // float-tolerant equality
       if (Math.abs(pp.end - cp.start) < 0.005) {
         if (!binding || pp.end > binding.end) { binding = pp; bindingName = prodName; }

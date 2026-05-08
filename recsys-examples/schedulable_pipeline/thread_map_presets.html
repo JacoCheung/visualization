@@ -777,7 +777,7 @@ function renderDAG(presetName, preset) {
   }
 
   const safeId = presetName.replace(/[^a-zA-Z0-9_]/g, "_");
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width: 100%; max-width: ${W}px; border: 1px solid #ddd; background: #fafafa;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="flex: 1 1 600px; width: 100%; max-width: ${W}px; height: auto; border: 1px solid #ddd; background: #fafafa;">`;
   svg += `<defs>
     <marker id="dag_${safeId}_slot" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
       <path d="M0,0 L0,6 L9,3 z" fill="#1976d2"/></marker>
@@ -853,61 +853,43 @@ function renderDAG(presetName, preset) {
   }
 
   svg += `</svg>`;
-  return svg;
+
+  // ── Per-variant legend (variant-specific NCCL ticket list +
+  //    universal edge / stream / nccl conventions) ──
+  const ticketRows = Object.entries(tickets)
+    .sort((a, b) => a[1] - b[1])
+    .map(([n, t]) => `<div><span style="color:#d32f2f;font-weight:bold;">t${t}</span> ${n}</div>`)
+    .join("");
+  const legend = `
+<div style="flex: 0 1 280px; min-width: 240px; font-size: 11px; line-height: 1.7; padding: 10px 12px; background: #f5f7fa; border: 1px solid #d0d7e2; border-radius: 4px;">
+  <div style="font-weight: 600; margin-bottom: 4px; color: #333;">📐 ${presetName} 图例</div>
+  <h4 style="margin: 6px 0 2px 0; font-size: 11px;">边类型</h4>
+  <div><svg width="40" height="10" style="vertical-align:middle"><line x1="2" y1="5" x2="32" y2="5" stroke="#1976d2" stroke-width="1.8"/><polygon points="32,1 40,5 32,9" fill="#1976d2"/></svg> <span style="color:#1976d2">slot</span> reads/writes</div>
+  <div><svg width="40" height="10" style="vertical-align:middle"><line x1="2" y1="5" x2="32" y2="5" stroke="#2e7d32" stroke-width="1.8"/><polygon points="32,1 40,5 32,9" fill="#2e7d32"/></svg> <span style="color:#2e7d32">depends_on</span> 同 la</div>
+  <div><svg width="40" height="10" style="vertical-align:middle"><line x1="2" y1="5" x2="32" y2="5" stroke="#f57c00" stroke-width="1.8" stroke-dasharray="4 2"/><polygon points="32,1 40,5 32,9" fill="#f57c00"/></svg> <span style="color:#f57c00">same_progress_sync</span></div>
+  <h4 style="margin: 6px 0 2px 0; font-size: 11px;">节点底色 (stream)</h4>
+  <div><span style="background:#d4ecdb;padding:1px 6px;border:1px solid #aaa;border-radius:2px;font-family:monospace;">memcpy</span></div>
+  <div style="margin-top:2px;"><span style="background:#f6d4d4;padding:1px 6px;border:1px solid #aaa;border-radius:2px;font-family:monospace;">data_dist</span></div>
+  <div style="margin-top:2px;"><span style="background:#e7d4f4;padding:1px 6px;border:1px solid #aaa;border-radius:2px;font-family:monospace;">prefetch</span></div>
+  <div style="margin-top:2px;"><span style="background:#dde7fb;padding:1px 6px;border:1px solid #aaa;border-radius:2px;font-family:monospace;">default</span></div>
+  <h4 style="margin: 6px 0 2px 0; font-size: 11px;">边框 (nccl flag)</h4>
+  <div><span style="border:2px solid #d32f2f;padding:1px 6px;border-radius:2px;font-family:monospace;">红 2px</span> = nccl=True</div>
+  <div style="margin-top:2px;"><span style="border:1px solid #555;padding:1px 6px;border-radius:2px;font-family:monospace;">灰 1px</span> = nccl=False</div>
+  <h4 style="margin: 6px 0 2px 0; font-size: 11px;">NCCL ticket (此 variant)</h4>
+  <div style="font-family: monospace; font-size: 10px; line-height: 1.5;">${ticketRows || "<i>(none — legacy 不走 _NcclOrderedLock)</i>"}</div>
+  <h4 style="margin: 6px 0 2px 0; font-size: 11px;">统计</h4>
+  <div style="font-family:monospace;font-size:10px;">|V|=${tasks.length} · |E|=${edges.length} · 层数=${byLevel.length}</div>
+</div>`;
+
+  return `<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin:8px 0 16px;">${svg}${legend}</div>`;
 }
 
 // ============================================================
 //                          render
 // ============================================================
 
-function renderDAGLegend() {
-  // One-time legend block applying to every variant's DAG panel.
-  // Mirrors the conventions used by computeDAG / renderDAG.
-  return `
-<div style="margin: 28px 0 16px; padding: 14px 18px; background: #f0f5fa; border-left: 4px solid #1565c0; border-radius: 4px; font-size: 12px; line-height: 1.75;">
-  <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">📐 Same-progress DAG — 图例（适用每个 variant 第 ③ 块）</div>
-  <table style="border-collapse: collapse; width: 100%;">
-    <tr>
-      <td style="vertical-align: top; padding-right: 28px; min-width: 240px;">
-        <strong>边类型</strong><br>
-        <svg width="50" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="42" y2="5" stroke="#1976d2" stroke-width="1.8"/><polygon points="42,1 50,5 42,9" fill="#1976d2"/></svg>
-        <span style="color: #1976d2; font-weight: 600;">slot</span> reads/writes (精确 offset 匹配)<br>
-        <svg width="50" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="42" y2="5" stroke="#2e7d32" stroke-width="1.8"/><polygon points="42,1 50,5 42,9" fill="#2e7d32"/></svg>
-        <span style="color: #2e7d32; font-weight: 600;">depends_on</span> 同 lookahead<br>
-        <svg width="50" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="42" y2="5" stroke="#f57c00" stroke-width="1.8" stroke-dasharray="5 3"/><polygon points="42,1 50,5 42,9" fill="#f57c00"/></svg>
-        <span style="color: #f57c00; font-weight: 600;">same_progress_sync</span> (虚线，无视 la)
-      </td>
-      <td style="vertical-align: top; padding-right: 28px; min-width: 180px;">
-        <strong>节点底色 = stream</strong><br>
-        <span style="background: #d4ecdb; padding: 2px 10px; border: 1px solid #aaa; border-radius: 3px; font-family: monospace;">memcpy</span><br>
-        <span style="background: #f6d4d4; padding: 2px 10px; border: 1px solid #aaa; border-radius: 3px; font-family: monospace;">data_dist</span><br>
-        <span style="background: #e7d4f4; padding: 2px 10px; border: 1px solid #aaa; border-radius: 3px; font-family: monospace;">prefetch</span><br>
-        <span style="background: #dde7fb; padding: 2px 10px; border: 1px solid #aaa; border-radius: 3px; font-family: monospace;">default</span>
-      </td>
-      <td style="vertical-align: top; padding-right: 28px; min-width: 240px;">
-        <strong>节点边框 = nccl flag</strong><br>
-        <span style="border: 2px solid #d32f2f; padding: 2px 10px; border-radius: 3px; font-family: monospace;">红 2px</span> = <code>nccl=True</code>，参与 <code>_NcclOrderedLock</code><br>
-        <span style="border: 1px solid #555; padding: 2px 10px; border-radius: 3px; font-family: monospace;">灰 1px</span> = <code>nccl=False</code><br><br>
-        <strong>NCCL ticket</strong>: 节点右上角 <span style="color: #d32f2f; font-weight: bold; font-family: monospace;">t0..t7</span><br>
-        按 topo 序里 nccl=True 的子序列派发
-      </td>
-      <td style="vertical-align: top;">
-        <strong>过滤规则</strong> (<code>_build_same_progress_dag_edges</code>)<br>
-        <code>ord</code> 边：producer.la == consumer.la 才入图<br>
-        <code>sync</code> 边：总入图（不分 la）<br>
-        <code>fifo</code> 边：仅 Gantt 用，不入 DAG<br>
-        cross-la <code>ord</code>：由 BatchRing 跨 progress 满足
-      </td>
-    </tr>
-  </table>
-  <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #c8d4e3; color: #555;">
-    DAG 节点位置由 Kahn 拓扑排序自动分层；同一层内按 task 声明序排列。<strong>Variants 共享 DAG 拓扑</strong>：6 个 d3 variant（plateau cascade）共享一张图、2 个 d6 variant（6-la cascade）共享另一张——thread_map 不影响 DAG，只影响 ① Gantt 上 task 落在哪个线程。
-  </div>
-</div>`;
-}
-
 function render() {
-  let html = renderDAGLegend();
+  let html = "";
   for (const [name, preset] of Object.entries(PRESETS)) {
     html += `<h2>${name}</h2>`;
     html += `<p class="preset-meta">${preset.desc}</p>`;

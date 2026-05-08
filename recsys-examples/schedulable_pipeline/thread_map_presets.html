@@ -854,15 +854,20 @@ function renderDAG(presetName, preset) {
 
   svg += `</svg>`;
 
-  // ── Per-variant legend (variant-specific NCCL ticket list +
-  //    universal edge / stream / nccl conventions) ──
+  // ── Per-DAG legend (universal edge / stream / nccl conventions
+  //    + this DAG's NCCL ticket list + variants sharing this DAG) ──
   const ticketRows = Object.entries(tickets)
     .sort((a, b) => a[1] - b[1])
     .map(([n, t]) => `<div><span style="color:#d32f2f;font-weight:bold;">t${t}</span> ${n}</div>`)
     .join("");
+  const variantsBlock = preset._variants && preset._variants.length
+    ? `<h4 style="margin: 6px 0 2px 0; font-size: 11px;">共享此 DAG 的 variants</h4>
+       <div style="font-family: monospace; font-size: 10px; line-height: 1.5;">${preset._variants.map(v => `<div>· ${v}</div>`).join("")}</div>`
+    : "";
   const legend = `
 <div style="flex: 0 1 280px; min-width: 240px; font-size: 11px; line-height: 1.7; padding: 10px 12px; background: #f5f7fa; border: 1px solid #d0d7e2; border-radius: 4px;">
-  <div style="font-weight: 600; margin-bottom: 4px; color: #333;">📐 ${presetName} 图例</div>
+  <div style="font-weight: 600; margin-bottom: 4px; color: #333;">📐 ${preset.la_preset || presetName} 图例</div>
+  ${variantsBlock}
   <h4 style="margin: 6px 0 2px 0; font-size: 11px;">边类型</h4>
   <div><svg width="40" height="10" style="vertical-align:middle"><line x1="2" y1="5" x2="32" y2="5" stroke="#1976d2" stroke-width="1.8"/><polygon points="32,1 40,5 32,9" fill="#1976d2"/></svg> <span style="color:#1976d2">slot</span> reads/writes</div>
   <div><svg width="40" height="10" style="vertical-align:middle"><line x1="2" y1="5" x2="32" y2="5" stroke="#2e7d32" stroke-width="1.8"/><polygon points="32,1 40,5 32,9" fill="#2e7d32"/></svg> <span style="color:#2e7d32">depends_on</span> 同 la</div>
@@ -888,20 +893,47 @@ function renderDAG(presetName, preset) {
 //                          render
 // ============================================================
 
+function renderSharedDAGs() {
+  // DAG 跟 thread_map 无关：只由 task graph + lookahead profile 决定。
+  // 9 个 variant 中 7 个用 d3、2 个用 d6 → 实际只画 2 张 DAG，每张
+  // 列出共享它的 variant，避免在每个 panel 里重复。
+  const byLaPreset = {};
+  for (const [name, preset] of Object.entries(PRESETS)) {
+    (byLaPreset[preset.la_preset] = byLaPreset[preset.la_preset] || []).push(name);
+  }
+  const order = ["d3", "d6"];
+
+  let html = `<h2 style="margin-top: 32px;">Same-progress DAG（preset-independent）</h2>`;
+  html += `<p class="sub">DAG 拓扑由 ① <strong>task graph</strong>（每个 task 的 reads/writes/depends_on/same_progress_sync 声明）+ ② <strong>lookahead profile</strong>（d3 plateau cascade 或 d6 6-la cascade）决定，<strong>跟 thread_map 无关</strong>。9 个 variant 实际共享 2 张 DAG，下面分别画一次。NCCL ticket 顺序就是图里 nccl=true 节点按 topo 序的子序列。</p>`;
+
+  for (const laPreset of order) {
+    const variants = byLaPreset[laPreset] || [];
+    if (variants.length === 0) continue;
+    const tag = laPreset === "d3"
+      ? "plateau cascade（h2d/start_shuffle/finish_shuffle 都 la=2，cascade 内同 la 互相 slot 连边）"
+      : "6-la cascade（每个 cascade task 各自不同 la，同 progress 内基本不连边，全靠 ring rotation 跨 iter）";
+    html += `<h3 style="margin-top: 24px;">📐 DAG-${laPreset.toUpperCase()}: ${laPreset} ${tag}</h3>`;
+    html += `<p class="preset-meta"><strong>${variants.length} 个 variant 共享此 DAG</strong>：${variants.join(" · ")}</p>`;
+    html += renderDAG(`${laPreset} cascade — shared by ${variants.length} variants`, {
+      la_preset: laPreset,
+      desc: `shared DAG for ${variants.length} variants`,
+      _variants: variants,
+    });
+  }
+  return html;
+}
+
 function render() {
-  let html = "";
+  let html = renderSharedDAGs();
+  html += `<h2 style="margin-top: 40px; padding-top: 16px; border-top: 2px solid #ccc;">Per-variant: Gantt + 线程拓扑</h2>`;
+  html += `<p class="sub">下面 9 个 variant 各自的 ① Gantt（thread_map 决定 task 在哪个线程上跑） + ② 拓扑（stream × thread × la）。每个 variant 用的 DAG 是上面 d3/d6 中的一张。</p>`;
   for (const [name, preset] of Object.entries(PRESETS)) {
     html += `<h2>${name}</h2>`;
-    html += `<p class="preset-meta">${preset.desc}</p>`;
+    html += `<p class="preset-meta">${preset.desc} · <span style="color:#1565c0;">DAG = ${preset.la_preset}</span></p>`;
     html += `<h3>① Gantt — 一次 progress() 在各线程上的时间分布</h3>`;
     html += renderGantt(name, preset);
     html += `<h3>② 拓扑 — task ↔ stream / thread / lookahead</h3>`;
     html += renderTopology(name, preset);
-    const dagNote = name === "legacy_none"
-      ? "；legacy 不走 engine，ticket 标号仅作语义对照"
-      : "";
-    html += `<h3>③ Same-progress DAG — task 依赖图（NCCL ticket 顺序由此 topo 序得出${dagNote}）</h3>`;
-    html += renderDAG(name, preset);
   }
   document.getElementById("panels").innerHTML = html;
 }

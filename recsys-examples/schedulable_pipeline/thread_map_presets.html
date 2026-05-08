@@ -60,7 +60,7 @@
   <br>
   <strong>lookahead</strong>: <code>la=k</code> 表示该 task 比同 progress 的 <code>la=0</code> task 提前处理 batch index +k；<code>la=0</code> = 处理本步 batch。<br>
   <strong>Gantt 中的红色虚线</strong>：跨线程同 progress 数据/控制依赖中**导致 wait** 的 binding 边。规则：<code>ord</code> 类（slot edge / depends_on）只在 producer.la == consumer.la 时画 wait；不同 la 由 engine ring rotation 跨 progress 满足，本 progress 内**不**画 wait。<code>sync</code> 类（<code>same_progress_sync</code>，比如 prefetch=True 时 prefetch_embeddings→backward）不分 la 永远画。<br>
-  → 例：<code>finish_shuffle → start_input_dist</code> 在 OLD la (2 vs 1) 下不画，**只有 NEW la cascade (3 vs 3 同 la) 才画**。所以前 7 个 OLD-la variant 没有 io→compute 的同 progress wait，只有 la_cascade / la_cascade_full_split 有。<br>
+  → 例：<code>finish_shuffle → start_input_dist</code> 在 d3 (2 vs 1) 下不画，**只有 d6 cascade (3 vs 3 同 la) 才画**。所以前 7 个 d3 variant 没有 io→compute 的同 progress wait，只有 default_d6 / full_split_d6 有。<br>
   la=0 cluster 内部（zero_grad / global_tokens / nccl_safety_barrier / forward → backward → finalize → opt → watchdog）所有任务都同 la=0，跨线程时画 wait（per_task 下 forward→backward 把 backward 锁在 forward 之后）。<br>
   <strong>Gantt task 宽度</strong>：粗略 CPU host-thread 时间估计（HSTU H100 单节点，prefetch=True，仅做相对比较；GPU 实际时间另算）。
 </div>
@@ -71,20 +71,20 @@
   ▸ <strong>la cascade 机制本身有效</strong>：NVTX 上 <code>wait_input_dist</code> host block 从 ~8ms 压到 ~0.4ms（splits a2a 已飞 1 整 iter）<br>
   ▸ <strong>但 default 2-thread map 下增益被吞</strong>：11 个 task 串行在 compute 线程，任意一个剩余 host sync 都拦住后面 task 发射 → 加 thread 拆开后才能真正受益。
   <table style="margin-top: 10px; border-collapse: collapse; font-size: 12px;">
-    <tr style="background: #f0e0a0;"><th style="padding: 4px 10px; border: 1px solid #ccc;">variant</th><th style="padding: 4px 10px; border: 1px solid #ccc;">la cascade</th><th style="padding: 4px 10px; border: 1px solid #ccc;">thread_map</th><th style="padding: 4px 10px; border: 1px solid #ccc;">TFLOPS</th><th style="padding: 4px 10px; border: 1px solid #ccc;">vs new_default</th></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">legacy_none</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">— (legacy)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1976</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−2.2%</td></tr>
-    <tr style="background: #f5f5f5;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>new_default</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2021</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">baseline</td></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_by_stream</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">by_stream (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_per_task</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">per_task (14)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1945</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−3.8%</td></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_prefetch_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / prefetch / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1999</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.1%</td></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_data_dist_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / data_dist / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">2017</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.2%</td></tr>
-    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">new_io_data_dist_prefetch_compute</td><td style="padding: 3px 10px; border: 1px solid #ccc;">OLD</td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
-    <tr style="background: #fff0e0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>la_cascade</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>NEW</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2019</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.1%</td></tr>
-    <tr style="background: #ffe0d0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>la_cascade_full_split</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>NEW</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><i>pending re-run</i></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">—</td></tr>
+    <tr style="background: #f0e0a0;"><th style="padding: 4px 10px; border: 1px solid #ccc;">variant</th><th style="padding: 4px 10px; border: 1px solid #ccc;">la cascade</th><th style="padding: 4px 10px; border: 1px solid #ccc;">thread_map</th><th style="padding: 4px 10px; border: 1px solid #ccc;">TFLOPS</th><th style="padding: 4px 10px; border: 1px solid #ccc;">vs default_d3</th></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">legacy_none</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">— (legacy)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1976</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−2.2%</td></tr>
+    <tr style="background: #f5f5f5;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>default_d3</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2021</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">baseline</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">by_stream_d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">by_stream (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">per_task_d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">per_task (14)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1945</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−3.8%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">io_prefetch_compute_d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / prefetch / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1999</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.1%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">io_data_dist_compute_d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / data_dist / compute (3)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">2017</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.2%</td></tr>
+    <tr><td style="padding: 3px 10px; border: 1px solid #ccc;">full_split_d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">d3</td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">1997</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−1.2%</td></tr>
+    <tr style="background: #fff0e0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>default_d6</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>d6</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">io / compute (2)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><b>2019</b></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">−0.1%</td></tr>
+    <tr style="background: #ffe0d0;"><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>full_split_d6</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;"><b>d6</b></td><td style="padding: 3px 10px; border: 1px solid #ccc;">full split (4)</td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;"><i>pending re-run</i></td><td style="padding: 3px 10px; border: 1px solid #ccc; text-align: right;">—</td></tr>
   </table>
-  ▸ <strong>关键观察</strong>：(1) la_cascade 单独不显著（−0.1%），跟 new_default 在噪声范围内；(2) per_task 最差（−3.8%，14 thread dispatch 开销 dominates）；(3) <code>io_data_dist_compute</code> 最接近 new_default（−0.2%），把 input_dist 拆出去看起来微正向；(4) <strong>la_cascade_full_split</strong> 是关键测试——能否 cascade × 4-thread 联合做出净收益。<br>
+  ▸ <strong>关键观察</strong>：(1) default_d6 单独不显著（−0.1%），跟 default_d3 在噪声范围内；(2) per_task 最差（−3.8%，14 thread dispatch 开销 dominates）；(3) <code>io_data_dist_compute</code> 最接近 default_d3（−0.2%），把 input_dist 拆出去看起来微正向；(4) <strong>full_split_d6</strong> 是关键测试——能否 cascade × 4-thread 联合做出净收益。<br>
   ▸ <strong>下一步攻 default-stream idle gap</strong>：(a) <code>zero_grad</code> 等上一 iter DDP grad allreduce 的 ~4.7ms idle；(b) shuffle/input_dist NCCL 跟 default-stream compute overlap 率 ≈0%（NCCL 跑在 default 流的 idle 窗口里，没真正藏到计算后面）<br>
-  ▸ <strong>注</strong>：上面 8 个 OLD-la 数据来自 round3 第一次跑，executor.py 还没带本会话加的 <code>[engine]</code> orange + <code>inline_thread="compute"</code> 改动；patched 重跑结果出来后会刷新此表。
+  ▸ <strong>注</strong>：上面 8 个 d3 数据来自 round3 第一次跑，executor.py 还没带本会话加的 <code>[engine]</code> orange + <code>inline_thread="compute"</code> 改动；patched 重跑结果出来后会刷新此表。
 </div>
 
 <!-- ========================================================== -->
@@ -111,15 +111,15 @@ const TASKS = [
 
 // Lookahead 两套：OLD = round2 代码原始 cascade (depth+1=2 for h2d);
 // NEW = 6-la cascade (pipeline.py:386-391, 每个跨 la pair 都 +1)。
-// round3 sweep: 7 个 variant 用 OLD（同 round2 clone 代码），la_cascade
+// round3 sweep: 7 个 d3 variant（同 round2 clone 代码 = depth+1 cascade），default_d6
 // 用 NEW（rework-mtms HEAD）。未列出的 task la=0。
 const LA_PRESETS = {
-  OLD: {
+  d3: {
     h2d: 2, start_shuffle: 2, finish_shuffle: 2,
     start_input_dist: 1, wait_input_dist: 1,
     prefetch_embeddings: 1,
   },
-  NEW: {
+  d6: {
     h2d: 5, start_shuffle: 4, finish_shuffle: 3,
     start_input_dist: 3, wait_input_dist: 2,
     prefetch_embeddings: 1,
@@ -184,8 +184,8 @@ const SAME_PROGRESS_CROSS_PAIRS = [
 
 const STREAM_ORDER = ["memcpy", "data_dist", "prefetch", "default"];
 
-// 8 round3 variants. la_preset: "OLD" = round2 代码原始 cascade (depth+1);
-// "NEW" = 6-la cascade (rework-mtms HEAD)。tflops 取 round3 sweep iter 599/699/799
+// 9 variants. la_preset: "d3" = round2-era depth+1 plateau cascade;
+// d6 = 6-la cascade (rework-mtms HEAD)。tflops 取 round3 sweep iter 599/699/799
 // 平均 (cw-dfw H100 ×8, mtms_sweep_round3_20260430_140637)。
 const ALL_ON = (thread) => Object.fromEntries(TASKS.map(t => [t.name, thread]));
 
@@ -202,19 +202,19 @@ const NEW_DEFAULT_MAP = {
 const PRESETS = {
   "legacy_none": {
     desc: "Legacy pipeline (RECSYS_PIPELINE_BACKEND=legacy) — 单 thread, 无 engine, OLD la cascade",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 1975,
     map: ALL_ON("main"),
   },
-  "new_default": {
+  "default_d3": {
     desc: "engine + HSTU_DEFAULT_THREAD_MAP (io / compute), OLD la — round3 baseline / 冠军",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 2037,
     map: NEW_DEFAULT_MAP,
   },
-  "new_by_stream": {
+  "by_stream_d3": {
     desc: "engine + by_stream sentinel (4 threads, 每 task → 它自己的 stream 名)",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 2002,
     map: {
       h2d: "memcpy", start_shuffle: "memcpy", finish_shuffle: "memcpy",
@@ -226,15 +226,15 @@ const PRESETS = {
       optimizer_step: "default", watchdog_step: "default",
     },
   },
-  "new_per_task": {
+  "per_task_d3": {
     desc: "engine + per_task sentinel — 14 threads，thread id == task.name (executor.py:_resolve_thread_id 197-198)",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 1945,
     map: Object.fromEntries(TASKS.map(t => [t.name, t.name])),
   },
-  "new_io_prefetch_compute": {
+  "io_prefetch_compute_d3": {
     desc: "engine 3 threads (io / prefetch / compute) — prefetch 拆出去和 backward 重叠",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 1999,
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
@@ -246,9 +246,9 @@ const PRESETS = {
       optimizer_step: "compute", watchdog_step: "compute",
     },
   },
-  "new_io_data_dist_compute": {
+  "io_data_dist_compute_d3": {
     desc: "engine 3 threads (io / data_dist / compute) — data_dist 拆出去，compute 不再被 io 阻塞",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 2017,
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
@@ -260,9 +260,9 @@ const PRESETS = {
       optimizer_step: "compute", watchdog_step: "compute",
     },
   },
-  "new_io_data_dist_prefetch_compute": {
+  "full_split_d3": {
     desc: "engine 4 threads (io / data_dist / prefetch / compute) — full split",
-    la_preset: "OLD",
+    la_preset: "d3",
     tflops: 1997,
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
@@ -274,15 +274,15 @@ const PRESETS = {
       optimizer_step: "compute", watchdog_step: "compute",
     },
   },
-  "la_cascade": {
+  "default_d6": {
     desc: "engine + default thread_map (2 thread) + NEW 6-la cascade — 11 个 task 全在 compute 线程串行，host sync 容易 block",
-    la_preset: "NEW",
+    la_preset: "d6",
     tflops: 2019,
     map: NEW_DEFAULT_MAP,
   },
-  "la_cascade_full_split": {
+  "full_split_d6": {
     desc: "engine + io_data_dist_prefetch_compute (4 thread) + NEW 6-la cascade — 把可能 host sync 的 task 拆到独立线程，避免一拦众",
-    la_preset: "NEW",
+    la_preset: "d6",
     tflops: null,  // round3 re-run pending
     map: {
       h2d: "io", start_shuffle: "io", finish_shuffle: "io",
@@ -388,7 +388,7 @@ function renderGantt(presetName, preset) {
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
   // header — preset name + la_preset tag + measured TFLOPS
   svg += `<rect x="0" y="0" width="${W}" height="${HEADER_H}" fill="#222"/>`;
-  const laTag = preset.la_preset === "NEW" ? "NEW 6-la cascade" : "OLD la (depth+1)";
+  const laTag = preset.la_preset === "d6" ? "6-la cascade (d=6)" : "plateau cascade (d=3)";
   const tflopsTag = preset.tflops ? `${preset.tflops} TFLOPS (round3 measured)` : "TFLOPS pending";
   svg += `<text x="12" y="17" fill="#fff" font-family="ui-monospace, monospace" font-size="12" font-weight="bold">${presetName} — Gantt · ${laTag} · ${tflopsTag}</text>`;
   svg += `<text x="${W - 8}" y="17" text-anchor="end" fill="#bbb" font-family="ui-monospace, monospace" font-size="11">总 CPU ≈ ${totalEnd.toFixed(1)} ms (critical path = max thread)</text>`;

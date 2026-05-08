@@ -668,6 +668,195 @@ window.addEventListener("DOMContentLoaded", render);
 
 <div id="panels"></div>
 
+<!-- ============================================================
+     Same-progress DAG (intra-iter dependency graph)
+     14 tasks, prefetch=True, d6 cascade. Preset-independent.
+============================================================ -->
+<h2 style="margin-top: 56px; padding-top: 16px; border-top: 2px solid var(--border);">Same-progress DAG（任务依赖图）</h2>
+<p class="sub">
+14 tasks（含 2026-05-08 新增 <code>compute_output_dist</code>、删除 <code>nccl_safety_barrier</code>），prefetch=True，d6 cascade。边由
+<a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/engine/deps.py"><code>deps.py:_build_same_progress_dag_edges</code></a>
+计算：① slot reads/writes 精确 offset 匹配；② <code>depends_on</code> 同 lookahead；③ <code>same_progress_sync</code>（无视 lookahead）。
+跨 lookahead 的 <code>depends_on</code> 由 BatchRing 平移在跨 progress 处理，<strong>本图不画</strong>。
+此 DAG 是 <strong>preset-independent</strong>——只取决于 task graph + lookaheads，跟具体 thread_map 无关；ticket 派发顺序就是这张图按声明序作 tie-break 的 Kahn 拓扑序里 <code>nccl=True</code> 的子序列。
+</p>
+<div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin: 16px 0;">
+  <svg viewBox="0 0 1100 720" style="flex: 1 1 760px; max-width: 1100px; border: 1px solid var(--border); background: #fafafa; height: auto;">
+    <defs>
+      <marker id="dag-arrow-slot" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#1976d2"/>
+      </marker>
+      <marker id="dag-arrow-deps" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#2e7d32"/>
+      </marker>
+      <marker id="dag-arrow-sps" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#f57c00"/>
+      </marker>
+    </defs>
+
+    <!-- ── Level labels (left margin) ── -->
+    <text x="10" y="84" font-size="10" fill="#999" font-family="monospace">L0</text>
+    <text x="10" y="204" font-size="10" fill="#999" font-family="monospace">L1</text>
+    <text x="10" y="344" font-size="10" fill="#999" font-family="monospace">L2</text>
+    <text x="10" y="464" font-size="10" fill="#999" font-family="monospace">L3</text>
+    <text x="10" y="544" font-size="10" fill="#999" font-family="monospace">L4</text>
+    <text x="10" y="624" font-size="10" fill="#999" font-family="monospace">L5</text>
+
+    <!-- ── Edges (drawn first so nodes overlay) ── -->
+    <!-- 1. finish_shuffle → start_input_dist  (slot shuffled_batch@3) -->
+    <line x1="340" y1="98" x2="340" y2="180" stroke="#1976d2" stroke-width="1.8" marker-end="url(#dag-arrow-slot)"/>
+    <text x="346" y="142" fill="#1976d2" font-size="10" font-family="monospace">shuffled_batch@3</text>
+
+    <!-- 2. compute_output_dist → forward  (depends_on, same la=0) -->
+    <line x1="990" y1="98" x2="990" y2="180" stroke="#2e7d32" stroke-width="1.8" marker-end="url(#dag-arrow-deps)"/>
+    <text x="996" y="142" fill="#2e7d32" font-size="10" font-family="monospace">depends_on</text>
+
+    <!-- 3. zero_grad → backward  (depends_on, same la=0) -->
+    <line x1="730" y1="98" x2="730" y2="320" stroke="#2e7d32" stroke-width="1.8" marker-end="url(#dag-arrow-deps)"/>
+    <text x="736" y="200" fill="#2e7d32" font-size="10" font-family="monospace">depends_on</text>
+
+    <!-- 4. global_tokens_allreduce → backward  (slot global_tokens@0) -->
+    <line x1="860" y1="98" x2="755" y2="320" stroke="#1976d2" stroke-width="1.8" marker-end="url(#dag-arrow-slot)"/>
+    <text x="800" y="180" fill="#1976d2" font-size="10" font-family="monospace">global_tokens@0</text>
+
+    <!-- 5. forward → backward  (slot losses@0) -->
+    <line x1="990" y1="222" x2="775" y2="320" stroke="#1976d2" stroke-width="1.8" marker-end="url(#dag-arrow-slot)"/>
+    <text x="850" y="278" fill="#1976d2" font-size="10" font-family="monospace">losses@0</text>
+
+    <!-- 6. prefetch_embeddings → backward  (same_progress_sync, prefetch only) -->
+    <line x1="600" y1="98" x2="710" y2="320" stroke="#f57c00" stroke-width="1.8" stroke-dasharray="6 3" marker-end="url(#dag-arrow-sps)"/>
+    <text x="540" y="202" fill="#f57c00" font-size="10" font-family="monospace">same_progress_sync</text>
+
+    <!-- 7. backward → finalize_model_grads -->
+    <line x1="730" y1="358" x2="730" y2="440" stroke="#2e7d32" stroke-width="1.8" marker-end="url(#dag-arrow-deps)"/>
+
+    <!-- 8. finalize_model_grads → optimizer_step -->
+    <line x1="730" y1="478" x2="730" y2="520" stroke="#2e7d32" stroke-width="1.8" marker-end="url(#dag-arrow-deps)"/>
+
+    <!-- 9. optimizer_step → watchdog_step -->
+    <line x1="730" y1="558" x2="730" y2="600" stroke="#2e7d32" stroke-width="1.8" marker-end="url(#dag-arrow-deps)"/>
+
+    <!-- ── Nodes ── -->
+    <!-- helper template: rect + name + la-badge -->
+    <!-- Stream colors: memcpy=#bbdefb, data_dist=#c8e6c9, prefetch=#ffe0b2, default=#eeeeee -->
+    <!-- NCCL: stroke="#d32f2f" stroke-width="2" else stroke="#555" stroke-width="1" -->
+
+    <!-- Level 0: 8 root nodes -->
+    <!-- h2d (la=5, memcpy, no nccl) -->
+    <g><rect x="20" y="62" width="120" height="36" rx="4" fill="#bbdefb" stroke="#555" stroke-width="1"/>
+       <text x="80" y="84" text-anchor="middle" font-size="11" font-family="monospace">h2d</text>
+       <text x="80" y="55" text-anchor="middle" font-size="9" fill="#666">la=5</text></g>
+    <!-- start_shuffle (la=4, memcpy, NCCL) -->
+    <g><rect x="150" y="62" width="120" height="36" rx="4" fill="#bbdefb" stroke="#d32f2f" stroke-width="2"/>
+       <text x="210" y="84" text-anchor="middle" font-size="11" font-family="monospace">start_shuffle</text>
+       <text x="210" y="55" text-anchor="middle" font-size="9" fill="#666">la=4</text></g>
+    <!-- finish_shuffle (la=3, memcpy, NCCL) -->
+    <g><rect x="280" y="62" width="120" height="36" rx="4" fill="#bbdefb" stroke="#d32f2f" stroke-width="2"/>
+       <text x="340" y="84" text-anchor="middle" font-size="11" font-family="monospace">finish_shuffle</text>
+       <text x="340" y="55" text-anchor="middle" font-size="9" fill="#666">la=3</text></g>
+    <!-- wait_input_dist (la=2, data_dist, NCCL) -->
+    <g><rect x="410" y="62" width="120" height="36" rx="4" fill="#c8e6c9" stroke="#d32f2f" stroke-width="2"/>
+       <text x="470" y="84" text-anchor="middle" font-size="11" font-family="monospace">wait_input_dist</text>
+       <text x="470" y="55" text-anchor="middle" font-size="9" fill="#666">la=2</text></g>
+    <!-- prefetch_embeddings (la=1, prefetch, no nccl) -->
+    <g><rect x="540" y="62" width="120" height="36" rx="4" fill="#ffe0b2" stroke="#555" stroke-width="1"/>
+       <text x="600" y="84" text-anchor="middle" font-size="11" font-family="monospace">prefetch_emb</text>
+       <text x="600" y="55" text-anchor="middle" font-size="9" fill="#666">la=1</text></g>
+    <!-- zero_grad (la=0, default, no nccl) -->
+    <g><rect x="670" y="62" width="120" height="36" rx="4" fill="#eeeeee" stroke="#555" stroke-width="1"/>
+       <text x="730" y="84" text-anchor="middle" font-size="11" font-family="monospace">zero_grad</text>
+       <text x="730" y="55" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+    <!-- global_tokens_allreduce (la=0, default, NCCL) -->
+    <g><rect x="800" y="62" width="120" height="36" rx="4" fill="#eeeeee" stroke="#d32f2f" stroke-width="2"/>
+       <text x="860" y="84" text-anchor="middle" font-size="10" font-family="monospace">global_tokens</text>
+       <text x="860" y="55" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+    <!-- compute_output_dist (la=0, data_dist, NCCL) -->
+    <g><rect x="930" y="62" width="120" height="36" rx="4" fill="#c8e6c9" stroke="#d32f2f" stroke-width="2"/>
+       <text x="990" y="84" text-anchor="middle" font-size="10" font-family="monospace">compute_out_dist</text>
+       <text x="990" y="55" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+
+    <!-- Level 1 -->
+    <!-- start_input_dist (la=3, data_dist, NCCL) -->
+    <g><rect x="280" y="182" width="120" height="36" rx="4" fill="#c8e6c9" stroke="#d32f2f" stroke-width="2"/>
+       <text x="340" y="204" text-anchor="middle" font-size="11" font-family="monospace">start_input_dist</text>
+       <text x="340" y="234" text-anchor="middle" font-size="9" fill="#666">la=3</text></g>
+    <!-- forward (la=0, default, no nccl) -->
+    <g><rect x="930" y="182" width="120" height="36" rx="4" fill="#eeeeee" stroke="#555" stroke-width="1"/>
+       <text x="990" y="204" text-anchor="middle" font-size="11" font-family="monospace">forward</text>
+       <text x="990" y="234" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+
+    <!-- Level 2: backward (la=0, default, NCCL) -->
+    <g><rect x="670" y="322" width="120" height="36" rx="4" fill="#eeeeee" stroke="#d32f2f" stroke-width="2"/>
+       <text x="730" y="344" text-anchor="middle" font-size="11" font-family="monospace">backward</text>
+       <text x="730" y="374" text-anchor="middle" font-size="9" fill="#666">la=0 · in-deg=4</text></g>
+
+    <!-- Level 3: finalize_model_grads (la=0, default, NCCL) -->
+    <g><rect x="670" y="442" width="120" height="36" rx="4" fill="#eeeeee" stroke="#d32f2f" stroke-width="2"/>
+       <text x="730" y="464" text-anchor="middle" font-size="10" font-family="monospace">finalize_grads</text>
+       <text x="730" y="494" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+
+    <!-- Level 4: optimizer_step (la=0, default, no nccl) -->
+    <g><rect x="670" y="522" width="120" height="36" rx="4" fill="#eeeeee" stroke="#555" stroke-width="1"/>
+       <text x="730" y="544" text-anchor="middle" font-size="11" font-family="monospace">optimizer_step</text>
+       <text x="730" y="574" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+
+    <!-- Level 5: watchdog_step (la=0, default, no nccl) -->
+    <g><rect x="670" y="602" width="120" height="36" rx="4" fill="#eeeeee" stroke="#555" stroke-width="1"/>
+       <text x="730" y="624" text-anchor="middle" font-size="11" font-family="monospace">watchdog_step</text>
+       <text x="730" y="654" text-anchor="middle" font-size="9" fill="#666">la=0</text></g>
+
+    <!-- ── NCCL ticket annotations (right of NCCL nodes) ── -->
+    <text x="280" y="78" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t0</text>
+    <text x="410" y="78" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t1</text>
+    <text x="280" y="198" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t2</text>
+    <text x="540" y="78" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t3</text>
+    <text x="930" y="78" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t4</text>
+    <text x="1060" y="78" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t5</text>
+    <text x="800" y="338" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t6</text>
+    <text x="800" y="458" font-size="9" fill="#d32f2f" font-family="monospace" font-weight="bold">t7</text>
+  </svg>
+
+  <div style="flex: 0 1 280px; font-size: 11px; line-height: 1.7;">
+    <h4 style="margin: 4px 0;">边类型</h4>
+    <div><svg width="40" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="34" y2="5" stroke="#1976d2" stroke-width="1.8"/><polygon points="34,1 40,5 34,9" fill="#1976d2"/></svg> slot reads/writes</div>
+    <div><svg width="40" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="34" y2="5" stroke="#2e7d32" stroke-width="1.8"/><polygon points="34,1 40,5 34,9" fill="#2e7d32"/></svg> depends_on（同 la）</div>
+    <div><svg width="40" height="10" style="vertical-align: middle"><line x1="2" y1="5" x2="34" y2="5" stroke="#f57c00" stroke-width="1.8" stroke-dasharray="4 2"/><polygon points="34,1 40,5 34,9" fill="#f57c00"/></svg> same_progress_sync</div>
+    <h4 style="margin: 8px 0 4px 0;">节点颜色（stream）</h4>
+    <div><span style="background: #bbdefb; padding: 1px 8px; border-radius: 3px;">memcpy</span></div>
+    <div style="margin-top: 3px;"><span style="background: #c8e6c9; padding: 1px 8px; border-radius: 3px;">data_dist</span></div>
+    <div style="margin-top: 3px;"><span style="background: #ffe0b2; padding: 1px 8px; border-radius: 3px;">prefetch</span></div>
+    <div style="margin-top: 3px;"><span style="background: #eeeeee; padding: 1px 8px; border-radius: 3px;">default</span></div>
+    <h4 style="margin: 8px 0 4px 0;">节点边框</h4>
+    <div><span style="border: 2px solid #d32f2f; padding: 1px 8px; border-radius: 3px;">红框 = nccl=True</span></div>
+    <div style="margin-top: 3px;"><span style="border: 1px solid #555; padding: 1px 8px; border-radius: 3px;">灰框 = nccl=False</span></div>
+    <h4 style="margin: 8px 0 4px 0;">NCCL ticket（红色 t0..t7）</h4>
+    <div style="font-family: monospace; font-size: 10px;">
+      t0 start_shuffle<br>
+      t1 finish_shuffle<br>
+      t2 start_input_dist<br>
+      t3 wait_input_dist<br>
+      t4 global_tokens_allreduce<br>
+      t5 compute_output_dist<br>
+      t6 backward<br>
+      t7 finalize_model_grads
+    </div>
+    <h4 style="margin: 8px 0 4px 0;">统计</h4>
+    <div style="font-family: monospace; font-size: 10px;">
+      |V| = 14 nodes<br>
+      |E| = 9 edges<br>
+      Roots (in-deg=0) = 8<br>
+      NCCL tasks = 8<br>
+      Topo levels = 6
+    </div>
+  </div>
+</div>
+<p style="font-size: 11px; color: #666; margin: 8px 0 24px 0;">
+<strong>关键观察</strong>：(1) <code>backward</code> 是流量瓶颈（in-deg=4：<code>zero_grad</code> / <code>global_tokens</code> / <code>forward</code> / <code>prefetch_emb</code> 全汇于此）。
+(2) 8 个根节点能在 iter 起始 <strong>并行</strong>起飞（受 NCCL ordered lock 串行约束）。
+(3) Cascade 5 task (h2d / start_shuffle / finish_shuffle / start_input_dist / wait_input_dist) 在 same-progress 内只有 1 条 slot 边（<code>finish_shuffle → start_input_dist</code>），其它衔接全靠 ring rotation 跨 iter 完成。
+(4) <code>compute_output_dist</code>（2026-05-08 新增）唯一出边到 <code>forward</code>，把 embedding output a2a NCCL 从 forward body 内部剥离到独立 task slot。
+</p>
+
 <p style="font-size: 12px; color: #777; margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--border);">
 源数据：
 <a href="https://github.com/JacoCheung/recsys-examples/blob/junzhang/rework-mtms/examples/commons/pipeline/hstu_pipeline/pipeline.py">pipeline.py</a>（HSTU_DEFAULT_THREAD_MAP / HSTU_THREAD_MAP_PRESETS / 6-la cascade lookaheads）

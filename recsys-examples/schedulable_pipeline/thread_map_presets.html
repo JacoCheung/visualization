@@ -869,10 +869,11 @@ function render() {
     html += renderGantt(name, preset);
     html += `<h3>② 拓扑 — task ↔ stream / thread / lookahead</h3>`;
     html += renderTopology(name, preset);
-    if (name !== "legacy_none") {
-      html += `<h3>③ Same-progress DAG — task 依赖图（NCCL ticket 顺序由此 topo 序得出）</h3>`;
-      html += renderDAG(name, preset);
-    }
+    const dagNote = name === "legacy_none"
+      ? "；legacy 不走 engine，ticket 标号仅作语义对照"
+      : "";
+    html += `<h3>③ Same-progress DAG — task 依赖图（NCCL ticket 顺序由此 topo 序得出${dagNote}）</h3>`;
+    html += renderDAG(name, preset);
   }
   document.getElementById("panels").innerHTML = html;
 }

@@ -83,112 +83,189 @@
 </div>
 
 <div style="background: #eef5ff; border-left: 4px solid #3b6cb1; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.55;">
-  <strong>📡 NCCL 通信清单 — 哪些 task 发哪些 collective</strong><br>
-  下表列出 14 个 task 中所有 <code>nccl=True</code> 的 task 对应的具体集合通信原语、参与的 process group、以及在 HSTU benchmark
-  (<code>balanced_ranking_benchmark.gin</code>: <code>local_batch=32</code>, <code>item_emb_dim=128</code>, <code>num_layers=10</code>,
-  <code>hidden=1024</code>, max_seqlen 4096 zipf α=1.2; 8×H100, DP=8, no TP/PP) 下每 iter 的大致单 rank 数据量量级。<br>
-  <em>Process group 全部塌缩到 WORLD：HSTU benchmark 是纯 DP-8，<code>DistributedModelParallel(env=ShardingEnv.from_process_group(WORLD))</code>
-  + Megatron DP 也是 WORLD（commons/distributed/sharding.py:282-283）。所有 NCCL 共用同一个 comm，所以 <code>_NcclOrderedLock</code>
-  ticket 链跨这 8 个 task 全局有效。</em>
+  <strong>📡 NCCL 通信清单 — 实测每 task 内逐个 NCCL 内核（nsys 采样）</strong><br>
+  下表来自实测 nsys 采样（rank0, 50 iter, HSTU benchmark <code>balanced_ranking_benchmark.gin</code>: <code>local_batch=32</code>,
+  <code>item_emb_dim=128</code>, <code>num_layers=10</code>, <code>hidden=1024</code>, max_seqlen 4096 zipf α=1.2;
+  8×H100, DP=8, no TP/PP）。一个 task 内可能包含多个 NCCL 内核——本表把每个 NCCL kernel 单独列出（CUPTI_ACTIVITY_KIND_KERNEL
+  shortName 直接采集），并标注它们运行在哪条 GPU stream（streamId 经 cross-check 得到 <em>str-7=default / str-23=TorchRec output_dist comm / str-24=batch_shuffler memcpy</em>）。<br>
+  <em>Process group：HSTU benchmark 是纯 DP-8，<code>DistributedModelParallel(env=ShardingEnv.from_process_group(WORLD))</code>
+  + Megatron DP 也是 WORLD（commons/distributed/sharding.py:282-283）→ 所有 NCCL 共用同一个 comm，
+  <code>_NcclOrderedLock</code> ticket 链跨表中所有 NCCL kernel 全局生效。</em>
   <table style="margin-top: 10px; border-collapse: collapse; font-size: 12px; width: 100%;">
     <tr style="background: #cfe0fa;">
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">#</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">task</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">stream</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">collective 原语</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">通信对象 (process group)</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">payload 内容</th>
-      <th style="padding: 5px 8px; border: 1px solid #b3c8e8;">单 rank/iter 量级</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">#</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">task</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">stream</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">CUDA streamId</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">NCCL kernel (shortName)</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">/iter</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">avg dur (μs)</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">p99 dur (μs)</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">channels (gridX)</th>
+      <th style="padding: 5px 6px; border: 1px solid #b3c8e8;">payload — 实际是什么 / 量级</th>
     </tr>
+
+    <!-- start_shuffle -->
     <tr>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">1</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>global_tokens_allreduce</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">default</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_reduce</code> (SUM)</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">WORLD (隐式 — <code>torch.distributed.all_reduce(tokens)</code> 不传 group)</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">本 batch 总 loss-token 数（标量 int64）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~8 B</b>（latency-bound）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="1"><code>start_shuffle</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">memcpy</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">24</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllGather_RING_LL</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">466</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">3350</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">workloads = int64[LBS=32] → 全局 256, <b>~2 KB</b>，1 channel = latency-bound</td>
+    </tr>
+
+    <!-- finish_shuffle: 2 NCCL kernels -->
+    <tr style="background: #f7faff;">
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">2</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2"><code>finish_shuffle</code><br><span style="font-size: 11px; color: #666;">→ <code>pad_and_allgather_batch</code> 内 KJT lengths AllGather + KJT values AllGatherV，2 个 kernel 串行</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2">memcpy</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">24</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllGather_RING_LL</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">341</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">821</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">KJT lengths：fixed-size int64×(LBS×#feature) → 全局 [256×#feat]，<b>~10 KB</b>，1 channel</td>
     </tr>
     <tr style="background: #f7faff;">
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">2</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>start_shuffle</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">memcpy</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_gather</code> (workloads)</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">DP group (= WORLD) — KK shuffler 用 <code>parallel_state.get_data_parallel_group()</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">每条样本的 token 数 = int64[<code>local_batch=32</code>] → 全局 [256]</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">~<b>2 KB</b>（latency-bound）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllGatherV_RING_LL</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">318</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">982</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">24</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">KJT values：variable-size int64 sum-of-seqlen，<b>~MB</b>，24 channel = bandwidth-bound</td>
     </tr>
+
+    <!-- start_input_dist -->
     <tr>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">3</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>finish_shuffle</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">memcpy</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_gather</code>×N (KJT lengths/values + dense 字段，融合成 1 对 lengths/values + 每个 dense 一次) <br>或 <code>all_to_all</code>（<code>--use-all2all</code> 路径）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">DP group (= WORLD)</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">完整 batch：sparse KJT values（≈ <code>LBS × Σseq</code> int64） + 数 KB 的 lengths + 小量 dense 标签字段</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~MB-级</b>（受 zipf 长尾控制；含整 batch sample 数据，是 io 主开销）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">3</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>start_input_dist</code><br><span style="font-size: 11px; color: #666;">→ TorchRec splits a2a，2 pipelined module 融合成 1 个 grouped call</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">data_dist</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">23</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">8442</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">28028</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">8</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">splits header (lengths-of-lengths) — int32×8×#feat，<b>~hundreds B</b>，但 dur 大 = 等前序 NCCL；8 channel = 8-rank a2a fanout</td>
+    </tr>
+
+    <!-- wait_input_dist: 2 NCCL kernels -->
+    <tr style="background: #f7faff;">
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">4</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2"><code>wait_input_dist</code><br><span style="font-size: 11px; color: #666;">→ 2 个 pipelined module（item EBC + dense ECC）各自 1 个 awaitable.wait()，互不融合 → 2 个独立 a2a kernel</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2">data_dist</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">23</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (item module)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~448</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">9883</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">8</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">item KJT values 按 feature shard a2a，<b>~MB</b>，8 channel</td>
     </tr>
     <tr style="background: #f7faff;">
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">4</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>start_input_dist</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">data_dist</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_to_all</code>（splits — KJT lengths）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">TorchRec sharding env = <code>ShardingEnv.from_process_group(WORLD)</code> → WORLD</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">每个 (rank, feature) 要发的 sample lengths 拆分头（int32/int64）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~hundreds of B</b>（latency-bound，TorchRec 把多 feature 融合一次）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (contextual module)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~448</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">9883</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">8</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">contextual KJT values a2a，<b>~hundreds KB</b>，8 channel</td>
     </tr>
+
+    <!-- global_tokens -->
     <tr>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">5</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>wait_input_dist</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">data_dist</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_to_all</code>（tensors — KJT values）— <code>awaitable.wait()</code> 触发底层 NCCL 提交</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">同 #4，WORLD（TorchRec sharding env）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">完整 KJT values 按 feature shard 重分布到 owner rank</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~MB-级</b>（与 finish_shuffle 同量级；token id 总量）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">5</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>global_tokens_allreduce</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">default</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">7</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllReduce_Sum_f32_RING_LL</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">373</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">6702</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">scalar int64 token count → 1 channel，<b>~8 B</b>（kernel cast 成 f32 SUM），latency-bound</td>
+    </tr>
+
+    <!-- prefetch -->
+    <tr style="background: #f7faff;">
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">—</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>prefetch_embeddings</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">prefetch</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" colspan="6"><span style="color: #888;">无 NCCL kernel — DynamicEmb cache lookup / UVM prefetch（GPU-local, <code>nccl=False</code>）</span></td>
+    </tr>
+
+    <!-- compute_output_dist -->
+    <tr>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">6</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>compute_output_dist</code><br><span style="font-size: 11px; color: #666;">→ embedding output a2a (forward)</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">default<br><span style="font-size: 11px; color: #c62828;">⚠ 但 NCCL kernel 落到 str-23（TorchRec 用自己的 output_dist comm stream 跑 a2a）</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">23</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (grouped, 2 modules)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">187</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">766</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">32</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">embedding output: <code>(global_batch×Σseq) × 128 × 4B</code> (FP32 qcomm)，<b>~tens of MB</b>，32 channel = 跑满最大并行</td>
+    </tr>
+
+    <!-- forward -->
+    <tr style="background: #f7faff;">
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">—</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>forward</code></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">default</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" colspan="6"><span style="color: #888;">无 NCCL kernel — 10 层 HSTU layer compute 全部本地（no TP）</span></td>
+    </tr>
+
+    <!-- backward -->
+    <tr>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">7</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>backward</code><br><span style="font-size: 11px; color: #666;">→ <code>.backward()</code> 内 autograd hook 触发的 emb output a2a 反向；DDP dense bucket AllReduce <strong>不在</strong> backward 里（HSTU benchmark <code>overlap_grad_reduce=False</code>，全部 defer 到 finalize_model_grads）</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">default<br><span style="font-size: 11px; color: #c62828;">⚠ NCCL kernel 落到 str-23（与 #6 同 comm stream，但 host launch 在 autograd 线程，<em>不</em>被 [engine] backward NVTX 包裹）</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;">23</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (emb a2a backward)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">3993</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">26151</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">17 (avg)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">embedding output a2a 的反向 → 同样 <b>~tens of MB</b>；critical-path gate 后 p99 暴涨到 26 ms（疑似根因）</td>
+    </tr>
+
+    <!-- finalize_model_grads: 2 NCCL kernels -->
+    <tr style="background: #f7faff;">
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">8</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2"><code>finalize_model_grads</code><br><span style="font-size: 11px; color: #666;">→ Megatron 把所有 dense bucket AllReduce 攒到这里串行发射（<code>overlap_grad_reduce=False</code>）；本 benchmark 配置下实测 2 个 AllReduce/iter</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2">default</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">7</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllReduce_Sum_f32_RING_LL</code> (bucket 1)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~648</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">924</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~9</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">HSTU layer dense param grads（10 层 hidden=1024 + heads），<b>~50 MB</b>，9 channel</td>
     </tr>
     <tr style="background: #f7faff;">
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">—</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>prefetch_embeddings</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">prefetch</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; color: #888;">— (<code>nccl=False</code>)</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; color: #888;">无 NCCL — DynamicEmb cache lookup / UVM prefetch（GPU-local）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; color: #888;">N/A</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; color: #888;">N/A</td>
-    </tr>
-    <tr>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">6</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>compute_output_dist</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">default</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>all_to_all</code>（embedding 输出按 batch shard 重分布）<br>+ FP32 qcomm codec（<code>QCommsConfig forward=FP32</code>）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">TorchRec sharding env = WORLD</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">查到的 embedding rows × emb_dim：<code>(global_batch × Σseq) × 128 × 4B</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~tens of MB</b>（embedding 通信主项；受 seqlen 长尾控制）</td>
-    </tr>
-    <tr style="background: #f7faff;">
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">7</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>backward</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">default</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">DDP grad <code>all_reduce</code>（Megatron <code>DistributedDataParallel</code> 在 <code>.backward()</code> 内 hook 自动发射，bucket 化）<br>+ embedding output a2a 的反向（同 #6 反向 a2a）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">Megatron DP group = WORLD（<code>apply_megatron_ddp</code> 默认 DP=WORLD，纯 DP 配置）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">10 层 HSTU dense 参数梯度 (hidden=1024, num_layers=10) + 输出 head + emb 反向 a2a</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~50–200 MB</b>（最大单项；通信带宽决定）</td>
-    </tr>
-    <tr>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5; text-align: center;">8</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><code>finalize_model_grads</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">default</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">Megatron <code>finalize_model_grads</code> — 视拓扑：<br>• 纯 DP：仅做 embedding/contextual emb 的额外梯度同步（DataParallel 子模块）<br>• TP/PP 才会触发跨 TP 重复参数 <code>all_reduce</code> / <code>broadcast</code></td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">Megatron embedding/TP group（HSTU benchmark 配置下退化为小 group 或近似 no-op）</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;">contextual / 数据并行 embedding 梯度</td>
-      <td style="padding: 4px 8px; border: 1px solid #d6e2f5;"><b>~KB-MB</b>（HSTU benchmark 纯 DP 下很小）</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_AllReduce_Sum_f32_RING_LL</code> (bucket 2 / embedding sync)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">1</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~648</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">924</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: right;">~9</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">contextual / DataParallelEmbeddingCollection 梯度同步，<b>~MB</b>，9 channel</td>
     </tr>
   </table>
-  <div style="margin-top: 8px; font-size: 11.5px; color: #555;">
-    <strong>注</strong>：&nbsp;(a) Volume 量级是 <em>balanced_ranking_benchmark</em> 配置下的粗估，受 zipf 序列长度长尾影响有数倍波动。<br>
-    (b) Stream 列对应 <code>commons/pipeline/streams.py</code> 的 4 条 GPU stream；NCCL <code>_NcclOrderedLock</code> 跨 stream 强制
-    submission order = task DAG topo 顺序，所以即便不同 stream 的 task，host enqueue 也是串行化的。<br>
-    (c) <code>compute_output_dist</code> 与 <code>backward</code> 中嵌入梯度的反向 a2a 用同一对 NCCL channel；critical-path gate
-    把 6 个非 critical task 排到 <code>compute_output_dist</code> 之后会改变这条 a2a 的 host enqueue 时机，进而 cascade 到
-    DDP all_reduce 与 embedding 反向 a2a 的 GPU 执行排序 → −10% 级 perf 退化的疑似根因（详见 round4 sweep 报告）。
+  <div style="margin-top: 10px; font-size: 11.5px; color: #555;">
+    <strong>采集方法</strong>：rank0 sqlite (<code>nsys export</code>) 上跑 SQL 把每个 <code>[engine] &lt;task&gt;</code> NVTX 范围
+    与<code>CUPTI_ACTIVITY_KIND_RUNTIME → CUPTI_ACTIVITY_KIND_KERNEL</code>（按 correlationId 配对）做时间包含连接，
+    再按 <code>shortName LIKE 'ncclDevKernel%'</code> 分组得到每 task 内的 NCCL kernel 计数 + 平均 / p99 GPU duration + gridX (= NCCL channels)。<br>
+    <strong>关键观察</strong>：&nbsp;
+    (a) 每 iter 共 <b>9 个 NCCL kernel</b>（1 AG + 1 AG + 1 AGV + 3 SendRecv + 1 AR + 1 SendRecv + 2 AR），跨 3 条不同的 GPU stream（7 / 23 / 24）；
+    (b) <code>compute_output_dist</code> 和 backward 的 emb a2a 反向都跑在 str-23（TorchRec 的 output_dist comm stream），不是 default；
+    (c) HSTU benchmark 没开 <code>overlap_grad_reduce</code>，所以 backward 内只剩 emb a2a 反向 1 个 SendRecv，dense param AllReduce 全部 defer 到 finalize_model_grads；
+    (d) <code>start_input_dist</code> 平均 8.4 ms / p99 28 ms 异常大 = NCCL ticket 等待前序 collective（<code>_NcclOrderedLock</code> 串行链 + 跨 rank 同步等待），不是数据量本身大。
   </div>
 </div>
 

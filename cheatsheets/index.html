@@ -71,6 +71,14 @@
       line-height: 1.6;
       color: #666;
     }
+    .card p code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #f1f5f9;
+      padding: 0 4px;
+      border-radius: 3px;
+      color: #0b3b8c;
+    }
     .tag {
       display: inline-block;
       font-size: 10px;
@@ -118,6 +126,11 @@
       <span class="tag">Claude Code</span>
       <h2>Claude Code 速查表</h2>
       <p>快捷键、Slash、MCP、CLI、配置与 Skills；已含 Opus 4.7 / xhigh、/ultrareview 等近期更新；布局对齐 cc.jiangrzc.cn；支持模糊搜索与导出 PDF。</p>
+    </a>
+    <a class="card" href="cupti/">
+      <span class="tag">Nsight / CUPTI</span>
+      <h2>CUPTI 表速查表</h2>
+      <p><code>nsys export --type sqlite</code> 后的核心表：每张表标注 GPU / CPU / MIXED / META，含字段含义、枚举取值与表间级联键；支持按 side 过滤、模糊搜索与导出 PDF。</p>
     </a>
   </div>
   <footer>GitHub Pages · JacoCheung/visualization</footer>

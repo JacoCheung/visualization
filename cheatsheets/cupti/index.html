@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nsight Systems / CUPTI 表速查表</title>
+  <meta name="description" content="nsys export --type sqlite 后的 CUPTI / Nsight 表结构速查：CPU / GPU / MIXED / META 分类、字段含义、枚举值、级联关系" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --line: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --green: #047857;
+      --purple: #7c3aed;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --gpu: #047857;
+      --cpu: #2563eb;
+      --mixed: #b45309;
+      --meta: #64748b;
+    }
+    html { font-size: 12px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 6mm;
+      line-height: 1.35;
+      font-size: 0.86rem;
+    }
+    .wrap { max-width: 320mm; margin: 0 auto; }
+    .crumb {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1.5mm;
+    }
+    .crumb a { color: var(--blue); text-decoration: none; }
+    .crumb a:hover { text-decoration: underline; }
+    .topline {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 2mm;
+    }
+    .topline a { color: var(--blue); text-decoration: none; }
+    .topline a:hover { text-decoration: underline; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 3mm;
+      margin-bottom: 2mm;
+      padding-bottom: 1mm;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { font-size: 1.4rem; line-height: 1.1; }
+    .meta { font-size: 0.72rem; color: var(--muted); text-align: right; }
+    .toolbar {
+      display: flex;
+      gap: 2mm;
+      margin-bottom: 2mm;
+      align-items: center;
+    }
+    .toolbar input {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 1.4mm 2mm;
+      font-size: 0.78rem;
+      background: #fff;
+    }
+    .toolbar button, .toolbar label {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 0.74rem;
+      padding: 1.2mm 2mm;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toolbar button:hover, .toolbar label:hover { background: #f1f5f9; }
+    .filters {
+      display: flex;
+      gap: 1mm;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 1mm;
+      font-size: 0.7rem;
+      padding: 0.6mm 1.6mm;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .chip input { margin: 0; }
+    .chip[data-side="GPU"]   { color: var(--gpu); }
+    .chip[data-side="CPU"]   { color: var(--cpu); }
+    .chip[data-side="MIXED"] { color: var(--mixed); }
+    .chip[data-side="META"]  { color: var(--meta); }
+    .chip.active[data-side="GPU"]   { background: #ecfdf5; border-color: var(--gpu); }
+    .chip.active[data-side="CPU"]   { background: #eff6ff; border-color: var(--cpu); }
+    .chip.active[data-side="MIXED"] { background: #fffbeb; border-color: var(--mixed); }
+    .chip.active[data-side="META"]  { background: #f1f5f9; border-color: var(--meta); }
+    .stats {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1.2mm;
+    }
+
+    /* Legend */
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2mm;
+      margin-bottom: 2mm;
+      font-size: 0.72rem;
+    }
+    .legend .item {
+      padding: 1.2mm 2mm;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .legend .item b { display: inline-block; margin-right: 1mm; }
+    .legend .item.gpu   b { color: var(--gpu); }
+    .legend .item.cpu   b { color: var(--cpu); }
+    .legend .item.mixed b { color: var(--mixed); }
+    .legend .item.meta  b { color: var(--meta); }
+
+    /* Schema diagram */
+    .schema {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 2mm 3mm;
+      margin-bottom: 2.5mm;
+      font-size: 0.72rem;
+    }
+    .schema h3 {
+      font-size: 0.82rem;
+      margin-bottom: 1.2mm;
+      color: var(--text);
+    }
+    .schema pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      line-height: 1.45;
+      color: #334155;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .schema .legend-key { color: var(--blue); font-weight: 600; }
+
+    /* Cards grid */
+    .grid {
+      display: grid;
+      gap: 2.4mm;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (min-width: 1500px) {
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      overflow: hidden;
+      break-inside: avoid;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 1.5mm;
+      padding: 1.4mm 2mm;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .card-head .name {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #0b3b8c;
+      flex: 1;
+      word-break: break-all;
+    }
+    .badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 0.5mm 1.4mm;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+    }
+    .badge.GPU   { background: #ecfdf5; color: var(--gpu); }
+    .badge.CPU   { background: #eff6ff; color: var(--cpu); }
+    .badge.MIXED { background: #fffbeb; color: var(--mixed); }
+    .badge.META  { background: #f1f5f9; color: var(--meta); }
+    .card-desc {
+      padding: 1.2mm 2mm;
+      font-size: 0.72rem;
+      color: #334155;
+      border-bottom: 1px dashed var(--line);
+    }
+    .card-joins {
+      padding: 1mm 2mm;
+      font-size: 0.7rem;
+      color: var(--muted);
+      border-bottom: 1px dashed var(--line);
+      background: #fafbfc;
+    }
+    .card-joins b { color: #334155; font-weight: 600; }
+    .card-joins code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #f1f5f9;
+      padding: 0 2px;
+      border-radius: 2px;
+      color: #0b3b8c;
+    }
+    .cols {
+      padding: 1mm 0;
+    }
+    .col {
+      display: grid;
+      grid-template-columns: 1.1fr 1.2fr 1.7fr;
+      gap: 1.6mm;
+      padding: 0.7mm 2mm;
+      font-size: 0.7rem;
+      border-bottom: 1px dashed #eef2f7;
+    }
+    .col:last-child { border-bottom: none; }
+    .col .n {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #0b3b8c;
+      word-break: break-all;
+    }
+    .col .t {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #475569;
+      font-size: 0.66rem;
+    }
+    .col .t i {
+      font-style: normal;
+      color: #b45309;
+    }
+    .col .d { color: #334155; }
+    .col-head {
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.4mm 2mm;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1.1fr 1.2fr 1.7fr;
+      gap: 1.6mm;
+    }
+
+    .hidden { display: none !important; }
+    .hit {
+      background: #fef3c7;
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+    .note {
+      margin-top: 2.5mm;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .note code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #f1f5f9;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+
+    @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) {
+      .col { grid-template-columns: 1fr; gap: 2px; }
+      .col-head { display: none; }
+      .legend { grid-template-columns: 1fr 1fr; }
+    }
+    @media print {
+      @page { size: A3 landscape; margin: 8mm; }
+      body { padding: 0; background: #fff; }
+      .crumb, .toolbar, .note { display: none !important; }
+      .grid { gap: 2mm; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="crumb"><a href="../">← 返回速查表合集</a></div>
+    <div class="topline">
+      参考：
+      <a href="https://docs.nvidia.com/nsight-systems/UserGuide/index.html#exporter" target="_blank" rel="noopener noreferrer">Nsight Systems Exporter</a>
+      ·
+      <a href="https://docs.nvidia.com/cupti/main/main.html#activity-api" target="_blank" rel="noopener noreferrer">CUPTI Activity API</a>
+      ·
+      <a href="https://docs.nvidia.com/cupti/api/structCUpti__Activity.html" target="_blank" rel="noopener noreferrer">CUpti_Activity 结构</a>
+    </div>
+    <div class="header">
+      <h1>Nsight Systems / CUPTI 表速查表</h1>
+      <div class="meta">
+        <code>nsys export --type sqlite</code> 后的核心表<br/>
+        ※ 列基于 nsys 2024.x — 2026.x；老版本字段集略小
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="item gpu"><b>GPU</b>实际在 GPU 上发生，时间戳为 GPU 时钟（KERNEL / MEMCPY / MEMSET / GRAPH_TRACE / UVM）</div>
+      <div class="item cpu"><b>CPU</b>host 线程上的事件，时间戳为 CPU 时钟（RUNTIME / DRIVER / OSRT / NVTX / SAMPLING）</div>
+      <div class="item mixed"><b>MIXED</b>同时含 host 与 device 语义（MEMORY 生命周期、SYNC 等待）</div>
+      <div class="item meta"><b>META</b>维度 / 元数据表，无时间序列（StringIds / TARGET_INFO_*）</div>
+    </div>
+
+    <div class="schema">
+      <h3>核心表的级联关系</h3>
+<pre>
+                              <span class="legend-key">[META]</span>                                              <span class="legend-key">[CPU]</span>
+                            StringIds(id, value)                              ┌──────────────────────────┐
+                                  ▲   ▲   ▲                                   │   NVTX_EVENTS            │
+                                  │   │   └────────── nameId ─────────────────┤   OSRT_API              │
+                                  │   └────────────── textId / domainId ──────┤   SAMPLING_CALLCHAINS   │
+                                  │                                           └──────────────────────────┘
+              <span class="legend-key">[CPU]</span>                                                                          ▲
+   ┌────────────────────────┐                                                              │ globalTid
+   │  RUNTIME (cudaXxx)     │── nameId ────────────────────────────────────────────────────┘
+   │  DRIVER  (cuXxx)       │── correlationId ──┐
+   │  CUDA_EVENT (eventRec) │                   │                                          <span class="legend-key">[META]</span>
+   └────────────────────────┘                   │                                ThreadNames(globalTid, nameId)
+                                                ▼                                          ▲
+                                  <span class="legend-key">[GPU]</span>                                       │ globalTid
+                          ┌──────────────────────────────────┐                             │
+                          │  KERNEL / GRAPH_TRACE            │── deviceId ────► TARGET_INFO_GPU(id)  <span class="legend-key">[META]</span>
+                          │  MEMCPY / MEMSET                 │── streamId, contextId, channelID
+                          │  SYNCHRONIZATION                 │
+                          │  UNIFIED_MEMORY_COUNTER          │
+                          │  CUDA_GPU_MEMORY_USAGE_EVENTS    │
+                          └──────────────────────────────────┘
+              <span class="legend-key">[MIXED]</span>
+   ┌────────────────────────┐
+   │  MEMORY / MEMORY2      │── correlationId（alloc 时的 RUNTIME 调用）
+   │  MEMORY_POOL           │── deviceId（在哪个 GPU 上分配）
+   └────────────────────────┘
+</pre>
+    </div>
+
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜索：表名 / 字段 / 含义，例 correlationId、HtoD、syncType、streamId ..." />
+      <div class="filters" id="filters"></div>
+      <button id="pdf" type="button">导出 PDF</button>
+    </div>
+    <div id="stats" class="stats">共 0 张表 · 0 个字段</div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="note">
+      <p>说明：</p>
+      <ul style="margin-left: 4mm; margin-top: 1mm;">
+        <li>字段类型基本都是 SQLite 的 <code>INTEGER</code>（含 64-bit 时间戳/ID）或 <code>TEXT</code>。表中标 <i>enum</i> 的整型字段是 CUPTI 枚举（取值见对应行）。</li>
+        <li>时间戳单位 = 纳秒；以 nsys session 起点为零（对应 <code>TARGET_INFO_SESSION_START_TIME</code>）。</li>
+        <li>跨 host↔device 关联的标准 join 键是 <code>correlationId</code>：RUNTIME / DRIVER 的一行（CPU launch）= KERNEL / MEMCPY / MEMSET / SYNCHRONIZATION 的一行（GPU 执行）。</li>
+        <li>所有 <code>nameId / shortName / demangledName</code> 等 *Id 字段都是 <code>StringIds(id)</code> 的外键，需要 join 才能拿到字符串。</li>
+        <li>不同 nsys 版本里某些列是 <code>_v2 / _v3</code> 版本（比如 <code>localMemoryTotal_v2</code>），含义不变，只是 schema 演进导致的别名。</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const TABLES = [
+      // ===================== GPU =====================
+      {
+        name: "CUPTI_ACTIVITY_KIND_KERNEL",
+        side: "GPU",
+        desc: "GPU 上每一次 kernel 启动（含 cooperative / graph / CDP）的执行段；最常用，对齐 NCCL kernel 也在这里。",
+        joins: [
+          ["correlationId", "CUPTI_ACTIVITY_KIND_RUNTIME / DRIVER（host launch 的那一行）"],
+          ["shortName / demangledName / mangledName", "StringIds(id)"],
+          ["deviceId", "TARGET_INFO_GPU(id)"],
+          ["graphId / graphNodeId", "CUDA Graph 节点（同 GRAPH_TRACE）"]
+        ],
+        cols: [
+          ["start",                    "INT64 ns",          "kernel 在 GPU 上开始执行的时间戳"],
+          ["end",                      "INT64 ns",          "kernel 在 GPU 上结束的时间戳"],
+          ["deviceId",                 "INT",               "GPU 设备号 → TARGET_INFO_GPU.id"],
+          ["contextId",                "INT",               "CUDA context id（同 device 上多 ctx 时区分）"],
+          ["streamId",                 "INT",               "CUDA stream id；0 = default stream"],
+          ["correlationId",            "INT",               "把 host launch（RUNTIME/DRIVER）和这次执行串起来的键"],
+          ["globalPid",                "INT64",             "编码后的 (pid, deviceId)；TARGET_INFO_PROCESS 一致"],
+          ["shortName",                "Id→TEXT",           "去掉模板/参数的 kernel 名"],
+          ["demangledName",            "Id→TEXT",           "demangle 后的完整名"],
+          ["mangledName",              "Id→TEXT",           "原始 mangled symbol"],
+          ["gridX / gridY / gridZ",    "INT",               "grid 维度"],
+          ["blockX / blockY / blockZ", "INT",               "block 维度"],
+          ["registersPerThread",       "INT",               "每线程寄存器数"],
+          ["staticSharedMemory",       "INT bytes",         "静态分配的 shared memory"],
+          ["dynamicSharedMemory",      "INT bytes",         "动态 shared memory（launch 第三参）"],
+          ["localMemoryPerThread",     "INT bytes",         "每线程 local memory（spill 等）"],
+          ["localMemoryTotal_v2",      "INT bytes",         "整 kernel 的 local memory 总量"],
+          ["gridId",                   "INT64",             "全局唯一 grid id"],
+          ["sharedMemoryConfig",       "enum",              "0=Default, 1=4Byte, 2=8Byte"],
+          ["sharedMemoryExecuted",     "INT bytes",         "实际占用的 shared memory"],
+          ["sharedMemoryLimitConfig",  "enum",              "0=Default, 1=Optin, 2=KernelLimit"],
+          ["partitionedGlobalCacheRequested", "enum",       "0=Unsupported,1=Off,2=On,3=ReqOff,4=ReqOn"],
+          ["partitionedGlobalCacheExecuted",  "enum",       "同上 — 实际命中"],
+          ["queued",                   "INT64 ns",          "进入 host launch 队列时间（部分 schema）"],
+          ["submitted",                "INT64 ns",          "提交给 GPU 的时间"],
+          ["completed",                "INT64 ns",          "GPU 完成时间（≈ end）"],
+          ["channelID",                "INT",               "GPU channel（device queue）id"],
+          ["channelType",              "enum",              "0=Compute,1=Async memcpy,2=H2D,3=D2H,...（取决于 driver）"],
+          ["launchType",               "enum",              "0=Regular, 1=CooperativeSingleDevice, 2=CooperativeMultiDevice"],
+          ["graphId",                  "INT",               "若为 graph kernel：所属 cudaGraphExec id"],
+          ["graphNodeId",              "INT64",             "若为 graph kernel：节点 id"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_MEMCPY",
+        side: "GPU",
+        desc: "GPU 上的 memcpy 段（H2D / D2H / D2D / P2P / managed），含字节数与源/目的内存类型。",
+        joins: [
+          ["correlationId", "RUNTIME / DRIVER（cudaMemcpy* 调用）"],
+          ["deviceId / srcDeviceId / dstDeviceId", "TARGET_INFO_GPU(id)"],
+          ["graphId / graphNodeId", "CUDA Graph 节点"]
+        ],
+        cols: [
+          ["start / end",              "INT64 ns",          "memcpy 在 GPU 上的执行段"],
+          ["deviceId",                 "INT",               "执行此 copy 的 GPU"],
+          ["contextId / streamId",     "INT",               "所属 ctx / stream"],
+          ["correlationId",            "INT",               "对应 host RUNTIME / DRIVER 调用"],
+          ["globalPid",                "INT64",             "进程 + GPU 编码"],
+          ["copyKind",                 "enum",              "1=HtoD,2=DtoH,3=HtoA,4=AtoH,5=AtoA,6=AtoD,7=DtoA,8=DtoD,9=HtoH,10=PtoP,11=Unified"],
+          ["srcKind",                  "enum",              "源 memoryKind：0=Unknown,1=Pageable,2=Pinned,3=Device,4=Array,5=Managed,6=DeviceStatic,7=ManagedStatic"],
+          ["dstKind",                  "enum",              "目的 memoryKind（同上枚举）"],
+          ["bytes",                    "INT64",             "传输字节数"],
+          ["srcDeviceId / dstDeviceId","INT",               "P2P 时源/目的 GPU；非 P2P 一般为 -1"],
+          ["srcContextId / dstContextId","INT",             "源/目的 context"],
+          ["graphId / graphNodeId",    "INT",               "若属于 CUDA Graph"],
+          ["channelID / channelType",  "INT / enum",        "GPU 内部 copy engine 通道"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_MEMSET",
+        side: "GPU",
+        desc: "GPU 上的 cudaMemset / cudaMemsetAsync 执行段。",
+        joins: [
+          ["correlationId", "RUNTIME / DRIVER"],
+          ["deviceId", "TARGET_INFO_GPU(id)"]
+        ],
+        cols: [
+          ["start / end",      "INT64 ns",  "memset 执行段"],
+          ["deviceId",         "INT",       "目标 GPU"],
+          ["contextId / streamId", "INT",   "ctx / stream"],
+          ["correlationId",    "INT",       "host 调用关联"],
+          ["globalPid",        "INT64",     "进程+GPU 编码"],
+          ["bytes",            "INT64",     "写入字节数"],
+          ["value",            "INT",       "填充的字节值（0–255）"],
+          ["memKind",          "enum",      "目标 memoryKind（同 MEMCPY.srcKind 枚举）"],
+          ["graphId / graphNodeId", "INT",  "若属 CUDA Graph"],
+          ["channelID / channelType","INT/enum","GPU copy engine 通道"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
+        side: "MIXED",
+        desc: "stream / event / context 同步事件 — host 端发起、GPU 端等待，时间段反映等待开销。",
+        joins: [
+          ["correlationId", "RUNTIME / DRIVER（cudaStreamSynchronize 等）"],
+          ["eventId", "对应的 cudaEvent_t（与 CUDA_EVENT 表交叉参考）"]
+        ],
+        cols: [
+          ["start / end",  "INT64 ns",  "等待区间"],
+          ["deviceId",     "INT",       "GPU 设备"],
+          ["contextId",    "INT",       "context"],
+          ["streamId",     "INT",       "stream（context-sync 时为 -1）"],
+          ["correlationId","INT",       "host 调用关联"],
+          ["globalPid",    "INT64",     "进程+GPU"],
+          ["syncType",     "enum",      "0=Unknown,1=EventSync,2=StreamWaitEvent,3=StreamSync,4=ContextSync"],
+          ["eventId",      "INT",       "若是 event 同步：事件 id"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_GRAPH_TRACE",
+        side: "GPU",
+        desc: "CUDA Graph 整体在 GPU 上的执行段（一个 graph launch 一行）；图内每个 kernel/copy 仍在各自表里、带 graphId/graphNodeId。",
+        joins: [
+          ["correlationId", "RUNTIME（cudaGraphLaunch 调用）"],
+          ["graphId", "聚合到 KERNEL / MEMCPY 同 graphId"]
+        ],
+        cols: [
+          ["start / end",   "INT64 ns",  "graph launch 在 GPU 上的执行段"],
+          ["deviceId",      "INT",       "GPU"],
+          ["contextId / streamId", "INT","ctx / stream"],
+          ["correlationId", "INT",       "host launch 关联"],
+          ["globalPid",     "INT64",     "进程+GPU"],
+          ["graphId",       "INT",       "cudaGraphExec id（与图内子节点共享）"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_UNIFIED_MEMORY_COUNTER",
+        side: "GPU",
+        desc: "Unified / Managed memory 的 page fault 与迁移事件；用于诊断 UVM 抖动。",
+        joins: [
+          ["srcId / dstId", "TARGET_INFO_GPU(id) 或 CPU socket id"],
+          ["processId", "TARGET_INFO_PROCESS"]
+        ],
+        cols: [
+          ["start / end",   "INT64 ns",  "事件 / 区间时间戳"],
+          ["counterKind",   "enum",      "0=Unknown,1=BytesXferHtoD,2=BytesXferDtoH,3=CPUPageFaultCount,4=GPUPageFault,5=Thrashing,6=Throttling,7=RemoteMap,8=BytesXferDtoD"],
+          ["value",         "INT64",     "字节数 / 计数"],
+          ["address",       "INT64",     "首页虚拟地址"],
+          ["srcId",         "INT",       "源端（GPU id 或 CPU socket id）"],
+          ["dstId",         "INT",       "目的端"],
+          ["streamId",      "INT",       "若有"],
+          ["processId",     "INT",       "进程"]
+        ]
+      },
+      {
+        name: "CUDA_GPU_MEMORY_USAGE_EVENTS",
+        side: "GPU",
+        desc: "device 端显存 alloc / free 时间序列（以 driver 视角）；可与 CUPTI_ACTIVITY_KIND_MEMORY 互补。",
+        joins: [
+          ["correlationId", "RUNTIME（cudaMalloc 等）"],
+          ["deviceId", "TARGET_INFO_GPU(id)"]
+        ],
+        cols: [
+          ["start",                  "INT64 ns",  "事件时间戳"],
+          ["address",                "INT64",     "GPU 虚拟地址"],
+          ["bytes",                  "INT64",     "本次操作字节数"],
+          ["memoryOperationType",    "enum",      "0=Allocation, 1=Deallocation"],
+          ["memKind",                "enum",      "memoryKind（同 MEMCPY.srcKind）"],
+          ["deviceId",               "INT",       "GPU 设备"],
+          ["correlationId",          "INT",       "host 调用关联"],
+          ["name",                   "Id→TEXT",   "可选 — 分配名/标签"],
+          ["pc",                     "INT64",     "调用 PC（栈关联用）"]
+        ]
+      },
+
+      // ===================== CPU =====================
+      {
+        name: "CUPTI_ACTIVITY_KIND_RUNTIME",
+        side: "CPU",
+        desc: "host 上每次 CUDA Runtime API（cudaXxx）调用 — 含 launch、memcpy、event、stream 创建等。",
+        joins: [
+          ["correlationId", "→ KERNEL / MEMCPY / MEMSET / SYNCHRONIZATION（GPU 端执行）"],
+          ["nameId", "StringIds(id) — API 名"],
+          ["globalTid", "ThreadNames(globalTid)"],
+          ["callchainId", "SAMPLING_CALLCHAINS(id)"]
+        ],
+        cols: [
+          ["start / end",     "INT64 ns",  "host 上 API 调用进入/返回的时间"],
+          ["globalTid",       "INT64",     "host 线程编码 (pid+tid)"],
+          ["correlationId",   "INT",       "用于关联到 GPU 端活动"],
+          ["nameId",          "Id→TEXT",   "API 名，如 cudaLaunchKernel"],
+          ["returnValue",     "INT",       "cudaError_t（0=cudaSuccess）"],
+          ["callchainId",     "INT",       "若开了栈采样：对应 SAMPLING_CALLCHAINS"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_DRIVER",
+        side: "CPU",
+        desc: "host 上每次 CUDA Driver API（cuXxx）调用；与 RUNTIME 同 schema。",
+        joins: [
+          ["correlationId", "→ GPU 活动表"],
+          ["nameId", "StringIds(id)"],
+          ["globalTid", "ThreadNames"]
+        ],
+        cols: [
+          ["start / end",   "INT64 ns",  "host 调用区间"],
+          ["globalTid",     "INT64",     "host 线程"],
+          ["correlationId", "INT",       "GPU 关联键"],
+          ["nameId",        "Id→TEXT",   "API 名，如 cuLaunchKernel"],
+          ["returnValue",   "INT",       "CUresult"],
+          ["callchainId",   "INT",       "栈采样关联"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_CUDA_EVENT",
+        side: "CPU",
+        desc: "host 端 cudaEventRecord / Query / Synchronize / WaitEvent；记录 host 看到的事件操作。",
+        joins: [
+          ["correlationId", "RUNTIME / DRIVER 的同次 API"],
+          ["eventId", "与 SYNCHRONIZATION.eventId 关联"]
+        ],
+        cols: [
+          ["start / end",   "INT64 ns",  "host 端 API 区间"],
+          ["globalTid",     "INT64",     "host 线程"],
+          ["correlationId", "INT",       "API 关联"],
+          ["eventId",       "INT",       "cudaEvent_t 句柄编号"],
+          ["contextId",     "INT",       "事件所属 ctx"],
+          ["streamId",      "INT",       "若是 streamWait/eventRecord 关联的 stream"],
+          ["eventKind",     "enum",      "0=Invalid,1=Created,2=Destroyed,3=Recorded,4=Queried,5=Synced"]
+        ]
+      },
+      {
+        name: "NVTX_EVENTS",
+        side: "CPU",
+        desc: "host 端 NVTX 标记 / range / category；NCCL / PyTorch profiler / 自定义打点都进这里。",
+        joins: [
+          ["textId / domainId / categoryId", "StringIds(id)"],
+          ["globalTid / endGlobalTid", "ThreadNames(globalTid)"]
+        ],
+        cols: [
+          ["start",         "INT64 ns",  "range 开始 / mark 时间"],
+          ["end",           "INT64 ns",  "range 结束（mark 类型为 NULL）"],
+          ["eventType",     "enum",      "33=NvtxCategory, 34=NvtxMark, 39=NvtxThread, 59=NvtxMarkFromString, 60=NvtxThreadFromString, 70=NvtxPushPopRange, 71=NvtxStartEndRange, 75=NvtxPushPopRangeFromString, 76=NvtxStartEndRangeFromString"],
+          ["rangeId",       "INT64",     "Start/End 类型的配对 id"],
+          ["category",      "INT",       "NVTX category id"],
+          ["color",         "INT",       "NVTX color (ARGB)"],
+          ["text",          "Id→TEXT",   "标记/范围名（指向 StringIds）"],
+          ["globalTid",     "INT64",     "host 线程"],
+          ["endGlobalTid",  "INT64",     "若 range 跨线程，记录结束线程"],
+          ["domainId",      "INT",       "NVTX domain — 由 nvtxDomainCreate 区分"]
+        ]
+      },
+      {
+        name: "OSRT_API",
+        side: "CPU",
+        desc: "OS runtime 调用（pthread_*、futex、open、read 等 libc/glibc）；用于看 host 阻塞。",
+        joins: [
+          ["nameId", "StringIds(id)"],
+          ["globalTid", "ThreadNames"],
+          ["callchainId", "SAMPLING_CALLCHAINS"]
+        ],
+        cols: [
+          ["start / end",   "INT64 ns",  "syscall / libc 调用区间"],
+          ["globalTid",     "INT64",     "host 线程"],
+          ["correlationId", "INT",       "(部分版本) 同步操作配对"],
+          ["nameId",        "Id→TEXT",   "API 名（pthread_mutex_lock 等）"],
+          ["returnValue",   "INT",       "返回码"],
+          ["callchainId",   "INT",       "栈关联"]
+        ]
+      },
+      {
+        name: "SAMPLING_CALLCHAINS",
+        side: "CPU",
+        desc: "栈采样的每一帧（多行 = 一条调用链）；和 RUNTIME / OSRT_API.callchainId 关联。",
+        joins: [
+          ["id", "← RUNTIME / DRIVER / OSRT_API.callchainId"],
+          ["symbol / module", "StringIds(id)"]
+        ],
+        cols: [
+          ["id",         "INT",     "调用链 id（同 id 的多行 = 一条栈，自顶向下）"],
+          ["stackDepth", "INT",     "栈帧深度，0 = 最顶层 frame"],
+          ["symbol",     "Id→TEXT", "函数符号（demangled）"],
+          ["module",     "Id→TEXT", "符号所在共享库 / 可执行文件"],
+          ["unresolved", "INT",     "0=已解析,1=未解析（仅 PC）"]
+        ]
+      },
+      {
+        name: "COMPOSITE_EVENTS",
+        side: "CPU",
+        desc: "采样产生的复合事件（CPU IP + 栈），是 SAMPLING_CALLCHAINS 的入口表。",
+        joins: [
+          ["callchainId", "SAMPLING_CALLCHAINS(id)"],
+          ["globalTid", "ThreadNames"]
+        ],
+        cols: [
+          ["start",       "INT64 ns",  "采样时刻"],
+          ["globalTid",   "INT64",     "被采样的 host 线程"],
+          ["cpu",         "INT",       "采样时所在 CPU 核"],
+          ["threadState", "enum",      "0=Running,1=Runnable,2=Sleeping,3=Stopped,4=Zombie 等（perf 状态）"],
+          ["callchainId", "INT",       "栈链关联"]
+        ]
+      },
+
+      // ===================== MIXED =====================
+      {
+        name: "CUPTI_ACTIVITY_KIND_MEMORY (MEMORY2)",
+        side: "MIXED",
+        desc: "device 端内存分配的整段生命周期（alloc → free 之间为一行）；start = alloc 时刻，end = free 时刻。新版 schema 拆为 _MEMORY2 / MEMORY_OPERATION 两表。",
+        joins: [
+          ["correlationId", "RUNTIME（cudaMalloc / cudaFree）"],
+          ["deviceId", "TARGET_INFO_GPU(id)"],
+          ["name", "StringIds(id)"]
+        ],
+        cols: [
+          ["start",            "INT64 ns",  "分配时刻（cudaMalloc 完成）"],
+          ["end",              "INT64 ns",  "释放时刻（cudaFree 完成）；未释放则为 NULL"],
+          ["deviceId",         "INT",       "在哪个 GPU 上"],
+          ["contextId",        "INT",       "ctx"],
+          ["address",          "INT64",     "GPU 虚拟地址（基地址）"],
+          ["bytes",            "INT64",     "分配字节数"],
+          ["memKind",          "enum",      "memoryKind（同 MEMCPY 枚举）"],
+          ["correlationId",    "INT",       "→ alloc 时的 RUNTIME 行"],
+          ["allocPC / freePC", "INT64",     "alloc/free 的调用 PC（栈关联用）"],
+          ["source",           "Id→TEXT",   "若编译时带行号信息：源文件:行"],
+          ["name",             "Id→TEXT",   "用户为该 alloc 起的名字（若有）"],
+          ["localMemoryPoolHandle","INT64", "若属 mempool：handle"]
+        ]
+      },
+      {
+        name: "CUPTI_ACTIVITY_KIND_MEMORY_POOL",
+        side: "MIXED",
+        desc: "cudaMemPool 创建/使用/销毁/trim 事件；解释 mempool 内 alloc 的归属。",
+        joins: [
+          ["correlationId", "RUNTIME（cudaMemPool* 调用）"],
+          ["deviceId", "TARGET_INFO_GPU(id)"]
+        ],
+        cols: [
+          ["start",         "INT64 ns",  "事件时刻"],
+          ["memoryPoolType","enum",      "0=Local,1=Imported"],
+          ["memoryPoolOperationType","enum","0=Created,1=Destroyed,2=Trimmed"],
+          ["address",       "INT64",     "pool 基地址 / handle"],
+          ["size",          "INT64",     "pool 大小"],
+          ["releaseThreshold","INT64",   "release threshold（trim 阈值）"],
+          ["utilizedSize",  "INT64",     "已用字节"],
+          ["deviceId",      "INT",       "所在 GPU"],
+          ["correlationId", "INT",       "host 调用关联"]
+        ]
+      },
+
+      // ===================== META =====================
+      {
+        name: "StringIds",
+        side: "META",
+        desc: "全局字符串池 — 所有 *Id 字段（nameId / shortName / textId / domainId 等）都指向这里。",
+        joins: [
+          ["id", "← RUNTIME.nameId, KERNEL.shortName, NVTX.text, OSRT_API.nameId, ..."]
+        ],
+        cols: [
+          ["id",    "INT PK",  "字符串 id"],
+          ["value", "TEXT",    "字符串内容（API 名 / kernel 名 / NVTX 标记等）"]
+        ]
+      },
+      {
+        name: "ThreadNames",
+        side: "META",
+        desc: "host 线程名映射；多次 setName 时取最近一次。",
+        joins: [
+          ["globalTid", "← RUNTIME / OSRT_API / NVTX_EVENTS / CUDA_EVENT.globalTid"],
+          ["nameId", "StringIds(id)"]
+        ],
+        cols: [
+          ["globalTid", "INT64 PK", "线程编码 (pid<<24 | tid 之类，nsys 内部编码)"],
+          ["nameId",    "Id→TEXT",  "线程名（pthread_setname_np 设的）"],
+          ["priority",  "INT",      "调度优先级（若可得）"]
+        ]
+      },
+      {
+        name: "TARGET_INFO_GPU",
+        side: "META",
+        desc: "本次 nsys 抓取里出现过的 GPU 设备清单。",
+        joins: [
+          ["id", "← KERNEL / MEMCPY / MEMSET / SYNC ... .deviceId"]
+        ],
+        cols: [
+          ["id",                 "INT PK",  "deviceId"],
+          ["vendor",             "TEXT",    "厂商，一般 NVIDIA"],
+          ["name",               "TEXT",    "GPU 名（GH200 / H100 / A100 …）"],
+          ["computeCapMajor / Minor","INT", "SM 架构号 (如 9.0 = Hopper)"],
+          ["pciBusId / pciDeviceId / pciDomainId","INT","PCIe 定位"],
+          ["uuid",               "TEXT",    "GPU UUID"],
+          ["l2CacheSize",        "INT bytes","L2 大小"],
+          ["deviceMemorySize",   "INT bytes","显存总量"],
+          ["deviceMemoryFreq",   "INT Hz",  "显存频率"],
+          ["smCount",            "INT",     "SM 数量"]
+        ]
+      },
+      {
+        name: "TARGET_INFO_NVLINK_INFO",
+        side: "META",
+        desc: "NVLink 拓扑（每条 link 一行）—— 解释 P2P MEMCPY 走的是哪条链路。",
+        joins: [
+          ["localGpuId / peerGpuId", "TARGET_INFO_GPU(id)"]
+        ],
+        cols: [
+          ["localGpuId",  "INT",     "本端 GPU"],
+          ["peerGpuId",   "INT",     "对端 GPU（也可能是 NIC / CPU NUMA）"],
+          ["bandwidth",   "INT B/s", "理论带宽"],
+          ["physicalNvLinkCount","INT","物理 link 数"],
+          ["isActive",    "INT",     "0/1"]
+        ]
+      },
+      {
+        name: "TARGET_INFO_PCIE_INFO",
+        side: "META",
+        desc: "PCIe 拓扑 / 速率 — 用于 host↔device memcpy 的带宽上限。",
+        joins: [
+          ["gpuId", "TARGET_INFO_GPU(id)"]
+        ],
+        cols: [
+          ["gpuId",    "INT",      "GPU"],
+          ["pcieGen",  "INT",      "PCIe 代次（3/4/5）"],
+          ["pcieWidth","INT",      "x4 / x8 / x16"],
+          ["bandwidth","INT B/s",  "理论带宽"]
+        ]
+      },
+      {
+        name: "TARGET_INFO_PROCESS",
+        side: "META",
+        desc: "本次 trace 内出现的进程清单。",
+        joins: [
+          ["globalPid", "← KERNEL / MEMCPY / ... .globalPid"]
+        ],
+        cols: [
+          ["globalPid", "INT64 PK","进程编码（pid + 内部标记）"],
+          ["pid",       "INT",     "OS pid"],
+          ["nameId",    "Id→TEXT", "可执行文件名"],
+          ["command",   "TEXT",    "完整命令行"]
+        ]
+      },
+      {
+        name: "TARGET_INFO_SESSION_START_TIME",
+        side: "META",
+        desc: "session 起始 wall-clock 时间 — 把 ns 偏移翻成绝对时间。",
+        joins: [],
+        cols: [
+          ["utcEpochNs", "INT64 ns","session 0 时刻对应的 UTC 纳秒"]
+        ]
+      },
+      {
+        name: "PROFILER_OVERHEAD",
+        side: "META",
+        desc: "CUPTI 自身 overhead 的标记区间 — 你的 host 时间轴上 CUPTI flush / buffer 切换的开销在这里。",
+        joins: [
+          ["globalTid", "ThreadNames"],
+          ["nameId", "StringIds(id)"]
+        ],
+        cols: [
+          ["start / end", "INT64 ns","overhead 区间"],
+          ["globalTid",   "INT64",   "发生在哪个线程"],
+          ["nameId",      "Id→TEXT", "overhead 类型（buffer flush / registration ...）"]
+        ]
+      }
+    ];
+
+    const SIDE_LABEL = { GPU: "GPU 活动", CPU: "CPU 活动", MIXED: "CPU+GPU", META: "元数据" };
+    const SIDES = ["GPU", "CPU", "MIXED", "META"];
+    const activeSides = new Set(SIDES);
+
+    const grid = document.getElementById("grid");
+    const input = document.getElementById("q");
+    const stats = document.getElementById("stats");
+    const filters = document.getElementById("filters");
+    document.getElementById("pdf").addEventListener("click", () => window.print());
+
+    // build filter chips
+    SIDES.forEach((s) => {
+      const lbl = document.createElement("label");
+      lbl.className = "chip active";
+      lbl.dataset.side = s;
+      lbl.innerHTML = `<input type="checkbox" checked /> ${s}`;
+      const cb = lbl.querySelector("input");
+      cb.addEventListener("change", () => {
+        if (cb.checked) { activeSides.add(s); lbl.classList.add("active"); }
+        else { activeSides.delete(s); lbl.classList.remove("active"); }
+        render();
+      });
+      filters.appendChild(lbl);
+    });
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+    }
+    function highlight(text, q) {
+      if (!q) return escapeHtml(text);
+      const lower = String(text).toLowerCase();
+      const qLower = q.toLowerCase();
+      const idx = lower.indexOf(qLower);
+      if (idx < 0) return escapeHtml(text);
+      const a = escapeHtml(String(text).slice(0, idx));
+      const b = escapeHtml(String(text).slice(idx, idx + q.length));
+      const c = escapeHtml(String(text).slice(idx + q.length));
+      return a + '<span class="hit">' + b + "</span>" + c;
+    }
+
+    function rowMatches(text, q) {
+      if (!q) return true;
+      return String(text).toLowerCase().includes(q.toLowerCase());
+    }
+
+    function renderTable(t, q) {
+      // a table is shown if either the table-level text matches OR any column matches
+      const tableText = `${t.name} ${t.side} ${t.desc}`.toLowerCase();
+      const colsMatch = t.cols.filter(([n, ty, d]) => rowMatches(`${n} ${ty} ${d}`, q));
+      const matchedAll = !q || tableText.includes(q.toLowerCase());
+      const visibleCols = matchedAll ? t.cols : colsMatch;
+      if (!matchedAll && colsMatch.length === 0) return null;
+
+      const card = document.createElement("section");
+      card.className = "card";
+
+      const joinsHtml = t.joins && t.joins.length
+        ? t.joins.map(([k, v]) => `<div><b>${escapeHtml(k)}</b> → ${escapeHtml(v)}</div>`).join("")
+        : `<div style="color:#94a3b8">无外键</div>`;
+
+      card.innerHTML =
+        `<div class="card-head">
+           <span class="name">${highlight(t.name, q)}</span>
+           <span class="badge ${t.side}" title="${SIDE_LABEL[t.side]}">${t.side}</span>
+         </div>
+         <div class="card-desc">${highlight(t.desc, q)}</div>
+         <div class="card-joins"><b>级联：</b>${joinsHtml}</div>
+         <div class="col-head"><div>字段</div><div>类型 / 取值</div><div>含义</div></div>
+         <div class="cols">` +
+           visibleCols.map(([n, ty, d]) =>
+             `<div class="col"><div class="n">${highlight(n, q)}</div><div class="t">${highlight(ty, q).replace("enum", "<i>enum</i>")}</div><div class="d">${highlight(d, q)}</div></div>`
+           ).join("") +
+        `</div>`;
+      return { card, matched: visibleCols.length };
+    }
+
+    function render() {
+      const q = input.value.trim();
+      grid.innerHTML = "";
+      let totalTables = 0;
+      let totalCols = 0;
+      for (const t of TABLES) {
+        if (!activeSides.has(t.side)) continue;
+        const r = renderTable(t, q);
+        if (!r) continue;
+        grid.appendChild(r.card);
+        totalTables++;
+        totalCols += r.matched;
+      }
+      stats.textContent = `当前显示 ${totalTables} 张表 · ${totalCols} 个字段`;
+    }
+
+    input.addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>

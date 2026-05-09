@@ -324,35 +324,59 @@
     </div>
 
     <div class="schema">
-      <h3>核心表的级联关系</h3>
+      <h3>核心表的级联关系（全部 24 张表，全名）</h3>
 <pre>
-                              <span class="legend-key">[META]</span>                                              <span class="legend-key">[CPU]</span>
-                            StringIds(id, value)                              ┌──────────────────────────┐
-                                  ▲   ▲   ▲                                   │   NVTX_EVENTS            │
-                                  │   │   └────────── nameId ─────────────────┤   OSRT_API              │
-                                  │   └────────────── textId / domainId ──────┤   SAMPLING_CALLCHAINS   │
-                                  │                                           └──────────────────────────┘
-              <span class="legend-key">[CPU]</span>                                                                          ▲
-   ┌────────────────────────────┐                                                          │ globalTid
-   │  RUNTIME       (cudaXxx)   │── nameId ────────────────────────────────────────────────┘
-   │  DRIVER        (cuXxx)     │── correlationId ──┐
-   │  CUDA_EVENT    (host eventRec) │               │                                      <span class="legend-key">[META]</span>
-   │  SYNCHRONIZATION (host wait)   │               │                            ThreadNames(globalTid, nameId)
-   └────────────────────────────┘                   │                                      ▲
-                                                    ▼                                      │ globalTid
-                                  <span class="legend-key">[GPU]</span>                                       │
-                          ┌──────────────────────────────────┐                             │
-                          │  KERNEL / GRAPH_TRACE            │── deviceId ────► TARGET_INFO_GPU(id)  <span class="legend-key">[META]</span>
-                          │  MEMCPY / MEMSET                 │── streamId, contextId, channelID
-                          │  UNIFIED_MEMORY_COUNTER          │
-                          │  CUDA_GPU_MEMORY_USAGE_EVENTS    │
-                          └──────────────────────────────────┘
-              <span class="legend-key">[MIXED]</span>
-   ┌────────────────────────┐
-   │  MEMORY / MEMORY2      │── correlationId（alloc 时的 RUNTIME 调用）
-   │  MEMORY_POOL           │── deviceId（在哪个 GPU 上分配）
-   └────────────────────────┘
+<span class="legend-key">[CPU 事实表]</span>                                                                  <span class="legend-key">[GPU 事实表]</span>
+┌─────────────────────────────────────────┐                                ┌─────────────────────────────────────────┐
+│ CUPTI_ACTIVITY_KIND_RUNTIME             │                                │ CUPTI_ACTIVITY_KIND_KERNEL              │
+│ CUPTI_ACTIVITY_KIND_DRIVER              │                                │ CUPTI_ACTIVITY_KIND_MEMCPY              │
+│ CUPTI_ACTIVITY_KIND_CUDA_EVENT          │── correlationId ──────────────►│ CUPTI_ACTIVITY_KIND_MEMSET              │
+│ CUPTI_ACTIVITY_KIND_SYNCHRONIZATION     │   (host launch ↔ GPU 执行)      │ CUPTI_ACTIVITY_KIND_GRAPH_TRACE         │
+│ NVTX_EVENTS                             │                                │ CUPTI_ACTIVITY_KIND_UNIFIED_MEMORY_     │
+│ OSRT_API                                │                                │   COUNTER                               │
+│ COMPOSITE_EVENTS                        │── callchainId ────►            │ CUDA_GPU_MEMORY_USAGE_EVENTS            │
+│ PROFILER_OVERHEAD                       │   SAMPLING_CALLCHAINS(id)      └─────────────────────────────────────────┘
+└─────────────────────────────────────────┘                                            │  graphId / graphNodeId
+              │                  │                                                      │  （CUDA Graph 子节点
+              │ globalTid        │ nameId / textId / domainId /                         │   与 GRAPH_TRACE 共享）
+              │                  │ symbol / module / shortName /                        │
+              ▼                  │ demangledName / mangledName /                        ▼
+<span class="legend-key">[META 维度表]</span>            │ name / source / value（所有 *Id 字段）         自连接
+ThreadNames(                     ▼
+  globalTid, nameId,    StringIds(id, value)  ◄────────────────────────── 几乎所有事实表都通过 *Id 字段引用
+  priority)                       ▲
+       ▲                          │
+       │ globalTid                │ nameId（线程名）
+       └──────────────────────────┘
+
+<span class="legend-key">[MIXED 生命周期表]</span>                                                       <span class="legend-key">[META 主题维度]</span>
+┌────────────────────────────────────────────┐                          TARGET_INFO_PROCESS(globalPid, pid, nameId, command)
+│ CUPTI_ACTIVITY_KIND_MEMORY                 │── correlationId          ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲
+│ CUPTI_ACTIVITY_KIND_MEMORY2 (新版拆分)     │   （cudaMalloc/Free 的    │ globalPid 来自所有 GPU 事实表 + NVTX_EVENTS
+│ CUPTI_ACTIVITY_KIND_MEMORY_POOL            │   RUNTIME 行）            │
+└────────────────────────────────────────────┘                          TARGET_INFO_GPU(id, name, computeCapMajor/Minor, smCount, ...)
+        │                                                                ▲   ▲   ▲   ▲   ▲   ▲   ▲   ▲
+        │ deviceId（在哪个 GPU 分配）                                     │ deviceId / srcDeviceId / dstDeviceId / srcId / dstId / gpuId
+        └─────────────────────────────────────────────────────────────────┘ 来自 KERNEL, MEMCPY, MEMSET, SYNCHRONIZATION, GRAPH_TRACE,
+                                                                            UVM_COUNTER, GPU_MEMORY_USAGE, MEMORY, MEMORY_POOL,
+                                                                            TARGET_INFO_NVLINK_INFO, TARGET_INFO_PCIE_INFO
+
+<span class="legend-key">[META 拓扑]</span>
+TARGET_INFO_NVLINK_INFO(localGpuId, peerGpuId, bandwidth, physicalNvLinkCount, isActive)
+       │                                       │
+       └── localGpuId / peerGpuId ─────────────┴──► TARGET_INFO_GPU(id)
+
+TARGET_INFO_PCIE_INFO(gpuId, pcieGen, pcieWidth, bandwidth) ── gpuId ──► TARGET_INFO_GPU(id)
+
+<span class="legend-key">[META 全局常量]</span>
+TARGET_INFO_SESSION_START_TIME(utcEpochNs) — session 0 时刻对应的 UTC 纳秒；
+   与所有事实表无 FK，仅作为时间偏移→绝对时间的基准
 </pre>
+      <p style="font-size: 0.7rem; color: var(--muted); margin-top: 1.5mm;">
+        约定：箭头方向 <b>事实表 ──FK 列──► 维度表</b>。两条隐式规则在卡片里不再重复列出 ——
+        <b>所有 host 事实表的 globalTid → ThreadNames</b>，
+        <b>所有事实表的 globalPid → TARGET_INFO_PROCESS</b>。
+      </p>
     </div>
 
     <div class="toolbar">
@@ -474,8 +498,9 @@
         side: "CPU",
         desc: "host 端 cuda{Stream,Event,Ctx}Synchronize / cuStreamWaitEvent 调用区间。时间戳取的是 host clock，start/end 是 host API 的进入/返回 — 对 *Synchronize 来说，end-start 等于 host 线程因等 GPU 完成被阻塞的时长。Nsight Systems 里通常画在对应 stream 的泳道上，但本质是 CPU 活动（与 RUNTIME/DRIVER/CUDA_EVENT 同时间基）。",
         joins: [
-          ["correlationId", "RUNTIME / DRIVER（同一次 host API 调用）"],
-          ["eventId", "对应的 cudaEvent_t（与 CUDA_EVENT 表交叉参考）"]
+          ["correlationId", "CUPTI_ACTIVITY_KIND_RUNTIME / DRIVER（同一次 host API 调用）"],
+          ["eventId", "对应的 cudaEvent_t（与 CUPTI_ACTIVITY_KIND_CUDA_EVENT 交叉参考）"],
+          ["deviceId", "TARGET_INFO_GPU(id) — 同步针对哪个 GPU"]
         ],
         cols: [
           ["start / end",  "INT64 ns (host)",  "host API 调用区间；阻塞型同步里 = host 等待 GPU 的时长"],
@@ -723,22 +748,27 @@
       {
         name: "StringIds",
         side: "META",
-        desc: "全局字符串池 — 所有 *Id 字段（nameId / shortName / textId / domainId 等）都指向这里。",
+        desc: "全局字符串池 — schema 里所有 *Id 字段都指向这里。",
         joins: [
-          ["id", "← RUNTIME.nameId, KERNEL.shortName, NVTX.text, OSRT_API.nameId, ..."]
+          ["id ← *.nameId", "CUPTI_ACTIVITY_KIND_RUNTIME / DRIVER / CUDA_EVENT.nameId, OSRT_API.nameId, PROFILER_OVERHEAD.nameId, ThreadNames.nameId, TARGET_INFO_PROCESS.nameId"],
+          ["id ← KERNEL.{shortName,demangledName,mangledName}", "CUPTI_ACTIVITY_KIND_KERNEL"],
+          ["id ← NVTX_EVENTS.{text,domainId}", "NVTX_EVENTS"],
+          ["id ← SAMPLING_CALLCHAINS.{symbol,module}", "SAMPLING_CALLCHAINS"],
+          ["id ← MEMORY.{name,source}", "CUPTI_ACTIVITY_KIND_MEMORY / MEMORY2"],
+          ["id ← CUDA_GPU_MEMORY_USAGE_EVENTS.name", "GPU mem alloc 标签"]
         ],
         cols: [
           ["id",    "INT PK",  "字符串 id"],
-          ["value", "TEXT",    "字符串内容（API 名 / kernel 名 / NVTX 标记等）"]
+          ["value", "TEXT",    "字符串内容（API 名 / kernel 名 / NVTX 标记 / 文件路径等）"]
         ]
       },
       {
         name: "ThreadNames",
         side: "META",
-        desc: "host 线程名映射；多次 setName 时取最近一次。",
+        desc: "host 线程名映射；多次 setName 时取最近一次。所有 host-side 事实表的 globalTid 都回到这里。",
         joins: [
-          ["globalTid", "← RUNTIME / OSRT_API / NVTX_EVENTS / CUDA_EVENT.globalTid"],
-          ["nameId", "StringIds(id)"]
+          ["globalTid ← *.globalTid", "CUPTI_ACTIVITY_KIND_RUNTIME / DRIVER / CUDA_EVENT, NVTX_EVENTS, OSRT_API, COMPOSITE_EVENTS, PROFILER_OVERHEAD"],
+          ["nameId", "StringIds(id) — 线程名"]
         ],
         cols: [
           ["globalTid", "INT64 PK", "线程编码 (pid<<24 | tid 之类，nsys 内部编码)"],
@@ -749,9 +779,13 @@
       {
         name: "TARGET_INFO_GPU",
         side: "META",
-        desc: "本次 nsys 抓取里出现过的 GPU 设备清单。",
+        desc: "本次 nsys 抓取里出现过的 GPU 设备清单。所有提到 deviceId / srcDeviceId / dstDeviceId / gpuId / *GpuId 的字段都回到这里。",
         joins: [
-          ["id", "← KERNEL / MEMCPY / MEMSET / SYNC ... .deviceId"]
+          ["id ← *.deviceId", "CUPTI_ACTIVITY_KIND_KERNEL / MEMCPY / MEMSET / SYNCHRONIZATION / GRAPH_TRACE / MEMORY / MEMORY_POOL, CUDA_GPU_MEMORY_USAGE_EVENTS, UNIFIED_MEMORY_COUNTER"],
+          ["id ← MEMCPY.{srcDeviceId,dstDeviceId}", "P2P 时的源/目的 GPU"],
+          ["id ← UNIFIED_MEMORY_COUNTER.{srcId,dstId}", "源/目的端（GPU 或 CPU socket）"],
+          ["id ← TARGET_INFO_NVLINK_INFO.{localGpuId,peerGpuId}", "拓扑两端"],
+          ["id ← TARGET_INFO_PCIE_INFO.gpuId", "PCIe 速率定位"]
         ],
         cols: [
           ["id",                 "INT PK",  "deviceId"],
@@ -798,9 +832,10 @@
       {
         name: "TARGET_INFO_PROCESS",
         side: "META",
-        desc: "本次 trace 内出现的进程清单。",
+        desc: "本次 trace 内出现的进程清单。所有事实表（GPU / CPU / MIXED）的 globalPid 都回到这里 — 隐式 join，卡片里不再重复列。",
         joins: [
-          ["globalPid", "← KERNEL / MEMCPY / ... .globalPid"]
+          ["globalPid ← *.globalPid", "CUPTI_ACTIVITY_KIND_KERNEL / MEMCPY / MEMSET / SYNCHRONIZATION / GRAPH_TRACE / MEMORY / MEMORY_POOL / CUDA_EVENT, CUDA_GPU_MEMORY_USAGE_EVENTS, NVTX_EVENTS（部分版本）"],
+          ["nameId", "StringIds(id) — 可执行文件名"]
         ],
         cols: [
           ["globalPid", "INT64 PK","进程编码（pid + 内部标记）"],

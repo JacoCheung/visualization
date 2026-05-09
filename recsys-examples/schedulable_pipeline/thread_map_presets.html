@@ -135,18 +135,18 @@
       <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">splits header (lengths-of-lengths) — int32×8×#feat，<b>~hundreds B</b>；8 channel = 8-rank a2a fanout</td>
     </tr>
 
-    <!-- wait_input_dist: 2 NCCL kernels -->
+    <!-- wait_input_dist: 2 NCCL kernels = KJT lengths a2a + KJT values a2a (single sharded module) -->
     <tr style="background: #f7faff;">
       <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">4</td>
-      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2"><code>wait_input_dist</code><br><span style="font-size: 11px; color: #666;">→ 2 个 pipelined module（item EBC + dense ECC）各自 1 个 awaitable.wait()，互不融合 → 2 个独立 a2a kernel</span></td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2"><code>wait_input_dist</code><br><span style="font-size: 11px; color: #666;">→ <code>splits_awaitable.wait()</code> 在 sharded <code>EmbeddingCollection</code>（仅 1 个 model-parallel 模块）上触发底层 <code>KJTAllToAllTensorsAwaitable</code>，它把 KJT 的 <strong>lengths</strong> 和 <strong>values</strong> 拆成 <strong>2 个独立的</strong> a2a NCCL group，串行发射</span></td>
       <td style="padding: 3px 6px; border: 1px solid #d6e2f5;" rowspan="2">data_dist</td>
       <td style="padding: 3px 6px; border: 1px solid #d6e2f5; text-align: center;" rowspan="2">23</td>
-      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (item module)</td>
-      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">item KJT values 按 feature shard a2a，<b>~MB</b>，8 channel</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (KJT <b>lengths</b> a2a)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">每条样本在每个 feature 上的 token 数 — int64×#feat×LBS 的拆分，<b>~tens of KB</b>，按 8-rank a2a fanout</td>
     </tr>
     <tr style="background: #f7faff;">
-      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (contextual module)</td>
-      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">contextual KJT values a2a，<b>~hundreds KB</b>，8 channel</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;"><code>ncclDevKernel_SendRecv</code> (KJT <b>values</b> a2a)</td>
+      <td style="padding: 3px 6px; border: 1px solid #d6e2f5;">实际的 token id（int64 sum-of-seqlen × #feat），按 feature shard 重分布到 owner rank，<b>~MB</b></td>
     </tr>
 
     <!-- global_tokens -->

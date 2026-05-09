@@ -333,17 +333,17 @@
                                   │   └────────────── textId / domainId ──────┤   SAMPLING_CALLCHAINS   │
                                   │                                           └──────────────────────────┘
               <span class="legend-key">[CPU]</span>                                                                          ▲
-   ┌────────────────────────┐                                                              │ globalTid
-   │  RUNTIME (cudaXxx)     │── nameId ────────────────────────────────────────────────────┘
-   │  DRIVER  (cuXxx)       │── correlationId ──┐
-   │  CUDA_EVENT (eventRec) │                   │                                          <span class="legend-key">[META]</span>
-   └────────────────────────┘                   │                                ThreadNames(globalTid, nameId)
-                                                ▼                                          ▲
-                                  <span class="legend-key">[GPU]</span>                                       │ globalTid
+   ┌────────────────────────────┐                                                          │ globalTid
+   │  RUNTIME       (cudaXxx)   │── nameId ────────────────────────────────────────────────┘
+   │  DRIVER        (cuXxx)     │── correlationId ──┐
+   │  CUDA_EVENT    (host eventRec) │               │                                      <span class="legend-key">[META]</span>
+   │  SYNCHRONIZATION (host wait)   │               │                            ThreadNames(globalTid, nameId)
+   └────────────────────────────┘                   │                                      ▲
+                                                    ▼                                      │ globalTid
+                                  <span class="legend-key">[GPU]</span>                                       │
                           ┌──────────────────────────────────┐                             │
                           │  KERNEL / GRAPH_TRACE            │── deviceId ────► TARGET_INFO_GPU(id)  <span class="legend-key">[META]</span>
                           │  MEMCPY / MEMSET                 │── streamId, contextId, channelID
-                          │  SYNCHRONIZATION                 │
                           │  UNIFIED_MEMORY_COUNTER          │
                           │  CUDA_GPU_MEMORY_USAGE_EVENTS    │
                           └──────────────────────────────────┘
@@ -471,18 +471,18 @@
       },
       {
         name: "CUPTI_ACTIVITY_KIND_SYNCHRONIZATION",
-        side: "MIXED",
-        desc: "stream / event / context 同步事件 — host 端发起、GPU 端等待，时间段反映等待开销。",
+        side: "CPU",
+        desc: "host 端 cuda{Stream,Event,Ctx}Synchronize / cuStreamWaitEvent 调用区间。时间戳取的是 host clock，start/end 是 host API 的进入/返回 — 对 *Synchronize 来说，end-start 等于 host 线程因等 GPU 完成被阻塞的时长。Nsight Systems 里通常画在对应 stream 的泳道上，但本质是 CPU 活动（与 RUNTIME/DRIVER/CUDA_EVENT 同时间基）。",
         joins: [
-          ["correlationId", "RUNTIME / DRIVER（cudaStreamSynchronize 等）"],
+          ["correlationId", "RUNTIME / DRIVER（同一次 host API 调用）"],
           ["eventId", "对应的 cudaEvent_t（与 CUDA_EVENT 表交叉参考）"]
         ],
         cols: [
-          ["start / end",  "INT64 ns",  "等待区间"],
-          ["deviceId",     "INT",       "GPU 设备"],
+          ["start / end",  "INT64 ns (host)",  "host API 调用区间；阻塞型同步里 = host 等待 GPU 的时长"],
+          ["deviceId",     "INT",       "目标 GPU"],
           ["contextId",    "INT",       "context"],
-          ["streamId",     "INT",       "stream（context-sync 时为 -1）"],
-          ["correlationId","INT",       "host 调用关联"],
+          ["streamId",     "INT",       "stream；ContextSync 时为 -1"],
+          ["correlationId","INT",       "host 调用关联（→ RUNTIME / DRIVER）"],
           ["globalPid",    "INT64",     "进程+GPU"],
           ["syncType",     "enum",      "0=Unknown,1=EventSync,2=StreamWaitEvent,3=StreamSync,4=ContextSync"],
           ["eventId",      "INT",       "若是 event 同步：事件 id"]

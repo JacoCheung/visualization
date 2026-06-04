@@ -1114,7 +1114,13 @@ function updateToggleUI(){
 document.getElementById("tg-xlog").addEventListener("click",()=>{ xLog=!xLog; userDomain=null; updateToggleUI(); render(); save(); });
 document.getElementById("tg-ylog").addEventListener("click",()=>{ yLog=!yLog; userDomain=null; updateToggleUI(); render(); save(); });
 document.getElementById("btn-fit").addEventListener("click",()=>{ userDomain=null; render(); });
-document.getElementById("btn-reset").addEventListener("click",()=>{ localStorage.removeItem(STORE); seedDefaults(); userDomain=null; renderAll(); save(); });
+document.getElementById("btn-reset").addEventListener("click",()=>{
+  localStorage.removeItem(STORE);
+  // hard-clear every chart layer (interrupt in-flight transitions + cancel pending removes)
+  // so the re-render is a clean full enter, immune to enter/exit/update races
+  [gGrid,gRegion,gRoof,gRidge,gWL,gPts].forEach(g=>g.selectAll("*").interrupt().remove());
+  seedDefaults(); userDomain=null; renderAll(); save();
+});
 
 // ============================================================
 //  Init

@@ -25,6 +25,11 @@ footer{margin-top:auto;padding-top:40px;font-size:11px;color:#bbb}
 <h1>Visualizations</h1>
 <p class="sub">交互式可视化合集</p>
 <div class="cards">
+  <a class="card" href="roofline/index.html">
+    <span class="tag tag-interactive">Interactive</span>
+    <h2>Roofline Studio — GPU & Workload Arithmetic Intensity</h2>
+    <p>类 Nsight Compute 的 roofline 可视化（D3 + KaTeX）：每个 GPU 一条 roofline 折线，每个 workload（GEMM / Batched GEMM / Attention）按计算密度落一条垂直线，hover 交点查看 spec、计算密度与 TeX 公式推导。内置 A100/H100/H200/B200/V100/MI300X 等 dense 算力预设，支持自定义。</p>
+  </a>
   <a class="card" href="cheatsheets/">
     <span class="tag tag-doc">Cheatsheets</span>
     <h2>速查表合集</h2>

@@ -216,7 +216,10 @@
   .roofline path{fill:none;stroke-width:2.25;stroke-linejoin:round;stroke-linecap:round}
   .roofline path.glow{stroke-width:7;opacity:.16;filter:blur(3px)}
   .roof-label{font-size:11px;font-weight:600;font-family:var(--sans)}
-  .ridge-dot{stroke:var(--bg);stroke-width:1.5}
+  .ridge{cursor:pointer}
+  .ridge-ring{fill:var(--bg);stroke-width:2}
+  .ridge-core{stroke:none}
+  .ridge-lbl{font-size:10px;font-family:var(--mono);font-weight:600;opacity:.9}
 
   .wl-line{stroke-width:1.4;stroke-dasharray:5 5;opacity:.55}
   .wl-toplabel{font-size:10.5px;font-weight:600;font-family:var(--mono)}
@@ -650,15 +653,25 @@ function drawRooflines(iw,ih){
   sel.exit().each(function(){ d3.select(this).select(".core").transition().duration(DUR/1.5).attr("opacity",0); })
      .transition().duration(DUR/1.5).style("opacity",0).remove();
 
-  // ridge dots
-  const rdata = data.filter(h=>{const r=ridgeAI(h);return r>dom.x[0]&&r<dom.x[1]&&h.peak<dom.y[1]&&h.peak>dom.y[0];});
-  gRidge.selectAll(".ridge-dot").data(rdata,d=>d.id).join(
-    e=>e.append("circle").attr("class","ridge-dot").attr("r",0).attr("fill",d=>d.color)
-        .attr("cx",d=>x(ridgeAI(d))).attr("cy",d=>y(d.peak))
-        .call(s=>s.transition().duration(DUR).attr("r",3.5)),
-    u=>u.attr("fill",d=>d.color).call(s=>s.transition().duration(DUR).attr("cx",d=>x(ridgeAI(d))).attr("cy",d=>y(d.peak)).attr("r",3.5)),
-    ex=>ex.remove()
-  );
+  // ridge points (knee of the roofline: x = peak / bandwidth = AI*, y = peak)
+  const rdata = data.filter(h=>{const r=ridgeAI(h);return r>=dom.x[0]&&r<=dom.x[1]&&h.peak>=dom.y[0]&&h.peak<=dom.y[1];});
+  const rsel = gRidge.selectAll(".ridge").data(rdata, d=>d.id);
+  const rent = rsel.enter().append("g").attr("class","ridge")
+      .on("mouseenter",(e,d)=>{ highlight("hw",d.id); showHwTip(e,d); })
+      .on("mousemove",(e)=>moveTip(e))
+      .on("mouseleave",()=>{ clearHighlight(); hideTip(); });
+  rent.append("circle").attr("class","ridge-ring").attr("r",0);
+  rent.append("circle").attr("class","ridge-core").attr("r",0);
+  rent.append("text").attr("class","ridge-lbl");
+  const rall = rent.merge(rsel);
+  rall.select(".ridge-ring").attr("stroke",d=>d.color)
+      .transition().duration(DUR).attr("cx",d=>x(ridgeAI(d))).attr("cy",d=>y(d.peak)).attr("r",6);
+  rall.select(".ridge-core").attr("fill",d=>d.color)
+      .transition().duration(DUR).attr("cx",d=>x(ridgeAI(d))).attr("cy",d=>y(d.peak)).attr("r",2.2);
+  rall.select(".ridge-lbl").attr("fill",d=>d.color).attr("text-anchor","start")
+      .text(d=>`AI*=${fmtAI(ridgeAI(d))}`)
+      .transition().duration(DUR).attr("x",d=>x(ridgeAI(d))+10).attr("y",d=>y(d.peak)-9);
+  rsel.exit().remove();
 }
 
 function drawWorkloads(iw,ih){
@@ -729,6 +742,7 @@ function drawPoints(){
 // ============================================================
 function highlight(kind,id){
   gRoof.selectAll(".roofline").classed("dim",d=> kind==="hw" ? d.id!==id : true).classed("focus",d=> kind==="hw" && d.id===id);
+  gRidge.selectAll(".ridge").classed("dim",d=> kind==="hw" ? d.id!==id : true);
   gWL.selectAll(".wl-grp").classed("dim",d=> kind==="wl" ? d.id!==id : true).classed("focus",d=> kind==="wl" && d.id===id);
   gPts.selectAll(".pt").classed("dim",function(){
     const hw=this.getAttribute("data-hw"), wl=this.getAttribute("data-wl");
@@ -738,10 +752,12 @@ function highlight(kind,id){
 function highlightPair(d){
   gPts.selectAll(".pt").classed("dim",p=>p.key!==d.key);
   gRoof.selectAll(".roofline").classed("dim",h=>h.id!==d.h.id);
+  gRidge.selectAll(".ridge").classed("dim",h=>h.id!==d.h.id);
   gWL.selectAll(".wl-grp").classed("dim",w=>w.id!==d.w.id);
 }
 function clearHighlight(){
   gRoof.selectAll(".roofline").classed("dim",false).classed("focus",false);
+  gRidge.selectAll(".ridge").classed("dim",false);
   gWL.selectAll(".wl-grp").classed("dim",false).classed("focus",false);
   gPts.selectAll(".pt").classed("dim",false);
 }

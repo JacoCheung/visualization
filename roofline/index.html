@@ -1023,17 +1023,20 @@ function saveWlEdit(id){
 // ============================================================
 function shortHw(name){ return name.replace(/^NVIDIA\s+/,"").replace(/^AMD\s+/,"").replace(/\s+SXM.*$/,"").replace(/\s+\d+GB$/,""); }
 
-function addHardware(name, dtype, peak, bw, shortName){
+function pushHardware(name, dtype, peak, bw, shortName){
   hardware.push({
     id:"h"+(++hwSeq), name, shortName:shortName||shortHw(name), dtype,
     peak:+peak, bw:+bw, color:HW_COLORS[hwColorI++ % HW_COLORS.length], visible:true
   });
+}
+function addHardware(name, dtype, peak, bw, shortName){
+  pushHardware(name, dtype, peak, bw, shortName);
   userDomain=null; renderHwList(); render(); save();
 }
 function removeHardware(id){ hardware=hardware.filter(h=>h.id!==id); userDomain=null; renderHwList(); render(); save(); }
 
 let wlNameCounter = {gemm:0,bgemm:0,attention:0};
-function addWorkload(type, params, dtype, name){
+function pushWorkload(type, params, dtype, name){
   const pre = type==="attention"?"ATTN":type==="bgemm"?"BMM":"MM";
   const auto = `${pre}-${++wlNameCounter[type]}`;
   workloads.push({
@@ -1041,6 +1044,9 @@ function addWorkload(type, params, dtype, name){
     shortName:(name && name.trim()) || auto,
     color:WL_COLORS[wlColorI++ % WL_COLORS.length], visible:true
   });
+}
+function addWorkload(type, params, dtype, name){
+  pushWorkload(type, params, dtype, name);
   userDomain=null; renderWlList(); render(); save();
 }
 function removeWorkload(id){ workloads=workloads.filter(w=>w.id!==id); userDomain=null; renderWlList(); render(); save(); }
@@ -1108,18 +1114,18 @@ function updateToggleUI(){
 document.getElementById("tg-xlog").addEventListener("click",()=>{ xLog=!xLog; userDomain=null; updateToggleUI(); render(); save(); });
 document.getElementById("tg-ylog").addEventListener("click",()=>{ yLog=!yLog; userDomain=null; updateToggleUI(); render(); save(); });
 document.getElementById("btn-fit").addEventListener("click",()=>{ userDomain=null; render(); });
-document.getElementById("btn-reset").addEventListener("click",()=>{ localStorage.removeItem(STORE); seedDefaults(); renderAll(); });
+document.getElementById("btn-reset").addEventListener("click",()=>{ localStorage.removeItem(STORE); seedDefaults(); userDomain=null; renderAll(); save(); });
 
 // ============================================================
 //  Init
 // ============================================================
 function seedDefaults(){
   hardware=[]; workloads=[]; hwSeq=wlSeq=hwColorI=wlColorI=0; wlNameCounter={gemm:0,bgemm:0,attention:0};
-  addHardware("NVIDIA A100 SXM","FP16",312,2039);
-  addHardware("NVIDIA H100 SXM","FP16",990,3350);
-  addHardware("NVIDIA B200","FP8",4500,8000);
-  addWorkload("gemm",{M:4096,N:4096,K:4096},"FP16");
-  addWorkload("attention",{B:8,H:32,d:128,s:4096},"FP16");
+  pushHardware("NVIDIA A100 SXM","FP16",312,2039);
+  pushHardware("NVIDIA H100 SXM","FP16",990,3350);
+  pushHardware("NVIDIA B200","FP8",4500,8000);
+  pushWorkload("gemm",{M:4096,N:4096,K:4096},"FP16");
+  pushWorkload("attention",{B:8,H:32,d:128,s:4096},"FP16");
 }
 function renderAll(){ updateToggleUI(); renderHwList(); renderWlList(); renderWlParams(); render(); }
 
